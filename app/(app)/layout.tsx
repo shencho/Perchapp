@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { Header } from "@/components/shared/header";
 
-// Layout protegido: cualquier ruta bajo (app) requiere sesión activa.
+// Layout protegido: requiere sesión activa y onboarding completado.
 export default async function AppLayout({
   children,
 }: {
@@ -15,6 +15,17 @@ export default async function AppLayout({
 
   if (!user) {
     redirect("/login");
+  }
+
+  // Verificar que el usuario completó el onboarding
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("onboarding_completado")
+    .eq("id", user.id)
+    .single();
+
+  if (!profile || !profile.onboarding_completado) {
+    redirect("/onboarding");
   }
 
   return (
