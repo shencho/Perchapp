@@ -7,11 +7,36 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
 const PROFESIONES = [
-  { slug: "psicopedagogia", label: "Psicopedagogía" },
-  { slug: "coaching",       label: "Coaching"       },
-  { slug: "consultoria",    label: "Consultoría"    },
-  { slug: "profesor",       label: "Profesor/a"     },
-  { slug: "generico",       label: "Otro"           },
+  {
+    slug: "salud-bienestar",
+    label: "Salud y bienestar",
+    ejemplos: "psicóloga, kinesióloga, nutricionista, fonoaudióloga, personal trainer",
+  },
+  {
+    slug: "educacion",
+    label: "Educación",
+    ejemplos: "profesor particular, profesor de idiomas, tutor, profesor de música",
+  },
+  {
+    slug: "servicios-profesionales",
+    label: "Servicios profesionales",
+    ejemplos: "consultor, abogado, contador, asesor financiero, coach ejecutivo",
+  },
+  {
+    slug: "creatividad-digital",
+    label: "Creatividad y digital",
+    ejemplos: "diseñador, programador, fotógrafo, marketer, redactor, traductor",
+  },
+  {
+    slug: "belleza-cuidado",
+    label: "Belleza y cuidado personal",
+    ejemplos: "peluquera, manicura, esteticista, maquilladora, depiladora",
+  },
+  {
+    slug: "generico",
+    label: "Otro / Genérico",
+    ejemplos: "para quienes no encajan en las opciones anteriores",
+  },
 ];
 
 const MODOS = [
@@ -88,6 +113,10 @@ export default function OnboardingPage() {
           {/* Step 1 — Nombre */}
           {step === 1 && (
             <div className="flex flex-col gap-4">
+              <div className="flex flex-col items-center gap-1 text-center mb-2">
+                <p className="text-3xl font-bold tracking-tight">Perchapp</p>
+                <p className="text-sm font-medium text-muted-foreground">No te cuelgues</p>
+              </div>
               <div className="flex flex-col gap-1.5">
                 <h2 className="text-2xl font-semibold tracking-tight">¿Cómo te llamás?</h2>
                 <p className="text-sm text-muted-foreground">Tu nombre o como preferís que te llame el asistente.</p>
@@ -119,13 +148,16 @@ export default function OnboardingPage() {
                     key={prof.slug}
                     type="button"
                     onClick={() => setForm({ ...form, profesion: prof.slug })}
-                    className={`w-full text-left px-4 py-3 rounded-lg border text-sm font-medium transition-colors ${
+                    className={`w-full text-left px-4 py-3 rounded-lg border transition-colors ${
                       form.profesion === prof.slug
-                        ? "border-primary bg-primary/10 text-primary"
+                        ? "border-primary bg-primary/10"
                         : "border-border bg-card hover:bg-muted"
                     }`}
                   >
-                    {prof.label}
+                    <p className={`text-sm font-medium ${form.profesion === prof.slug ? "text-primary" : ""}`}>
+                      {prof.label}
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-0.5">ej: {prof.ejemplos}</p>
                   </button>
                 ))}
               </div>

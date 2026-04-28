@@ -78,6 +78,7 @@ export default function LoginPage() {
           <span className="text-primary-foreground font-bold text-lg">P</span>
         </div>
         <h1 className="text-2xl font-semibold tracking-tight">Perchapp</h1>
+        <p className="text-xs font-medium text-muted-foreground tracking-wide">No te cuelgues</p>
         <p className="text-sm text-muted-foreground">
           Ingresá a tu cuenta
         </p>
