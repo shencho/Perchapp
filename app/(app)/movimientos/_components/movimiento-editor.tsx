@@ -27,6 +27,7 @@ import {
   type MovimientoInput,
 } from "@/lib/supabase/actions/movimientos-types";
 import type { Movimiento, Cuenta, Tarjeta, Categoria } from "@/types/supabase";
+import { CreatableSelect, type CatOption } from "./creatable-select";
 
 // ── Schema ────────────────────────────────────────────────────────────────────
 
@@ -66,6 +67,7 @@ interface Props {
   tarjetas: Tarjeta[];
   categorias: Categoria[];
   defaultValues?: Partial<FormData>;
+  suggestCategoria?: string;
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -98,10 +100,11 @@ function todayStr() {
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
-export function MovimientoEditor({ open, onClose, editing, cuentas, tarjetas, categorias, defaultValues }: Props) {
+export function MovimientoEditor({ open, onClose, editing, cuentas, tarjetas, categorias, defaultValues, suggestCategoria }: Props) {
   const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [localCategorias, setLocalCategorias] = useState<Categoria[]>(categorias);
 
   const {
     register,
@@ -173,12 +176,12 @@ export function MovimientoEditor({ open, onClose, editing, cuentas, tarjetas, ca
   const catPadreId   = watch("categoria_id");
 
   // Categorías padre (sin parent_id)
-  const catsPadre = categorias.filter((c) => !c.parent_id && (
+  const catsPadre = localCategorias.filter((c) => !c.parent_id && (
     tipo === "Transferencia" ? false : c.tipo === tipo || c.tipo === "Ambos"
   ));
   // Subcategorías del padre seleccionado
   const catsHijas = catPadreId
-    ? categorias.filter((c) => c.parent_id === catPadreId)
+    ? localCategorias.filter((c) => c.parent_id === catPadreId)
     : [];
 
   // Estado local para subcategoría (separado del categoria_id que apunta al padre o hijo)
@@ -376,44 +379,70 @@ export function MovimientoEditor({ open, onClose, editing, cuentas, tarjetas, ca
                     name="categoria_id"
                     control={control}
                     render={({ field }) => (
-                      <Select
+                      <CreatableSelect
+                        options={catsPadre as CatOption[]}
                         value={field.value ?? ""}
                         onValueChange={(v) => {
                           field.onChange(v || null);
                           setSubcatId(null);
                         }}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Seleccionar…" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {catsPadre.map((c) => (
-                            <SelectItem key={c.id} value={c.id}>{c.nombre}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                        onCreated={(opt) => {
+                          setLocalCategorias((prev) => [
+                            ...prev,
+                            {
+                              id: opt.id,
+                              nombre: opt.nombre,
+                              tipo: tipo === "Ingreso" ? "Ingreso" : "Egreso",
+                              parent_id: null,
+                              user_id: "",
+                              color: null,
+                              icono: null,
+                              orden: 999,
+                              archivada: false,
+                              created_at: new Date().toISOString(),
+                            },
+                          ]);
+                          setValue("categoria_id", opt.id);
+                          setSubcatId(null);
+                        }}
+                        tipo={tipo === "Ingreso" ? "Ingreso" : "Egreso"}
+                        parent_id={null}
+                        suggestCreate={suggestCategoria}
+                      />
                     )}
                   />
                 </div>
 
-                {catsHijas.length > 0 && (
-                  <div className="space-y-1.5">
-                    <Label>Subcategoría</Label>
-                    <Select
-                      value={subcatId ?? ""}
-                      onValueChange={(v) => setSubcatId(v || null)}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Opcional" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {catsHijas.map((c) => (
-                          <SelectItem key={c.id} value={c.id}>{c.nombre}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                )}
+                <div className="space-y-1.5">
+                  <Label>Subcategoría</Label>
+                  <CreatableSelect
+                    options={catsHijas as CatOption[]}
+                    value={subcatId ?? ""}
+                    onValueChange={(v) => setSubcatId(v || null)}
+                    onCreated={(opt) => {
+                      setLocalCategorias((prev) => [
+                        ...prev,
+                        {
+                          id: opt.id,
+                          nombre: opt.nombre,
+                          tipo: tipo === "Ingreso" ? "Ingreso" : "Egreso",
+                          parent_id: catPadreId ?? null,
+                          user_id: "",
+                          color: null,
+                          icono: null,
+                          orden: 999,
+                          archivada: false,
+                          created_at: new Date().toISOString(),
+                        },
+                      ]);
+                      setSubcatId(opt.id);
+                    }}
+                    tipo={tipo === "Ingreso" ? "Ingreso" : "Egreso"}
+                    parent_id={catPadreId}
+                    placeholder="Opcional"
+                    disabled={!catPadreId}
+                  />
+                </div>
               </div>
             )}
 

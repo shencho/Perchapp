@@ -49,6 +49,45 @@ export async function updateCategoria(id: string, data: CategoriaData) {
   revalidatePath("/ajustes");
 }
 
+export async function createCategoriaInline(data: {
+  nombre: string;
+  tipo: "Ingreso" | "Egreso";
+  parent_id?: string | null;
+}): Promise<{ id: string; alreadyExisted: boolean }> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) redirect("/login");
+
+  const nombre = data.nombre.trim();
+
+  let dupeQuery = supabase
+    .from("categorias")
+    .select("id")
+    .eq("user_id", user.id)
+    .ilike("nombre", nombre)
+    .eq("tipo", data.tipo);
+
+  if (data.parent_id) {
+    dupeQuery = dupeQuery.eq("parent_id", data.parent_id);
+  } else {
+    dupeQuery = dupeQuery.is("parent_id", null);
+  }
+
+  const { data: existing } = await dupeQuery.maybeSingle();
+  if (existing) return { id: existing.id, alreadyExisted: true };
+
+  const { data: created, error } = await supabase
+    .from("categorias")
+    .insert({ user_id: user.id, nombre, tipo: data.tipo, parent_id: data.parent_id ?? null })
+    .select("id")
+    .single();
+
+  if (error) throw new Error(error.message);
+  return { id: created.id, alreadyExisted: false };
+}
+
 export async function archiveCategoria(id: string) {
   const supabase = await createClient();
   const {

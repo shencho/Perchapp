@@ -215,7 +215,7 @@ export function RevisionModal({ open, onClose, parsed, cuentas, tarjetas, catego
       </div>
 
       {/* Editor de edición previa (pre-rellenado con lo que entendió Claude) */}
-      {editorOpen && (
+      {editorOpen && parsed && (
         <MovimientoEditor
           open={editorOpen}
           onClose={() => setEditorOpen(false)}
@@ -224,6 +224,11 @@ export function RevisionModal({ open, onClose, parsed, cuentas, tarjetas, catego
           tarjetas={tarjetas}
           categorias={categorias}
           defaultValues={parsedToEditorDefaults(parsed, categorias, cuentas) as Parameters<typeof MovimientoEditor>[0]["defaultValues"]}
+          suggestCategoria={
+            !categorias.find((c) => !c.parent_id && c.nombre.toLowerCase() === parsed.categoria?.toLowerCase())
+              ? (parsed.categoria ?? undefined)
+              : undefined
+          }
         />
       )}
     </>
