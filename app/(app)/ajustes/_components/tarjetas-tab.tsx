@@ -14,8 +14,8 @@ import {
   SelectContent,
   SelectItem,
   SelectTrigger,
-  SelectValue,
 } from "@/components/ui/select";
+import { NamedSelect } from "@/components/ui/named-select";
 import { FormDialog } from "@/components/shared/form-dialog";
 import { DeleteConfirm } from "@/components/shared/delete-confirm";
 import {
@@ -235,16 +235,12 @@ export function TarjetasTab({ tarjetas, cuentas }: Props) {
                 name="tipo"
                 control={control}
                 render={({ field }) => (
-                  <Select value={field.value} onValueChange={field.onChange}>
-                    <SelectTrigger className="w-full">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {TIPOS.map((t) => (
-                        <SelectItem key={t} value={t}>{t}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <NamedSelect
+                    options={TIPOS.map(t => ({ value: t, label: t }))}
+                    value={field.value}
+                    onValueChange={(v) => v && field.onChange(v)}
+                    className="w-full"
+                  />
                 )}
               />
             </div>
@@ -328,22 +324,16 @@ export function TarjetasTab({ tarjetas, cuentas }: Props) {
                 name="cuenta_pago_default"
                 control={control}
                 render={({ field }) => (
-                  <Select
+                  <NamedSelect
+                    options={[
+                      { value: "", label: "Sin cuenta asignada" },
+                      ...cuentas.map(c => ({ value: c.id, label: `${c.nombre} (${c.moneda})` })),
+                    ]}
                     value={field.value ?? ""}
-                    onValueChange={(v) => field.onChange(v || null)}
-                  >
-                    <SelectTrigger className="w-full">
-                      <SelectValue placeholder="Sin cuenta asignada" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="">Sin cuenta asignada</SelectItem>
-                      {cuentas.map((c) => (
-                        <SelectItem key={c.id} value={c.id}>
-                          {c.nombre} ({c.moneda})
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                    onValueChange={(v) => field.onChange(v)}
+                    placeholder="Sin cuenta asignada"
+                    className="w-full"
+                  />
                 )}
               />
             </div>

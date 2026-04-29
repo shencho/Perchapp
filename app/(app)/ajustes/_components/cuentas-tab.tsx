@@ -9,13 +9,7 @@ import { Plus, Pencil, Archive } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { NamedSelect } from "@/components/ui/named-select";
 import { FormDialog } from "@/components/shared/form-dialog";
 import { DeleteConfirm } from "@/components/shared/delete-confirm";
 import { createCuenta, updateCuenta, archiveCuenta } from "@/lib/supabase/actions/cuentas";
@@ -202,16 +196,13 @@ export function CuentasTab({ cuentas }: Props) {
               name="tipo"
               control={control}
               render={({ field }) => (
-                <Select value={field.value} onValueChange={field.onChange}>
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Seleccionar tipo..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {TIPOS.map((t) => (
-                      <SelectItem key={t} value={t}>{t}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <NamedSelect
+                  options={TIPOS.map(t => ({ value: t, label: t }))}
+                  value={field.value}
+                  onValueChange={(v) => v && field.onChange(v)}
+                  placeholder="Seleccionar tipo..."
+                  className="w-full"
+                />
               )}
             />
             {errors.tipo && (
@@ -226,15 +217,12 @@ export function CuentasTab({ cuentas }: Props) {
                 name="moneda"
                 control={control}
                 render={({ field }) => (
-                  <Select value={field.value} onValueChange={field.onChange}>
-                    <SelectTrigger className="w-full">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="ARS">ARS</SelectItem>
-                      <SelectItem value="USD">USD</SelectItem>
-                    </SelectContent>
-                  </Select>
+                  <NamedSelect
+                    options={[{ value: "ARS", label: "ARS" }, { value: "USD", label: "USD" }]}
+                    value={field.value}
+                    onValueChange={(v) => v && field.onChange(v)}
+                    className="w-full"
+                  />
                 )}
               />
             </div>

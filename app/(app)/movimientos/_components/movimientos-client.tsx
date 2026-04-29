@@ -5,14 +5,8 @@ import { useRouter } from "next/navigation";
 import { Plus, Pencil, Copy, Trash2, Search, ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { cn } from "@/lib/utils";
+import { NamedSelect } from "@/components/ui/named-select";
 import { deleteMovimiento, duplicateMovimiento } from "@/lib/supabase/actions/movimientos";
 import { TIPOS_MOV, METODOS, AMBITOS } from "@/lib/supabase/actions/movimientos-types";
 import { MovimientoEditor } from "./movimiento-editor";
@@ -171,71 +165,57 @@ export function MovimientosClient({ movimientos, total, cuentas, tarjetas, categ
         </div>
 
         {/* Mes */}
-        <Select value={filtroMes} onValueChange={handleMesChange}>
-          <SelectTrigger className="h-8 text-sm w-40">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {meses.map((m) => (
-              <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <NamedSelect
+          options={meses}
+          value={filtroMes}
+          onValueChange={(v) => v && handleMesChange(v)}
+          className="h-8 text-sm w-40"
+        />
 
-        {/* Tipo */}
-        <Select value={filtroTipo} onValueChange={(v) => v && setFiltroTipo(v)}>
-          <SelectTrigger className="h-8 text-sm w-36">
-            <SelectValue placeholder="Tipo" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="todos">Todos los tipos</SelectItem>
-            {TIPOS_MOV.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
-          </SelectContent>
-        </Select>
+        {/* Tipo — muestra "Tipo" (muted) cuando no hay filtro */}
+        <NamedSelect
+          options={[{ value: "todos", label: "Todos los tipos" }, ...TIPOS_MOV.map(t => ({ value: t, label: t }))]}
+          value={filtroTipo !== "todos" ? filtroTipo : ""}
+          onValueChange={(v) => setFiltroTipo(v ?? "todos")}
+          placeholder="Tipo"
+          className={cn("h-8 text-sm w-36", filtroTipo !== "todos" && "ring-1 ring-primary/50 border-primary/50")}
+        />
 
         {/* Ámbito */}
-        <Select value={filtroAmbito} onValueChange={(v) => v && setFiltroAmbito(v)}>
-          <SelectTrigger className="h-8 text-sm w-32">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="todos">Todos</SelectItem>
-            {AMBITOS.map((a) => <SelectItem key={a} value={a}>{a}</SelectItem>)}
-          </SelectContent>
-        </Select>
+        <NamedSelect
+          options={[{ value: "todos", label: "Todos" }, ...AMBITOS.map(a => ({ value: a, label: a }))]}
+          value={filtroAmbito !== "todos" ? filtroAmbito : ""}
+          onValueChange={(v) => setFiltroAmbito(v ?? "todos")}
+          placeholder="Ámbito"
+          className={cn("h-8 text-sm w-32", filtroAmbito !== "todos" && "ring-1 ring-primary/50 border-primary/50")}
+        />
 
         {/* Método */}
-        <Select value={filtroMetodo} onValueChange={(v) => v && setFiltroMetodo(v)}>
-          <SelectTrigger className="h-8 text-sm w-40">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="todos">Todos los métodos</SelectItem>
-            {METODOS.map((m) => <SelectItem key={m} value={m}>{m}</SelectItem>)}
-          </SelectContent>
-        </Select>
+        <NamedSelect
+          options={[{ value: "todos", label: "Todos los métodos" }, ...METODOS.map(m => ({ value: m, label: m }))]}
+          value={filtroMetodo !== "todos" ? filtroMetodo : ""}
+          onValueChange={(v) => setFiltroMetodo(v ?? "todos")}
+          placeholder="Método"
+          className={cn("h-8 text-sm w-40", filtroMetodo !== "todos" && "ring-1 ring-primary/50 border-primary/50")}
+        />
 
-        {/* Cuenta */}
-        <Select value={filtroCuenta} onValueChange={(v) => v && setFiltroCuenta(v)}>
-          <SelectTrigger className="h-8 text-sm w-36">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="todas">Todas las cuentas</SelectItem>
-            {cuentas.map((c) => <SelectItem key={c.id} value={c.id}>{c.nombre}</SelectItem>)}
-          </SelectContent>
-        </Select>
+        {/* Cuenta — usa UUIDs como valores */}
+        <NamedSelect
+          options={[{ value: "todas", label: "Todas las cuentas" }, ...cuentas.map(c => ({ value: c.id, label: c.nombre }))]}
+          value={filtroCuenta !== "todas" ? filtroCuenta : ""}
+          onValueChange={(v) => setFiltroCuenta(v ?? "todas")}
+          placeholder="Cuenta"
+          className={cn("h-8 text-sm w-36", filtroCuenta !== "todas" && "ring-1 ring-primary/50 border-primary/50")}
+        />
 
-        {/* Categoría */}
-        <Select value={filtroCategoria} onValueChange={(v) => v && setFiltroCategoria(v)}>
-          <SelectTrigger className="h-8 text-sm w-40">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="todas">Todas las categorías</SelectItem>
-            {catsPadre.map((c) => <SelectItem key={c.id} value={c.id}>{c.nombre}</SelectItem>)}
-          </SelectContent>
-        </Select>
+        {/* Categoría — usa UUIDs como valores */}
+        <NamedSelect
+          options={[{ value: "todas", label: "Todas las categorías" }, ...catsPadre.map(c => ({ value: c.id, label: c.nombre }))]}
+          value={filtroCategoria !== "todas" ? filtroCategoria : ""}
+          onValueChange={(v) => setFiltroCategoria(v ?? "todas")}
+          placeholder="Categoría"
+          className={cn("h-8 text-sm w-40", filtroCategoria !== "todas" && "ring-1 ring-primary/50 border-primary/50")}
+        />
       </div>
 
       {/* Lista */}

@@ -26,8 +26,8 @@ const CONFIANZA_STYLES: Record<string, string> = {
   baja:  "bg-red-900/50 text-red-300 border-red-800",
 };
 
-// Infiere la cuenta más obvia según el método de pago.
-// Si Claude ya devolvió un cuentaId, ese tiene prioridad.
+// ── Cuenta inferida ───────────────────────────────────────────────────────────
+
 function inferirCuentaId(
   metodo: string | undefined,
   cuentaIdDeClaude: string | null | undefined,
@@ -35,12 +35,10 @@ function inferirCuentaId(
 ): string | undefined {
   if (cuentaIdDeClaude) return cuentaIdDeClaude;
   if (!metodo) return undefined;
-
   const activasTipo = (tipo: string) => cuentas.filter((c) => c.tipo === tipo && !c.archivada);
-
   if (metodo === "Efectivo") {
-    const efectivo = activasTipo("Efectivo");
-    return efectivo.length === 1 ? efectivo[0].id : undefined;
+    const e = activasTipo("Efectivo");
+    return e.length === 1 ? e[0].id : undefined;
   }
   if (metodo === "Billetera virtual") {
     const bv = activasTipo("Billetera virtual");
@@ -53,43 +51,74 @@ function inferirCuentaId(
   return undefined;
 }
 
-// Mapea campos del intérprete al formato del editor
+// Resuelve tarjeta_id: usa el que Claude devolvió, o busca por nombre
+function inferirTarjetaId(
+  parsed: ParsedMovimiento,
+  tarjetas: Tarjeta[],
+): string | undefined {
+  if (parsed.tarjeta_id) return parsed.tarjeta_id;
+  if (!parsed.tarjeta) return undefined;
+  return tarjetas.find(
+    (t) => t.nombre.toLowerCase() === parsed.tarjeta.toLowerCase()
+  )?.id;
+}
+
+// ── Valores para el editor ────────────────────────────────────────────────────
+
 function parsedToEditorDefaults(
   p: ParsedMovimiento,
   categorias: Categoria[],
   cuentas: Cuenta[],
+  tarjetas: Tarjeta[],
 ): Record<string, unknown> {
-  // Buscar categoria_id por nombre (concepto o categoría)
-  const catMatch = categorias.find(
-    (c) => c.nombre.toLowerCase() === p.concepto?.toLowerCase() ||
-           c.nombre.toLowerCase() === p.categoria?.toLowerCase()
-  );
+  // categoria_id para el editor: prefer subcategoria_id (editor resolverá padre+subcat)
+  // fallback: categoria_id, luego búsqueda por nombre
+  const cat_id =
+    p.subcategoria_id ??
+    p.categoria_id ??
+    categorias.find(
+      (c) =>
+        c.nombre.toLowerCase() === p.concepto?.toLowerCase() ||
+        c.nombre.toLowerCase() === p.categoria?.toLowerCase()
+    )?.id;
 
   const cuenta_id = inferirCuentaId(p.metodo, p.cuentaId, cuentas);
+  const tarjeta_id = inferirTarjetaId(p, tarjetas);
 
   return {
-    tipo:          p.tipo,
-    ambito:        "Personal",
-    moneda:        p.moneda,
-    tipo_cambio:   p.tipoCambio ?? undefined,
-    monto:         p.final,
-    categoria_id:  catMatch?.id ?? undefined,
-    clasificacion: p.clasificacion,
-    cuotas:        p.cuotas,
-    frecuencia:    p.frecuencia,
-    necesidad:     p.necesidad ?? undefined,
-    metodo:        p.metodo as Parameters<typeof createMovimiento>[0]["metodo"],
+    tipo:              p.tipo,
+    ambito:            "Personal",
+    moneda:            p.moneda,
+    tipo_cambio:       p.tipoCambio ?? undefined,
+    monto:             p.final,
+    categoria_id:      cat_id ?? undefined,
+    clasificacion:     p.clasificacion,
+    cuotas:            p.cuotas,
+    frecuencia:        p.frecuencia,
+    necesidad:         p.necesidad ?? undefined,
+    metodo:            p.metodo as Parameters<typeof createMovimiento>[0]["metodo"],
     cuenta_id,
-    concepto:      p.concepto,
-    descripcion:   p.descripcion,
-    cantidad:      p.cantidad,
-    fecha:         p.fechaConsumo,
+    tarjeta_id,
+    concepto:          p.concepto,
+    descripcion:       p.descripcion,
+    cantidad:          p.cantidad,
+    fecha:             p.fechaConsumo,
     fecha_vencimiento: p.fechaVencimiento ?? undefined,
-    debita_de:     p.debitaDe as "cuenta" | "tarjeta" | undefined,
+    debita_de:         p.debitaDe as "cuenta" | "tarjeta" | undefined,
   };
 }
 
-export function RevisionModal({ open, onClose, parsed, cuentas, tarjetas, categorias, onConfirmed }: Props) {
+// ── Component ─────────────────────────────────────────────────────────────────
+
+export function RevisionModal({
+  open,
+  onClose,
+  parsed,
+  cuentas,
+  tarjetas,
+  categorias,
+  onConfirmed,
+}: Props) {
   const router = useRouter();
   const [editorOpen, setEditorOpen] = useState(false);
   const [isConfirming, setIsConfirming] = useState(false);
@@ -97,30 +126,57 @@ export function RevisionModal({ open, onClose, parsed, cuentas, tarjetas, catego
 
   if (!open || !parsed) return null;
 
+  // Lookups for display
+  const cuentaId   = inferirCuentaId(parsed.metodo, parsed.cuentaId, cuentas);
+  const cuentaNombre = cuentas.find((c) => c.id === cuentaId)?.nombre;
+  const tarjetaId  = inferirTarjetaId(parsed, tarjetas);
+  const tarjetaNombre = tarjetas.find((t) => t.id === tarjetaId)?.nombre || parsed.tarjeta || undefined;
+
+  // Category display: look up parent name from categoria_id
+  const catPadreName =
+    parsed.categoria_id
+      ? (categorias.find((c) => c.id === parsed.categoria_id)?.nombre ?? parsed.categoria)
+      : parsed.categoria || undefined;
+  const catHijaNombre =
+    parsed.subcategoria_id
+      ? categorias.find((c) => c.id === parsed.subcategoria_id)?.nombre
+      : undefined;
+
+  // Whether categoria needs to be created (Claude couldn't find an ID)
+  const catNeedCreate = !parsed.categoria_id && !!parsed.categoria;
+  const subNeedCreate = parsed.categoria_id && !parsed.subcategoria_id && !!parsed.concepto
+    && parsed.concepto.toLowerCase() !== parsed.categoria?.toLowerCase();
+
+  const showTarjeta = parsed.metodo === "Crédito" ||
+    (parsed.metodo === "Débito automático" && parsed.debitaDe === "tarjeta");
+  const showCuotas = parsed.cuotas > 1;
+
   async function handleConfirmar() {
     if (!parsed) return;
     setIsConfirming(true);
     setError(null);
     try {
       await createMovimiento({
-        tipo:             parsed.tipo,
-        ambito:           "Personal",
-        monto:            parsed.final,
-        moneda:           parsed.moneda,
-        tipo_cambio:      parsed.tipoCambio ?? null,
-        concepto:         parsed.concepto,
-        descripcion:      parsed.descripcion,
-        clasificacion:    parsed.clasificacion,
-        cuotas:           parsed.cuotas,
-        frecuencia:       parsed.frecuencia,
-        necesidad:        parsed.necesidad ?? null,
-        metodo:           parsed.metodo as Parameters<typeof createMovimiento>[0]["metodo"],
-        cuenta_id:        inferirCuentaId(parsed.metodo, parsed.cuentaId, cuentas) ?? null,
-        fecha:            parsed.fechaConsumo,
+        tipo:              parsed.tipo,
+        ambito:            "Personal",
+        monto:             parsed.final,
+        moneda:            parsed.moneda,
+        tipo_cambio:       parsed.tipoCambio ?? null,
+        concepto:          parsed.concepto,
+        descripcion:       parsed.descripcion,
+        clasificacion:     parsed.clasificacion,
+        cuotas:            parsed.cuotas,
+        frecuencia:        parsed.frecuencia,
+        necesidad:         parsed.necesidad ?? null,
+        metodo:            parsed.metodo as Parameters<typeof createMovimiento>[0]["metodo"],
+        cuenta_id:         cuentaId ?? null,
+        tarjeta_id:        tarjetaId ?? null,
+        categoria_id:      parsed.subcategoria_id ?? parsed.categoria_id ?? null,
+        fecha:             parsed.fechaConsumo,
         fecha_vencimiento: parsed.fechaVencimiento ?? null,
-        debita_de:        (parsed.debitaDe ?? null) as "cuenta" | "tarjeta" | null,
-        cantidad:         parsed.cantidad,
-        unitario:         parsed.unitario,
+        debita_de:         (parsed.debitaDe ?? null) as "cuenta" | "tarjeta" | null,
+        cantidad:          parsed.cantidad,
+        unitario:          parsed.unitario,
       });
       router.refresh();
       onConfirmed();
@@ -132,13 +188,14 @@ export function RevisionModal({ open, onClose, parsed, cuentas, tarjetas, catego
     }
   }
 
+  // suggestCategoria: if Claude didn't find an ID, pre-fill the create input
+  const suggestCategoria = catNeedCreate ? (parsed.categoria ?? undefined) : undefined;
+
   return (
     <>
       <div className="fixed inset-0 z-50 flex items-start justify-center p-4 pt-10 sm:items-center sm:pt-4">
-        {/* Backdrop */}
         <div className="absolute inset-0 bg-black/60" onClick={onClose} />
 
-        {/* Panel */}
         <div className="relative z-10 w-full max-w-lg bg-card border border-border rounded-xl shadow-2xl">
           {/* Header */}
           <div className="flex items-center justify-between px-5 py-4 border-b border-border">
@@ -152,7 +209,7 @@ export function RevisionModal({ open, onClose, parsed, cuentas, tarjetas, catego
           </div>
 
           {/* Contenido */}
-          <div className="px-5 py-4 space-y-3">
+          <div className="px-5 py-4 space-y-3 max-h-[65vh] overflow-y-auto">
             {/* Badge de confianza */}
             <div className="flex items-center gap-2">
               <span className={cn(
@@ -163,24 +220,56 @@ export function RevisionModal({ open, onClose, parsed, cuentas, tarjetas, catego
               </span>
             </div>
 
-            {/* Resumen */}
+            {/* Resumen completo */}
             <div className="bg-surface rounded-lg p-4 space-y-2 text-sm">
-              <Row label="Tipo" value={parsed.tipo} accent={parsed.tipo === "Ingreso" ? "green" : "red"} />
-              <Row label="Concepto" value={parsed.concepto} />
+              <Row label="Tipo"          value={parsed.tipo}       accent={parsed.tipo === "Ingreso" ? "green" : "red"} />
+              <Row label="Ámbito"        value="Personal" />
+              <Row label="Concepto"      value={parsed.concepto} />
               {parsed.descripcion && <Row label="Descripción" value={parsed.descripcion} />}
-              <Row label="Categoría" value={parsed.categoria} />
-              <Row label="Monto" value={`${parsed.moneda} ${parsed.final.toLocaleString("es-AR")}`} />
-              {parsed.cuotas > 1 && (
-                <Row label="Cuotas" value={`${parsed.cuotas} cuotas de ${parsed.moneda} ${parsed.unitario.toLocaleString("es-AR")}`} />
+
+              {/* Categoría */}
+              {catNeedCreate ? (
+                <div className="flex justify-between gap-4">
+                  <span className="text-muted-foreground">Categoría</span>
+                  <span className="font-medium text-right text-primary text-xs">
+                    Crear: &quot;{parsed.categoria}&quot;
+                  </span>
+                </div>
+              ) : (
+                <Row label="Categoría" value={catPadreName} />
               )}
-              <Row label="Fecha" value={parsed.fechaConsumo} />
-              <Row label="Método" value={parsed.metodo} />
+
+              {/* Subcategoría */}
+              {catHijaNombre ? (
+                <Row label="Subcategoría" value={catHijaNombre} />
+              ) : subNeedCreate ? (
+                <div className="flex justify-between gap-4">
+                  <span className="text-muted-foreground">Subcategoría</span>
+                  <span className="font-medium text-right text-primary text-xs">
+                    Crear: &quot;{parsed.concepto}&quot;
+                  </span>
+                </div>
+              ) : null}
+
+              <Row label="Monto"     value={`${parsed.moneda} ${parsed.final.toLocaleString("es-AR")}`} />
+              {parsed.moneda === "USD" && parsed.tipoCambio && (
+                <Row label="Tipo de cambio" value={`$${parsed.tipoCambio.toLocaleString("es-AR")}`} />
+              )}
+              {showCuotas && (
+                <Row
+                  label="Cuotas"
+                  value={`${parsed.cuotas} × ${parsed.moneda} ${parsed.unitario.toLocaleString("es-AR")}`}
+                />
+              )}
+              <Row label="Fecha"         value={parsed.fechaConsumo} />
+              <Row label="Método"        value={parsed.metodo} />
+              {showTarjeta && <Row label="Tarjeta"  value={tarjetaNombre ?? "(no inferida)"} muted={!tarjetaNombre} />}
+              {parsed.debitaDe && <Row label="Débita de" value={parsed.debitaDe} />}
+              {cuentaNombre  && <Row label="Cuenta"   value={cuentaNombre} />}
               {parsed.fechaVencimiento && <Row label="Vencimiento" value={parsed.fechaVencimiento} />}
-              {parsed.necesidad !== null && (
-                <Row label="Necesidad" value={`${parsed.necesidad}/5`} />
-              )}
+              {parsed.necesidad !== null && <Row label="Necesidad" value={`${parsed.necesidad}/5`} />}
               <Row label="Clasificación" value={parsed.clasificacion} />
-              <Row label="Frecuencia" value={parsed.frecuencia} />
+              <Row label="Frecuencia"    value={parsed.frecuencia} />
             </div>
 
             {/* Notas del intérprete */}
@@ -195,11 +284,7 @@ export function RevisionModal({ open, onClose, parsed, cuentas, tarjetas, catego
 
           {/* Footer */}
           <div className="flex items-center justify-between px-5 py-4 border-t border-border gap-3">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setEditorOpen(true)}
-            >
+            <Button variant="ghost" size="sm" onClick={() => setEditorOpen(true)}>
               Editar antes de confirmar
             </Button>
             <div className="flex gap-2">
@@ -214,8 +299,7 @@ export function RevisionModal({ open, onClose, parsed, cuentas, tarjetas, catego
         </div>
       </div>
 
-      {/* Editor de edición previa (pre-rellenado con lo que entendió Claude) */}
-      {editorOpen && parsed && (
+      {editorOpen && (
         <MovimientoEditor
           open={editorOpen}
           onClose={() => setEditorOpen(false)}
@@ -223,19 +307,30 @@ export function RevisionModal({ open, onClose, parsed, cuentas, tarjetas, catego
           cuentas={cuentas}
           tarjetas={tarjetas}
           categorias={categorias}
-          defaultValues={parsedToEditorDefaults(parsed, categorias, cuentas) as Parameters<typeof MovimientoEditor>[0]["defaultValues"]}
-          suggestCategoria={
-            !categorias.find((c) => !c.parent_id && c.nombre.toLowerCase() === parsed.categoria?.toLowerCase())
-              ? (parsed.categoria ?? undefined)
-              : undefined
+          defaultValues={
+            parsedToEditorDefaults(parsed, categorias, cuentas, tarjetas) as
+              Parameters<typeof MovimientoEditor>[0]["defaultValues"]
           }
+          suggestCategoria={suggestCategoria}
         />
       )}
     </>
   );
 }
 
-function Row({ label, value, accent }: { label: string; value: string | number | null | undefined; accent?: "green" | "red" }) {
+// ── Row helper ────────────────────────────────────────────────────────────────
+
+function Row({
+  label,
+  value,
+  accent,
+  muted,
+}: {
+  label: string;
+  value: string | number | null | undefined;
+  accent?: "green" | "red";
+  muted?: boolean;
+}) {
   if (!value && value !== 0) return null;
   return (
     <div className="flex justify-between gap-4">
@@ -243,7 +338,8 @@ function Row({ label, value, accent }: { label: string; value: string | number |
       <span className={cn(
         "font-medium text-right",
         accent === "green" && "text-green-400",
-        accent === "red" && "text-red-400",
+        accent === "red"   && "text-red-400",
+        muted              && "text-muted-foreground",
       )}>
         {String(value)}
       </span>

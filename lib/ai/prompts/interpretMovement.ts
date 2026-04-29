@@ -1,12 +1,11 @@
 // Prompt del intérprete de movimientos en lenguaje natural.
-// Adaptado del MVP HTML (buildInterpretPrompt).
 
 export interface PromptParams {
   userText: string;
   vtoDay: number;
   cuentas: { id: string; nombre: string; moneda: string }[];
   tarjetas: { id: string; nombre: string }[];
-  categorias: string[];
+  categorias: { id: string; nombre: string; tipo: string; parent_id: string | null }[];
   asistente_nombre: string;
   profesion: string;
   combosHistoricos?: string;
@@ -15,6 +14,8 @@ export interface PromptParams {
 export interface ParsedMovimiento {
   tipo:              "Ingreso" | "Egreso";
   categoria:         string;
+  categoria_id:      string | null;
+  subcategoria_id:   string | null;
   concepto:          string;
   descripcion:       string;
   clasificacion:     "Fijo" | "Variable" | "Cuotas";
@@ -30,15 +31,66 @@ export interface ParsedMovimiento {
   metodo:            "Efectivo" | "Transferencia" | "Billetera virtual" | "Crédito" | "Débito automático" | "Débito";
   debitaDe:          "cuenta" | "tarjeta" | null;
   tarjeta:           string;
+  tarjeta_id:        string | null;
   cuentaId:          string | null;
   cuotas:            number;
   confianza:         "alta" | "media" | "baja";
   notas:             string;
 }
 
-function hoy(): string {
-  return new Date().toISOString().slice(0, 10);
+// ── Calendario BA ─────────────────────────────────────────────────────────────
+
+function buildCalendario(): string {
+  const DIAS = ["domingo", "lunes", "martes", "miércoles", "jueves", "viernes", "sábado"];
+  // Fecha actual en timezone Buenos Aires
+  const baStr = new Date().toLocaleString("en-US", { timeZone: "America/Argentina/Buenos_Aires" });
+  const ba = new Date(baStr);
+  const hoy = new Date(ba.getFullYear(), ba.getMonth(), ba.getDate());
+
+  const fmt = (d: Date) => {
+    const yy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, "0");
+    const dd = String(d.getDate()).padStart(2, "0");
+    return `${DIAS[d.getDay()]} ${yy}-${mm}-${dd}`;
+  };
+
+  const lines = [`HOY: ${fmt(hoy)}`];
+  lines.push("Últimos 7 días:");
+  for (let i = 1; i <= 7; i++) {
+    const p = new Date(hoy); p.setDate(hoy.getDate() - i);
+    lines.push(`  -${i}d: ${fmt(p)}`);
+  }
+  lines.push("Próximos 7 días:");
+  for (let i = 1; i <= 7; i++) {
+    const n = new Date(hoy); n.setDate(hoy.getDate() + i);
+    lines.push(`  +${i}d: ${fmt(n)}`);
+  }
+  return lines.join("\n");
 }
+
+// ── Formato categorías ────────────────────────────────────────────────────────
+
+function formatCategorias(
+  cats: { id: string; nombre: string; tipo: string; parent_id: string | null }[]
+): string {
+  const padres = cats.filter(c => !c.parent_id);
+  const lines: string[] = [];
+  for (const p of padres) {
+    lines.push(`id="${p.id}" nombre="${p.nombre}" tipo=${p.tipo}`);
+    const hijos = cats.filter(c => c.parent_id === p.id);
+    for (const h of hijos) {
+      lines.push(`  ↳ id="${h.id}" nombre="${h.nombre}" tipo=${h.tipo}`);
+    }
+  }
+  // Categorías sin padre conocido en la lista
+  const huerfanas = cats.filter(c => c.parent_id && !cats.find(p => p.id === c.parent_id));
+  for (const h of huerfanas) {
+    lines.push(`id="${h.id}" nombre="${h.nombre}" tipo=${h.tipo}`);
+  }
+  return lines.length ? lines.join("\n") : "(sin categorías cargadas)";
+}
+
+// ── Builder ───────────────────────────────────────────────────────────────────
 
 export function buildInterpretPrompt(params: PromptParams): { sys: string; prompt: string } {
   const {
@@ -61,9 +113,20 @@ export function buildInterpretPrompt(params: PromptParams): { sys: string; promp
 
   const sys = `Sos "${asistente_nombre}", un asistente financiero argentino que interpreta mensajes en rioplatense para registrar movimientos. Respondés SIEMPRE con JSON válido, sin texto extra, sin backticks.`;
 
-  const prompt = `CONTEXTO:
-- Fecha actual: ${hoy()}
-- Día de vencimiento de resumen: ${vtoDay}
+  const prompt = `CALENDARIO DE REFERENCIA (usá estas fechas exactas, no calculés por tu cuenta):
+${buildCalendario()}
+
+REGLAS DE FECHAS:
+- "hoy" → HOY
+- "ayer" → -1d de HOY
+- "anteayer" / "antes de ayer" → -2d de HOY
+- "hace X días" → HOY -X días
+- "el lunes" / "lunes pasado" / "el lunes pasado" → el lunes más reciente ANTERIOR a HOY (buscalo en los últimos 7 días)
+- "el martes que viene" / "el próximo martes" → el martes más próximo POSTERIOR a HOY (buscalo en los próximos 7 días)
+- Igual para todos los demás días de la semana
+- Si no se menciona fecha → usá HOY
+
+DÍA DE VENCIMIENTO DE RESUMEN: ${vtoDay}
 
 CUENTAS DEL USUARIO:
 ${cuentasStr}
@@ -71,68 +134,74 @@ ${cuentasStr}
 TARJETAS DEL USUARIO:
 ${tarjetasStr}
 
-MAESTROS (usá estos valores exactos si corresponde):
-Categorías: ${categorias.join(", ")}
+CATEGORÍAS DEL USUARIO (devolvé categoria_id y subcategoria_id con los IDs exactos de esta lista; si no existe, devolvé null):
+${formatCategorias(categorias)}
+
+MAESTROS (usá estos valores exactos):
 Métodos: Efectivo, Transferencia, Billetera virtual, Crédito, Débito automático, Débito
 Clasificaciones: Fijo, Variable, Cuotas
 Frecuencias: Corriente, No corriente
 
-${combosHistoricos ? `COMBINACIONES HISTÓRICAS FRECUENTES DEL USUARIO (úsalas para inferir):\n${combosHistoricos}\n` : ""}
-REGLAS:
+${combosHistoricos ? `COMBINACIONES HISTÓRICAS FRECUENTES DEL USUARIO:\n${combosHistoricos}\n` : ""}
+REGLAS GENERALES:
 - "15 mil" = 15000, "2 palos" = 2000000, "1 luca" = 1000, "1.5k" = 1500, "1 palo" = 1000000
-- Si menciona tarjeta o dice "crédito", método="Crédito" y tarjeta=nombre de la tarjeta del usuario (buscá match por nombre o banco)
+- Si menciona tarjeta o dice "crédito" → método="Crédito", tarjeta=nombre de la tarjeta, tarjeta_id=su id si existe en la lista
 - "MP", "Mercado Pago", "Uala", "Modo", "Personal Pay", "Naranja X" = "Billetera virtual"
 - "DA" o "débito automático" = "Débito automático"
-- Débito automático puede debitarse de cuenta bancaria O de tarjeta de crédito. Si dice "me lo debitan del banco" o "cuenta" → debitaDe="cuenta". Si dice "me lo debitan en la master/visa" o "débito automático por tarjeta" → debitaDe="tarjeta" y rellená campo tarjeta. Si no es claro pero hay tarjeta en el mensaje → debitaDe="tarjeta". Si es un servicio que típicamente se debita de banco (luz, gas, prepaga, monotributo) → debitaDe="cuenta".
-- Si no especifica método → inferí por el concepto (ej. alquiler→Transferencia, kiosco/chino→Efectivo o Billetera virtual, supermercado→Débito o Billetera virtual)
-- Si no hay fecha → usá hoy
-- Si es Crédito O (Débito automático + debitaDe=tarjeta) → calculá fechaVencimiento = día ${vtoDay} del mes siguiente al consumo (formato YYYY-MM-DD)
+- Débito automático: si dice "me lo debitan del banco/cuenta" → debitaDe="cuenta". Si dice "por la master/visa/tarjeta" → debitaDe="tarjeta". Si es servicio que típicamente va al banco (luz, gas, prepaga, monotributo) → debitaDe="cuenta"
+- Si no especifica método → inferí (alquiler→Transferencia, kiosco/chino→Efectivo o Billetera virtual, supermercado→Débito o Billetera virtual)
+- Si es Crédito O (Débito automático + debitaDe=tarjeta) → fechaVencimiento = día ${vtoDay} del mes siguiente al consumo (YYYY-MM-DD)
 - Si no cumple eso → fechaVencimiento=null
-- Si menciona cuotas, detectá el número (ej "en 12 cuotas" → cuotas=12, clasificacion="Cuotas")
-- Inferí categoría y concepto del histórico y del sentido común: "chino" → Alimentos / Supermercado, "spotify" → Suscripciones / Streaming, "nafta" → Transporte / Combustible
-- cuentaId: buscá el id en la lista de cuentas del usuario según estas reglas (en orden de prioridad):
-  1. Si el usuario menciona explícitamente el nombre de una cuenta → usá ese id
-  2. Si método=Efectivo → usá el id de la única cuenta tipo Efectivo (siempre existe)
-  3. Si método=Billetera virtual → usá el id de la cuenta tipo Billetera virtual si hay una sola
-  4. Si método=Transferencia o Débito → usá el id de la cuenta tipo Banco si hay una sola
-  5. Si hay ambigüedad o ninguna coincide → cuentaId=null
-- MONEDA: si menciona "USD", "dólares", "u$s", "verdes" → moneda="USD". Si menciona tipo de cambio explícito ("a 1200") → tipoCambio=número. Si no menciona TC y es USD → tipoCambio=null. Si es ARS → moneda="ARS", tipoCambio=null.
-- confianza: "alta" si TODO claro, "media" si inferiste ≥1 campo importante, "baja" si varios campos son dudosos
-- unitario: precio unitario (si hay cuotas, es el valor de cada cuota; si no, igual a final/cantidad)
-- final: monto total (= cantidad × unitario si no hay cuotas; si hay cuotas es cantidad × cuotas × unitario)
+- Si menciona cuotas (ej "en 12 cuotas") → cuotas=12, clasificacion="Cuotas"
+- categoria_id: si la categoría inferida existe en la lista, devolvé su ID exacto. Si no existe → null
+- subcategoria_id: igual para subcategoría. Si el concepto coincide con una subcategoría en la lista, devolvé su id
+- tarjeta_id: buscá match case-insensitive por nombre en la lista de tarjetas. Si matchea → devolvé su id. Si no → null
+- cuentaId (en orden de prioridad):
+  1. Si el usuario menciona el nombre de una cuenta → usá ese id
+  2. Efectivo → cuenta tipo Efectivo (si hay una sola)
+  3. Billetera virtual → cuenta tipo Billetera virtual (si hay una sola)
+  4. Transferencia o Débito → cuenta tipo Banco (si hay una sola)
+  5. Si ambiguo → null
+- MONEDA: "USD", "dólares", "u$s", "verdes" → moneda="USD", tipoCambio=número si se mencionó, sino null. ARS → tipoCambio=null
+- confianza: "alta" si todo claro, "media" si inferiste ≥1 campo importante, "baja" si varios son dudosos
+- unitario: precio unitario (si hay cuotas: valor por cuota; sino: igual a final/cantidad)
+- final: monto total
 
-NECESIDAD (solo para Egresos, escala 1 a 5):
-- 1 (Innecesario): capricho puro, postergable sin pensar (vacaciones de lujo, boliches, compras impulsivas de ropa cara)
-- 2 (Prescindible): lindo pero evitable (delivery, indumentaria no urgente, regalos opcionales, salidas a bares/restaurantes)
-- 3 (Medio): útil con margen (peluquería, lavado auto, suscripciones de entretenimiento, juntadas, Spotify)
-- 4 (Necesario): afecta tu día a día si lo sacás (supermercado, combustible, seguro, cuidado personal básico, internet)
-- 5 (Esencial): crítico, no podés no pagarlo (alquiler, luz/gas/agua, medicina/prepaga, impuestos obligatorios, alimentos básicos)
+NECESIDAD (solo para Egresos, escala 1-5):
+- 1 Innecesario: capricho puro (vacaciones de lujo, boliches, compras impulsivas caras)
+- 2 Prescindible: lindo pero evitable (delivery, indumentaria no urgente, salidas a bares)
+- 3 Medio: útil con margen (peluquería, suscripciones de entretenimiento, Spotify)
+- 4 Necesario: afecta tu día a día si lo sacás (supermercado, combustible, seguro, internet)
+- 5 Esencial: crítico (alquiler, luz/gas/agua, medicina/prepaga, impuestos obligatorios)
 
 INPUT: """${userText}"""
 
 Devolvé SOLO este JSON (sin backticks, sin texto extra):
 {
   "tipo": "Egreso" o "Ingreso",
-  "categoria": "una de las categorías del maestro, o nueva si no hay match",
+  "categoria": "nombre de la categoría padre (para mostrar)",
+  "categoria_id": "id exacto de la categoría padre si existe en la lista, sino null",
+  "subcategoria_id": "id exacto de la subcategoría si existe en la lista, sino null",
   "concepto": "concepto corto (subcategoría o nombre del comercio)",
   "descripcion": "detalle adicional (o vacío)",
   "clasificacion": "Fijo" o "Variable" o "Cuotas",
   "frecuencia": "Corriente" o "No corriente",
-  "necesidad": número 1-5 (solo si es Egreso, sino null),
+  "necesidad": número 1-5 (solo si Egreso, sino null),
   "fechaConsumo": "YYYY-MM-DD",
   "fechaVencimiento": "YYYY-MM-DD" o null,
   "cantidad": 1,
-  "unitario": número en la moneda del movimiento,
-  "final": número en la moneda del movimiento,
+  "unitario": número,
+  "final": número,
   "moneda": "ARS" o "USD",
-  "tipoCambio": número (solo si moneda=USD y se mencionó) o null,
+  "tipoCambio": número o null,
   "metodo": "Crédito" o "Débito" o "Efectivo" o "Transferencia" o "Billetera virtual" o "Débito automático",
-  "debitaDe": "cuenta" o "tarjeta" (solo si método=Débito automático) o null,
-  "tarjeta": "nombre de tarjeta del usuario o vacío",
-  "cuentaId": "id de cuenta si el usuario la menciona, sino null",
+  "debitaDe": "cuenta" o "tarjeta" (solo si Débito automático) o null,
+  "tarjeta": "nombre de tarjeta o vacío",
+  "tarjeta_id": "id de tarjeta si matchea en la lista, sino null",
+  "cuentaId": "id de cuenta si aplica, sino null",
   "cuotas": 1,
   "confianza": "alta" o "media" o "baja",
-  "notas": "breve explicación de qué inferiste (incluí por qué le pusiste ese nivel de necesidad)"
+  "notas": "breve explicación de qué inferiste y por qué ese nivel de necesidad"
 }`;
 
   return { sys, prompt };

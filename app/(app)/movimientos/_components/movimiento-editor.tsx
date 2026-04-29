@@ -9,13 +9,7 @@ import { X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { NamedSelect } from "@/components/ui/named-select";
 import { cn } from "@/lib/utils";
 import { createMovimiento, updateMovimiento } from "@/lib/supabase/actions/movimientos";
 import {
@@ -289,14 +283,12 @@ export function MovimientoEditor({ open, onClose, editing, cuentas, tarjetas, ca
                   name="tipo"
                   control={control}
                   render={({ field }) => (
-                    <Select value={field.value} onValueChange={field.onChange}>
-                      <SelectTrigger><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        {TIPOS_MOV.map((t) => (
-                          <SelectItem key={t} value={t}>{t}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <NamedSelect
+                      options={TIPOS_MOV.map(t => ({ value: t, label: t }))}
+                      value={field.value}
+                      onValueChange={(v) => v && field.onChange(v)}
+                      className="w-full"
+                    />
                   )}
                 />
               </div>
@@ -308,14 +300,12 @@ export function MovimientoEditor({ open, onClose, editing, cuentas, tarjetas, ca
                     name="ambito"
                     control={control}
                     render={({ field }) => (
-                      <Select value={field.value} onValueChange={field.onChange}>
-                        <SelectTrigger><SelectValue /></SelectTrigger>
-                        <SelectContent>
-                          {AMBITOS.map((a) => (
-                            <SelectItem key={a} value={a}>{a}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                      <NamedSelect
+                        options={AMBITOS.map(a => ({ value: a, label: a }))}
+                        value={field.value}
+                        onValueChange={(v) => v && field.onChange(v)}
+                        className="w-full"
+                      />
                     )}
                   />
                 </div>
@@ -338,13 +328,12 @@ export function MovimientoEditor({ open, onClose, editing, cuentas, tarjetas, ca
                   name="moneda"
                   control={control}
                   render={({ field }) => (
-                    <Select value={field.value} onValueChange={field.onChange}>
-                      <SelectTrigger><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="ARS">ARS — Pesos</SelectItem>
-                        <SelectItem value="USD">USD — Dólares</SelectItem>
-                      </SelectContent>
-                    </Select>
+                    <NamedSelect
+                      options={[{ value: "ARS", label: "ARS — Pesos" }, { value: "USD", label: "USD — Dólares" }]}
+                      value={field.value}
+                      onValueChange={(v) => v && field.onChange(v)}
+                      className="w-full"
+                    />
                   )}
                 />
               </div>
@@ -465,14 +454,12 @@ export function MovimientoEditor({ open, onClose, editing, cuentas, tarjetas, ca
                   name="clasificacion"
                   control={control}
                   render={({ field }) => (
-                    <Select value={field.value} onValueChange={field.onChange}>
-                      <SelectTrigger><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        {CLASIFICACIONES.map((c) => (
-                          <SelectItem key={c} value={c}>{c}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <NamedSelect
+                      options={CLASIFICACIONES.map(c => ({ value: c, label: c }))}
+                      value={field.value}
+                      onValueChange={(v) => v && field.onChange(v)}
+                      className="w-full"
+                    />
                   )}
                 />
               </div>
@@ -482,14 +469,12 @@ export function MovimientoEditor({ open, onClose, editing, cuentas, tarjetas, ca
                   name="frecuencia"
                   control={control}
                   render={({ field }) => (
-                    <Select value={field.value} onValueChange={field.onChange}>
-                      <SelectTrigger><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        {FRECUENCIAS.map((f) => (
-                          <SelectItem key={f} value={f}>{f}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <NamedSelect
+                      options={FRECUENCIAS.map(f => ({ value: f, label: f }))}
+                      value={field.value}
+                      onValueChange={(v) => v && field.onChange(v)}
+                      className="w-full"
+                    />
                   )}
                 />
               </div>
@@ -548,14 +533,13 @@ export function MovimientoEditor({ open, onClose, editing, cuentas, tarjetas, ca
                 name="metodo"
                 control={control}
                 render={({ field }) => (
-                  <Select value={field.value ?? ""} onValueChange={(v) => field.onChange(v || null)}>
-                    <SelectTrigger><SelectValue placeholder="Seleccionar…" /></SelectTrigger>
-                    <SelectContent>
-                      {METODOS.map((m) => (
-                        <SelectItem key={m} value={m}>{m}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <NamedSelect
+                    options={METODOS.map(m => ({ value: m, label: m }))}
+                    value={field.value ?? ""}
+                    onValueChange={(v) => field.onChange(v || null)}
+                    placeholder="Seleccionar…"
+                    className="w-full"
+                  />
                 )}
               />
             </div>
@@ -568,13 +552,13 @@ export function MovimientoEditor({ open, onClose, editing, cuentas, tarjetas, ca
                   name="debita_de"
                   control={control}
                   render={({ field }) => (
-                    <Select value={field.value ?? ""} onValueChange={(v) => field.onChange(v || null)}>
-                      <SelectTrigger><SelectValue placeholder="Seleccionar…" /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="cuenta">Cuenta bancaria</SelectItem>
-                        <SelectItem value="tarjeta">Tarjeta de crédito</SelectItem>
-                      </SelectContent>
-                    </Select>
+                    <NamedSelect
+                      options={[{ value: "cuenta", label: "Cuenta bancaria" }, { value: "tarjeta", label: "Tarjeta de crédito" }]}
+                      value={field.value ?? ""}
+                      onValueChange={(v) => field.onChange(v || null)}
+                      placeholder="Seleccionar…"
+                      className="w-full"
+                    />
                   )}
                 />
               </div>
@@ -589,14 +573,12 @@ export function MovimientoEditor({ open, onClose, editing, cuentas, tarjetas, ca
                     name="tarjeta_id"
                     control={control}
                     render={({ field }) => (
-                      <Select value={field.value ?? ""} onValueChange={(v) => field.onChange(v || null)}>
-                        <SelectTrigger><SelectValue placeholder="Seleccionar…" /></SelectTrigger>
-                        <SelectContent>
-                          {tarjetas.map((t) => (
-                            <SelectItem key={t.id} value={t.id}>{t.nombre}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                      <NamedSelect
+                        options={tarjetas.map(t => ({ value: t.id, label: t.nombre }))}
+                        value={field.value ?? ""}
+                        onValueChange={(v) => field.onChange(v)}
+                        placeholder="Seleccionar…"
+                      />
                     )}
                   />
                 </div>
@@ -617,14 +599,12 @@ export function MovimientoEditor({ open, onClose, editing, cuentas, tarjetas, ca
                   name="cuenta_id"
                   control={control}
                   render={({ field }) => (
-                    <Select value={field.value ?? ""} onValueChange={(v) => field.onChange(v || null)}>
-                      <SelectTrigger><SelectValue placeholder="Seleccionar…" /></SelectTrigger>
-                      <SelectContent>
-                        {cuentas.map((c) => (
-                          <SelectItem key={c.id} value={c.id}>{c.nombre}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <NamedSelect
+                      options={cuentas.map(c => ({ value: c.id, label: c.nombre }))}
+                      value={field.value ?? ""}
+                      onValueChange={(v) => field.onChange(v)}
+                      placeholder="Seleccionar…"
+                    />
                   )}
                 />
               </div>
@@ -637,14 +617,12 @@ export function MovimientoEditor({ open, onClose, editing, cuentas, tarjetas, ca
                     name="cuenta_destino_id"
                     control={control}
                     render={({ field }) => (
-                      <Select value={field.value ?? ""} onValueChange={(v) => field.onChange(v || null)}>
-                        <SelectTrigger><SelectValue placeholder="Seleccionar…" /></SelectTrigger>
-                        <SelectContent>
-                          {cuentas.map((c) => (
-                            <SelectItem key={c.id} value={c.id}>{c.nombre}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                      <NamedSelect
+                        options={cuentas.map(c => ({ value: c.id, label: c.nombre }))}
+                        value={field.value ?? ""}
+                        onValueChange={(v) => field.onChange(v)}
+                        placeholder="Seleccionar…"
+                      />
                     )}
                   />
                 </div>

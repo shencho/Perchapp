@@ -41,26 +41,17 @@ export async function POST(req: NextRequest) {
         .eq("archivada", false),
       supabase
         .from("categorias")
-        .select("nombre, parent_id")
+        .select("id, nombre, tipo, parent_id")
         .eq("user_id", user.id)
         .eq("archivada", false),
     ]);
 
-    const profile   = profileRes.data;
-    const cuentas   = cuentasRes.data   ?? [];
-    const tarjetas  = tarjetasRes.data  ?? [];
-    const categorias = categoriasRes.data ?? [];
-
-    // Aplanar categorías: "Padre > Hijo" para el prompt
-    const catMap = new Map(categorias.map((c) => [c.nombre, c]));
-    const categoriasPlanas = categorias.map((c) => {
-      if (!c.parent_id) return c.nombre;
-      const parent = categorias.find((p) => !p.parent_id && catMap.has(p.nombre));
-      // Buscar el padre por id (simplificado: lo buscamos en el array)
-      return c.nombre;
-    });
-    // Eliminar duplicados
-    const categoriasUnicas = [...new Set(categoriasPlanas)];
+    const profile    = profileRes.data;
+    const cuentas    = cuentasRes.data    ?? [];
+    const tarjetas   = tarjetasRes.data   ?? [];
+    const categorias = (categoriasRes.data ?? []) as {
+      id: string; nombre: string; tipo: string; parent_id: string | null;
+    }[];
 
     // 4. Construir prompt
     const { sys, prompt } = buildInterpretPrompt({
@@ -68,7 +59,7 @@ export async function POST(req: NextRequest) {
       vtoDay:            profile?.vto_day_default ?? 10,
       cuentas,
       tarjetas,
-      categorias:        categoriasUnicas,
+      categorias,
       asistente_nombre:  profile?.asistente_nombre ?? "Perchita",
       profesion:         profile?.profesion ?? "",
     });

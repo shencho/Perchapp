@@ -14,8 +14,8 @@ import {
   SelectContent,
   SelectItem,
   SelectTrigger,
-  SelectValue,
 } from "@/components/ui/select";
+import { NamedSelect } from "@/components/ui/named-select";
 import { FormDialog } from "@/components/shared/form-dialog";
 import { DeleteConfirm } from "@/components/shared/delete-confirm";
 import {
@@ -219,16 +219,12 @@ export function CategoriasTab({ categorias }: Props) {
               name="tipo"
               control={control}
               render={({ field }) => (
-                <Select value={field.value} onValueChange={field.onChange}>
-                  <SelectTrigger className="w-full">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {TIPOS.map((t) => (
-                      <SelectItem key={t} value={t}>{t}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <NamedSelect
+                  options={TIPOS.map(t => ({ value: t, label: t }))}
+                  value={field.value}
+                  onValueChange={(v) => v && field.onChange(v)}
+                  className="w-full"
+                />
               )}
             />
           </div>
@@ -240,24 +236,18 @@ export function CategoriasTab({ categorias }: Props) {
                 name="parent_id"
                 control={control}
                 render={({ field }) => (
-                  <Select
+                  <NamedSelect
+                    options={[
+                      { value: "", label: "Sin categoría padre (es raíz)" },
+                      ...padres
+                        .filter(p => p.id !== editing?.id)
+                        .map(p => ({ value: p.id, label: p.nombre })),
+                    ]}
                     value={field.value ?? ""}
-                    onValueChange={(v) => field.onChange(v || null)}
-                  >
-                    <SelectTrigger className="w-full">
-                      <SelectValue placeholder="Sin categoría padre (es raíz)" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="">Sin categoría padre</SelectItem>
-                      {padres
-                        .filter((p) => p.id !== editing?.id)
-                        .map((p) => (
-                          <SelectItem key={p.id} value={p.id}>
-                            {p.nombre}
-                          </SelectItem>
-                        ))}
-                    </SelectContent>
-                  </Select>
+                    onValueChange={(v) => field.onChange(v)}
+                    placeholder="Sin categoría padre (es raíz)"
+                    className="w-full"
+                  />
                 )}
               />
               <p className="text-xs text-muted-foreground">
