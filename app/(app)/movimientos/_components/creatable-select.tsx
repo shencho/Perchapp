@@ -7,7 +7,6 @@ import {
   SelectContent,
   SelectItem,
   SelectTrigger,
-  SelectValue,
 } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -126,7 +125,11 @@ export function CreatableSelect({
         disabled={disabled}
       >
         <SelectTrigger>
-          <SelectValue placeholder={placeholder} />
+          <span>
+            {value
+              ? (options.find((o) => o.id === value)?.nombre ?? placeholder)
+              : placeholder}
+          </span>
         </SelectTrigger>
         <SelectContent>
           {options.map((o) => (

@@ -105,6 +105,8 @@ export function MovimientoEditor({ open, onClose, editing, cuentas, tarjetas, ca
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [localCategorias, setLocalCategorias] = useState<Categoria[]>(categorias);
+  const [padreId, setPadreId] = useState<string | null>(null);
+  const [subcatId, setSubcatId] = useState<string | null>(null);
 
   const {
     register,
@@ -131,14 +133,27 @@ export function MovimientoEditor({ open, onClose, editing, cuentas, tarjetas, ca
 
   // Sincronizar si viene editing o defaultValues
   useEffect(() => {
+    // Determina padreId/subcatId a partir de un categoria_id que puede ser padre o hijo
+    function resolveCatId(catId: string | null | undefined) {
+      if (!catId) { setPadreId(null); setSubcatId(null); return; }
+      const cat = localCategorias.find((c) => c.id === catId);
+      if (cat?.parent_id) {
+        setPadreId(cat.parent_id);
+        setSubcatId(cat.id);
+      } else {
+        setPadreId(catId);
+        setSubcatId(null);
+      }
+    }
+
     if (editing) {
+      resolveCatId(editing.categoria_id);
       reset({
         tipo:              editing.tipo as FormData["tipo"],
         ambito:            editing.ambito as FormData["ambito"],
         moneda:            (editing.moneda ?? "ARS") as "ARS" | "USD",
         tipo_cambio:       editing.tipo_cambio ?? undefined,
         monto:             editing.monto,
-        categoria_id:      editing.categoria_id ?? undefined,
         clasificacion:     (editing.clasificacion ?? "Variable") as FormData["clasificacion"],
         cuotas:            editing.cuotas ?? 1,
         frecuencia:        (editing.frecuencia ?? "Corriente") as FormData["frecuencia"],
@@ -156,8 +171,11 @@ export function MovimientoEditor({ open, onClose, editing, cuentas, tarjetas, ca
         fecha:             editing.fecha ?? todayStr(),
       });
     } else if (defaultValues) {
+      resolveCatId(defaultValues.categoria_id as string | null | undefined);
       reset({ tipo: "Egreso", ambito: "Personal", moneda: "ARS", clasificacion: "Variable", cuotas: 1, frecuencia: "Corriente", cantidad: 1, fecha: todayStr(), ...defaultValues });
     } else {
+      setPadreId(null);
+      setSubcatId(null);
       reset({ tipo: "Egreso", ambito: "Personal", moneda: "ARS", clasificacion: "Variable", cuotas: 1, frecuencia: "Corriente", cantidad: 1, fecha: todayStr() });
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -173,31 +191,18 @@ export function MovimientoEditor({ open, onClose, editing, cuentas, tarjetas, ca
   const cuotas       = watch("cuotas");
   const monto        = watch("monto");
   const cantidad     = watch("cantidad");
-  const catPadreId   = watch("categoria_id");
 
   // Categorías padre (sin parent_id)
   const catsPadre = localCategorias.filter((c) => !c.parent_id && (
     tipo === "Transferencia" ? false : c.tipo === tipo || c.tipo === "Ambos"
   ));
-  // Subcategorías del padre seleccionado
-  const catsHijas = catPadreId
-    ? localCategorias.filter((c) => c.parent_id === catPadreId)
+  // Subcategorías del padre seleccionado — usa padreId (estado local, no RHF)
+  const catsHijas = padreId
+    ? localCategorias.filter((c) => c.parent_id === padreId)
     : [];
 
-  // Estado local para subcategoría (separado del categoria_id que apunta al padre o hijo)
-  const [subcatId, setSubcatId] = useState<string | null>(null);
-
-  // Al cambiar tipo o categoria padre, resetear subcategoría
-  useEffect(() => { setSubcatId(null); }, [tipo, catPadreId]);
-
-  // Al confirmar subcategoría: categoria_id apunta al hijo
-  useEffect(() => {
-    if (subcatId) setValue("categoria_id", subcatId);
-    else if (catPadreId && !catsHijas.find(c => c.id === catPadreId)) {
-      // catPadreId apunta al padre, dejarlo
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [subcatId]);
+  // Al cambiar tipo o categoría padre, limpiar subcategoría
+  useEffect(() => { setSubcatId(null); }, [tipo, padreId]);
 
   // Visibilidad de tarjeta y fecha_vencimiento
   const showTarjeta = metodo === "Crédito" || (metodo === "Débito automático" && debita_de === "tarjeta");
@@ -223,7 +228,7 @@ export function MovimientoEditor({ open, onClose, editing, cuentas, tarjetas, ca
         tipo_cambio:       values.tipo_cambio ?? null,
         concepto:          values.concepto ?? null,
         descripcion:       values.descripcion ?? null,
-        categoria_id:      subcatId ?? values.categoria_id ?? null,
+        categoria_id:      subcatId ?? padreId ?? null,
         necesidad:         showNecesidad ? (values.necesidad ?? null) : null,
         metodo:            values.metodo ?? null,
         cuenta_id:         values.cuenta_id ?? null,
@@ -375,41 +380,35 @@ export function MovimientoEditor({ open, onClose, editing, cuentas, tarjetas, ca
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
                   <Label>Categoría</Label>
-                  <Controller
-                    name="categoria_id"
-                    control={control}
-                    render={({ field }) => (
-                      <CreatableSelect
-                        options={catsPadre as CatOption[]}
-                        value={field.value ?? ""}
-                        onValueChange={(v) => {
-                          field.onChange(v || null);
-                          setSubcatId(null);
-                        }}
-                        onCreated={(opt) => {
-                          setLocalCategorias((prev) => [
-                            ...prev,
-                            {
-                              id: opt.id,
-                              nombre: opt.nombre,
-                              tipo: tipo === "Ingreso" ? "Ingreso" : "Egreso",
-                              parent_id: null,
-                              user_id: "",
-                              color: null,
-                              icono: null,
-                              orden: 999,
-                              archivada: false,
-                              created_at: new Date().toISOString(),
-                            },
-                          ]);
-                          setValue("categoria_id", opt.id);
-                          setSubcatId(null);
-                        }}
-                        tipo={tipo === "Ingreso" ? "Ingreso" : "Egreso"}
-                        parent_id={null}
-                        suggestCreate={suggestCategoria}
-                      />
-                    )}
+                  <CreatableSelect
+                    options={catsPadre as CatOption[]}
+                    value={padreId ?? ""}
+                    onValueChange={(v) => {
+                      setPadreId(v || null);
+                      setSubcatId(null);
+                    }}
+                    onCreated={(opt) => {
+                      setLocalCategorias((prev) => [
+                        ...prev,
+                        {
+                          id: opt.id,
+                          nombre: opt.nombre,
+                          tipo: tipo === "Ingreso" ? "Ingreso" : "Egreso",
+                          parent_id: null,
+                          user_id: "",
+                          color: null,
+                          icono: null,
+                          orden: 999,
+                          archivada: false,
+                          created_at: new Date().toISOString(),
+                        },
+                      ]);
+                      setPadreId(opt.id);
+                      setSubcatId(null);
+                    }}
+                    tipo={tipo === "Ingreso" ? "Ingreso" : "Egreso"}
+                    parent_id={null}
+                    suggestCreate={suggestCategoria}
                   />
                 </div>
 
@@ -426,7 +425,7 @@ export function MovimientoEditor({ open, onClose, editing, cuentas, tarjetas, ca
                           id: opt.id,
                           nombre: opt.nombre,
                           tipo: tipo === "Ingreso" ? "Ingreso" : "Egreso",
-                          parent_id: catPadreId ?? null,
+                          parent_id: padreId ?? null,
                           user_id: "",
                           color: null,
                           icono: null,
@@ -438,9 +437,9 @@ export function MovimientoEditor({ open, onClose, editing, cuentas, tarjetas, ca
                       setSubcatId(opt.id);
                     }}
                     tipo={tipo === "Ingreso" ? "Ingreso" : "Egreso"}
-                    parent_id={catPadreId}
+                    parent_id={padreId}
                     placeholder="Opcional"
-                    disabled={!catPadreId}
+                    disabled={!padreId}
                   />
                 </div>
               </div>
