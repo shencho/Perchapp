@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { createClient } from "@/lib/supabase/server";
 import { buildInterpretPrompt, extractJsonFromResponse } from "@/lib/ai/prompts/interpretMovement";
+import { ANTHROPIC_MODEL } from "@/lib/ai/config";
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
@@ -74,7 +75,7 @@ export async function POST(req: NextRequest) {
 
     // 5. Llamar a Claude
     const message = await anthropic.messages.create({
-      model:      "claude-sonnet-4-20250514",
+      model:      ANTHROPIC_MODEL,
       max_tokens: 1024,
       system:     sys,
       messages:   [{ role: "user", content: prompt }],
