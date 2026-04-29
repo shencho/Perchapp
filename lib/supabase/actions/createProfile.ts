@@ -3,19 +3,24 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 
-// Categorías base para todos los usuarios (tipos capitalizados según migration 006)
-const CATEGORIAS_BASE = [
-  { nombre: "Hogar",          tipo: "Egreso"  as const },
-  { nombre: "Alimentos",      tipo: "Egreso"  as const },
-  { nombre: "Transporte",     tipo: "Egreso"  as const },
-  { nombre: "Salud",          tipo: "Egreso"  as const },
-  { nombre: "Suscripciones",  tipo: "Egreso"  as const },
-  { nombre: "Otros gastos",   tipo: "Egreso"  as const },
-  { nombre: "Honorarios",     tipo: "Ingreso" as const },
-  { nombre: "Otros ingresos", tipo: "Ingreso" as const },
+// Categorías base con subcategorías para todos los usuarios
+const CATEGORIAS_BASE: {
+  nombre: string;
+  tipo: "Ingreso" | "Egreso";
+  subs: string[];
+}[] = [
+  { nombre: "Servicios del hogar", tipo: "Egreso",  subs: ["Internet", "Luz", "Gas", "Agua", "Expensas"] },
+  { nombre: "Suscripciones",       tipo: "Egreso",  subs: ["Streaming", "Software", "Apps"] },
+  { nombre: "Alimentos",           tipo: "Egreso",  subs: ["Supermercado", "Carnicería", "Verdulería", "Delivery"] },
+  { nombre: "Transporte",          tipo: "Egreso",  subs: ["Combustible", "Peajes", "Uber", "Estacionamiento"] },
+  { nombre: "Salud",               tipo: "Egreso",  subs: ["Prepaga", "Medicina", "Farmacia", "Consultas"] },
+  { nombre: "Esparcimiento",       tipo: "Egreso",  subs: ["Salidas", "Cine", "Viajes", "Hobbies"] },
+  { nombre: "Hogar",               tipo: "Egreso",  subs: ["Alquiler", "Mantenimiento"] },
+  { nombre: "Trabajo",             tipo: "Ingreso", subs: ["Honorarios", "Comisiones", "Sueldo"] },
+  { nombre: "Otros ingresos",      tipo: "Ingreso", subs: ["Reintegros", "Regalos"] },
 ];
 
-// Categorías específicas por área (6 áreas genéricas de migration 005)
+// Categorías adicionales planas por área profesional (se agregan sin duplicar nombres)
 const CATEGORIAS_POR_AREA: Record<string, { nombre: string; tipo: "Ingreso" | "Egreso" }[]> = {
   "salud-bienestar": [
     { nombre: "Sesión individual",       tipo: "Ingreso" },
@@ -98,7 +103,7 @@ export async function createProfile(data: OnboardingData) {
 
   if (profileError) throw new Error(profileError.message);
 
-  // 2. Crear cuenta Efectivo (tipo capitalizado según migration 006)
+  // 2. Crear cuenta Efectivo
   const { error: cuentaError } = await supabase.from("cuentas").insert({
     user_id: userId,
     nombre: "Efectivo",
@@ -109,22 +114,47 @@ export async function createProfile(data: OnboardingData) {
 
   if (cuentaError) throw new Error(cuentaError.message);
 
-  // 3. Crear categorías (base + específicas del área)
-  const categoriasEspecificas = CATEGORIAS_POR_AREA[data.profesion] ?? [];
-  const todasLasCategorias = [...CATEGORIAS_BASE, ...categoriasEspecificas];
+  // 3. Crear categorías base (jerárquicas: padres + subcategorías)
+  const nombresExistentes = new Set<string>(); // para no duplicar con área
 
-  const categoriasConUserId = todasLasCategorias.map((cat) => ({
-    ...cat,
-    user_id: userId,
-  }));
+  for (const cat of CATEGORIAS_BASE) {
+    // Insertar categoría padre
+    const { data: insertedParent, error: parentError } = await supabase
+      .from("categorias")
+      .insert({ user_id: userId, nombre: cat.nombre, tipo: cat.tipo })
+      .select("id")
+      .single();
 
-  const { error: categoriasError } = await supabase
-    .from("categorias")
-    .insert(categoriasConUserId);
+    if (parentError) throw new Error(parentError.message);
+    nombresExistentes.add(cat.nombre.toLowerCase());
 
-  if (categoriasError) throw new Error(categoriasError.message);
+    // Insertar subcategorías
+    if (cat.subs.length > 0) {
+      const subcats = cat.subs.map((s) => ({
+        user_id: userId,
+        nombre: s,
+        tipo: cat.tipo,
+        parent_id: insertedParent.id,
+      }));
+      const { error: subsError } = await supabase.from("categorias").insert(subcats);
+      if (subsError) throw new Error(subsError.message);
+    }
+  }
 
-  // 4. Crear feature_flags vacío
+  // 4. Agregar categorías del área profesional (solo las que no duplican nombre)
+  const categoriasArea = CATEGORIAS_POR_AREA[data.profesion] ?? [];
+  const catAreaFiltradas = categoriasArea.filter(
+    (c) => !nombresExistentes.has(c.nombre.toLowerCase())
+  );
+
+  if (catAreaFiltradas.length > 0) {
+    const { error: areaError } = await supabase.from("categorias").insert(
+      catAreaFiltradas.map((c) => ({ user_id: userId, nombre: c.nombre, tipo: c.tipo }))
+    );
+    if (areaError) throw new Error(areaError.message);
+  }
+
+  // 5. Crear feature_flags vacío
   const { error: flagsError } = await supabase.from("feature_flags").upsert({
     user_id: userId,
     flags: {},
@@ -132,6 +162,6 @@ export async function createProfile(data: OnboardingData) {
 
   if (flagsError) throw new Error(flagsError.message);
 
-  // 5. Redirigir al dashboard
+  // 6. Redirigir al dashboard
   redirect("/dashboard");
 }

@@ -352,9 +352,26 @@ export interface Database {
           user_id: string
           cuenta_id: string | null
           categoria_id: string | null
-          tipo: "ingreso" | "egreso"
+          tipo: "Ingreso" | "Egreso" | "Transferencia"
+          ambito: "Personal" | "Profesional"
           monto: number
+          moneda: string
+          tipo_cambio: number | null
+          concepto: string | null
           descripcion: string | null
+          clasificacion: "Fijo" | "Variable" | "Cuotas"
+          cuotas: number
+          frecuencia: "Corriente" | "No corriente"
+          necesidad: number | null
+          metodo: "Efectivo" | "Transferencia" | "Billetera virtual" | "Crédito" | "Débito automático" | "Débito" | null
+          tarjeta_id: string | null
+          fecha_vencimiento: string | null
+          debita_de: "cuenta" | "tarjeta" | null
+          cuenta_destino_id: string | null
+          cantidad: number
+          unitario: number | null
+          observaciones: string | null
+          cliente_id: string | null
           fecha: string
           created_at: string
         }
@@ -363,9 +380,26 @@ export interface Database {
           user_id: string
           cuenta_id?: string | null
           categoria_id?: string | null
-          tipo: "ingreso" | "egreso"
+          tipo: "Ingreso" | "Egreso" | "Transferencia"
+          ambito?: "Personal" | "Profesional"
           monto: number
+          moneda?: string
+          tipo_cambio?: number | null
+          concepto?: string | null
           descripcion?: string | null
+          clasificacion?: "Fijo" | "Variable" | "Cuotas"
+          cuotas?: number
+          frecuencia?: "Corriente" | "No corriente"
+          necesidad?: number | null
+          metodo?: "Efectivo" | "Transferencia" | "Billetera virtual" | "Crédito" | "Débito automático" | "Débito" | null
+          tarjeta_id?: string | null
+          fecha_vencimiento?: string | null
+          debita_de?: "cuenta" | "tarjeta" | null
+          cuenta_destino_id?: string | null
+          cantidad?: number
+          unitario?: number | null
+          observaciones?: string | null
+          cliente_id?: string | null
           fecha?: string
           created_at?: string
         }
@@ -374,9 +408,26 @@ export interface Database {
           user_id?: string
           cuenta_id?: string | null
           categoria_id?: string | null
-          tipo?: "ingreso" | "egreso"
+          tipo?: "Ingreso" | "Egreso" | "Transferencia"
+          ambito?: "Personal" | "Profesional"
           monto?: number
+          moneda?: string
+          tipo_cambio?: number | null
+          concepto?: string | null
           descripcion?: string | null
+          clasificacion?: "Fijo" | "Variable" | "Cuotas"
+          cuotas?: number
+          frecuencia?: "Corriente" | "No corriente"
+          necesidad?: number | null
+          metodo?: "Efectivo" | "Transferencia" | "Billetera virtual" | "Crédito" | "Débito automático" | "Débito" | null
+          tarjeta_id?: string | null
+          fecha_vencimiento?: string | null
+          debita_de?: "cuenta" | "tarjeta" | null
+          cuenta_destino_id?: string | null
+          cantidad?: number
+          unitario?: number | null
+          observaciones?: string | null
+          cliente_id?: string | null
           fecha?: string
           created_at?: string
         }
