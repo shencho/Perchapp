@@ -8,9 +8,6 @@ import {
   type MovimientosFiltros,
 } from "./movimientos-types";
 
-// Re-exportar para que los imports existentes en server components sigan funcionando
-export type { MovimientoInput, MovimientosFiltros };
-
 async function getAuthedUser() {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
