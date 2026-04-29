@@ -21,6 +21,7 @@ export interface Database {
           modo: "personal" | "profesional" | "ambos" | null
           asistente_nombre: string | null
           onboarding_completado: boolean
+          vto_day_default: number
           created_at: string
           updated_at: string
         }
@@ -31,6 +32,7 @@ export interface Database {
           modo?: "personal" | "profesional" | "ambos" | null
           asistente_nombre?: string | null
           onboarding_completado?: boolean
+          vto_day_default?: number
           created_at?: string
           updated_at?: string
         }
@@ -41,6 +43,7 @@ export interface Database {
           modo?: "personal" | "profesional" | "ambos" | null
           asistente_nombre?: string | null
           onboarding_completado?: boolean
+          vto_day_default?: number
           created_at?: string
           updated_at?: string
         }
@@ -50,27 +53,33 @@ export interface Database {
           id: string
           user_id: string
           nombre: string
-          tipo: "efectivo" | "banco" | "tarjeta" | "otro"
+          tipo: "Banco" | "Billetera virtual" | "Efectivo" | "Inversión"
           saldo: number
           moneda: string
+          orden: number
+          archivada: boolean
           created_at: string
         }
         Insert: {
           id?: string
           user_id: string
           nombre: string
-          tipo: "efectivo" | "banco" | "tarjeta" | "otro"
+          tipo: "Banco" | "Billetera virtual" | "Efectivo" | "Inversión"
           saldo?: number
           moneda?: string
+          orden?: number
+          archivada?: boolean
           created_at?: string
         }
         Update: {
           id?: string
           user_id?: string
           nombre?: string
-          tipo?: "efectivo" | "banco" | "tarjeta" | "otro"
+          tipo?: "Banco" | "Billetera virtual" | "Efectivo" | "Inversión"
           saldo?: number
           moneda?: string
+          orden?: number
+          archivada?: boolean
           created_at?: string
         }
       }
@@ -80,9 +89,16 @@ export interface Database {
           user_id: string
           cuenta_id: string | null
           nombre: string
+          tipo: "Crédito" | "Débito" | null
+          banco_emisor: string | null
+          ultimos_cuatro: string | null
           limite: number | null
+          limite_ars: number | null
+          limite_usd: number | null
           cierre_dia: number | null
           vencimiento_dia: number | null
+          cuenta_pago_default: string | null
+          archivada: boolean
           created_at: string
         }
         Insert: {
@@ -90,9 +106,16 @@ export interface Database {
           user_id: string
           cuenta_id?: string | null
           nombre: string
+          tipo?: "Crédito" | "Débito" | null
+          banco_emisor?: string | null
+          ultimos_cuatro?: string | null
           limite?: number | null
+          limite_ars?: number | null
+          limite_usd?: number | null
           cierre_dia?: number | null
           vencimiento_dia?: number | null
+          cuenta_pago_default?: string | null
+          archivada?: boolean
           created_at?: string
         }
         Update: {
@@ -100,9 +123,16 @@ export interface Database {
           user_id?: string
           cuenta_id?: string | null
           nombre?: string
+          tipo?: "Crédito" | "Débito" | null
+          banco_emisor?: string | null
+          ultimos_cuatro?: string | null
           limite?: number | null
+          limite_ars?: number | null
+          limite_usd?: number | null
           cierre_dia?: number | null
           vencimiento_dia?: number | null
+          cuenta_pago_default?: string | null
+          archivada?: boolean
           created_at?: string
         }
       }
@@ -111,27 +141,36 @@ export interface Database {
           id: string
           user_id: string
           nombre: string
-          tipo: "ingreso" | "egreso"
+          tipo: "Ingreso" | "Egreso" | "Ambos"
+          parent_id: string | null
           color: string | null
           icono: string | null
+          orden: number
+          archivada: boolean
           created_at: string
         }
         Insert: {
           id?: string
           user_id: string
           nombre: string
-          tipo: "ingreso" | "egreso"
+          tipo: "Ingreso" | "Egreso" | "Ambos"
+          parent_id?: string | null
           color?: string | null
           icono?: string | null
+          orden?: number
+          archivada?: boolean
           created_at?: string
         }
         Update: {
           id?: string
           user_id?: string
           nombre?: string
-          tipo?: "ingreso" | "egreso"
+          tipo?: "Ingreso" | "Egreso" | "Ambos"
+          parent_id?: string | null
           color?: string | null
           icono?: string | null
+          orden?: number
+          archivada?: boolean
           created_at?: string
         }
       }
@@ -371,6 +410,7 @@ export interface Database {
           nombre: string
           slug: string
           categorias_sugeridas: Json
+          modalidades: Json
           created_at: string
         }
         Insert: {
@@ -378,6 +418,7 @@ export interface Database {
           nombre: string
           slug: string
           categorias_sugeridas?: Json
+          modalidades?: Json
           created_at?: string
         }
         Update: {
@@ -385,6 +426,7 @@ export interface Database {
           nombre?: string
           slug?: string
           categorias_sugeridas?: Json
+          modalidades?: Json
           created_at?: string
         }
       }

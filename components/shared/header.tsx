@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
-import { LogOut } from "lucide-react";
+import { LogOut, Settings } from "lucide-react";
 
 interface HeaderProps {
   userEmail?: string;
@@ -28,12 +28,21 @@ export function Header({ userEmail }: HeaderProps) {
         <span className="font-semibold text-sm">Perchapp</span>
       </div>
 
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-1">
         {userEmail && (
-          <span className="text-xs text-muted-foreground hidden sm:block">
+          <span className="text-xs text-muted-foreground hidden sm:block mr-2">
             {userEmail}
           </span>
         )}
+        <Button
+          variant="ghost"
+          size="icon-sm"
+          onClick={() => router.push("/ajustes")}
+          className="text-muted-foreground hover:text-foreground"
+          title="Ajustes"
+        >
+          <Settings className="h-4 w-4" />
+        </Button>
         <Button
           variant="ghost"
           size="sm"

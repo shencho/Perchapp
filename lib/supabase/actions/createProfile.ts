@@ -3,48 +3,65 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 
-// Categorías base para todos los usuarios
+// Categorías base para todos los usuarios (tipos capitalizados según migration 006)
 const CATEGORIAS_BASE = [
-  { nombre: "Hogar",          tipo: "egreso"  as const },
-  { nombre: "Alimentos",      tipo: "egreso"  as const },
-  { nombre: "Transporte",     tipo: "egreso"  as const },
-  { nombre: "Salud",          tipo: "egreso"  as const },
-  { nombre: "Suscripciones",  tipo: "egreso"  as const },
-  { nombre: "Otros gastos",   tipo: "egreso"  as const },
-  { nombre: "Honorarios",     tipo: "ingreso" as const },
-  { nombre: "Otros ingresos", tipo: "ingreso" as const },
+  { nombre: "Hogar",          tipo: "Egreso"  as const },
+  { nombre: "Alimentos",      tipo: "Egreso"  as const },
+  { nombre: "Transporte",     tipo: "Egreso"  as const },
+  { nombre: "Salud",          tipo: "Egreso"  as const },
+  { nombre: "Suscripciones",  tipo: "Egreso"  as const },
+  { nombre: "Otros gastos",   tipo: "Egreso"  as const },
+  { nombre: "Honorarios",     tipo: "Ingreso" as const },
+  { nombre: "Otros ingresos", tipo: "Ingreso" as const },
 ];
 
-// Categorías específicas por profesión (se agregan a las base)
-const CATEGORIAS_POR_PROFESION: Record<string, { nombre: string; tipo: "ingreso" | "egreso" }[]> = {
-  psicopedagogia: [
-    { nombre: "Honorarios Psicopedagógicos", tipo: "ingreso" },
-    { nombre: "Informes y Evaluaciones",     tipo: "ingreso" },
-    { nombre: "Supervisión Profesional",     tipo: "egreso"  },
-    { nombre: "Material Didáctico",          tipo: "egreso"  },
-    { nombre: "Formación Continua",          tipo: "egreso"  },
+// Categorías específicas por área (6 áreas genéricas de migration 005)
+const CATEGORIAS_POR_AREA: Record<string, { nombre: string; tipo: "Ingreso" | "Egreso" }[]> = {
+  "salud-bienestar": [
+    { nombre: "Sesión individual",       tipo: "Ingreso" },
+    { nombre: "Sesión pareja/familia",   tipo: "Ingreso" },
+    { nombre: "Evaluación",              tipo: "Ingreso" },
+    { nombre: "Plan mensual",            tipo: "Ingreso" },
+    { nombre: "Material profesional",    tipo: "Egreso"  },
+    { nombre: "Capacitaciones",          tipo: "Egreso"  },
+    { nombre: "Supervisiones",           tipo: "Egreso"  },
+    { nombre: "Alquiler de consultorio", tipo: "Egreso"  },
   ],
-  coaching: [
-    { nombre: "Sesiones de Coaching", tipo: "ingreso" },
-    { nombre: "Talleres y Workshops", tipo: "ingreso" },
-    { nombre: "Certificaciones",      tipo: "egreso"  },
-    { nombre: "Supervisión",          tipo: "egreso"  },
-    { nombre: "Marketing Personal",   tipo: "egreso"  },
+  "educacion": [
+    { nombre: "Clase individual",          tipo: "Ingreso" },
+    { nombre: "Clase grupal",              tipo: "Ingreso" },
+    { nombre: "Curso completo",            tipo: "Ingreso" },
+    { nombre: "Material didáctico",        tipo: "Egreso"  },
+    { nombre: "Plataformas (Zoom, Teams)", tipo: "Egreso"  },
+    { nombre: "Certificaciones",           tipo: "Egreso"  },
   ],
-  consultoria: [
-    { nombre: "Honorarios Consultoría",  tipo: "ingreso" },
-    { nombre: "Proyectos",               tipo: "ingreso" },
-    { nombre: "Viáticos",                tipo: "egreso"  },
-    { nombre: "Software y Herramientas", tipo: "egreso"  },
-    { nombre: "Capacitación",            tipo: "egreso"  },
+  "servicios-profesionales": [
+    { nombre: "Honorarios profesionales", tipo: "Ingreso" },
+    { nombre: "Asesoría puntual",         tipo: "Ingreso" },
+    { nombre: "Proyecto",                 tipo: "Ingreso" },
+    { nombre: "Retainer mensual",         tipo: "Ingreso" },
+    { nombre: "Software profesional",     tipo: "Egreso"  },
+    { nombre: "Capacitaciones",           tipo: "Egreso"  },
+    { nombre: "Almuerzos comerciales",    tipo: "Egreso"  },
   ],
-  profesor: [
-    { nombre: "Clases Particulares",    tipo: "ingreso" },
-    { nombre: "Clases Grupales",        tipo: "ingreso" },
-    { nombre: "Material Educativo",     tipo: "egreso"  },
-    { nombre: "Plataformas Educativas", tipo: "egreso"  },
-    { nombre: "Formación Docente",      tipo: "egreso"  },
+  "creatividad-digital": [
+    { nombre: "Proyecto",                   tipo: "Ingreso" },
+    { nombre: "Iguala mensual",             tipo: "Ingreso" },
+    { nombre: "Licencias / Royalties",      tipo: "Ingreso" },
+    { nombre: "Software (Adobe, Figma...)", tipo: "Egreso"  },
+    { nombre: "Hardware",                   tipo: "Egreso"  },
+    { nombre: "Cursos",                     tipo: "Egreso"  },
+    { nombre: "Stock fotográfico",          tipo: "Egreso"  },
   ],
+  "belleza-cuidado": [
+    { nombre: "Servicio individual", tipo: "Ingreso" },
+    { nombre: "Paquete",             tipo: "Ingreso" },
+    { nombre: "Membresía",           tipo: "Ingreso" },
+    { nombre: "Insumos",             tipo: "Egreso"  },
+    { nombre: "Equipamiento",        tipo: "Egreso"  },
+    { nombre: "Alquiler de espacio", tipo: "Egreso"  },
+  ],
+  "generico": [],
 };
 
 export interface OnboardingData {
@@ -81,19 +98,19 @@ export async function createProfile(data: OnboardingData) {
 
   if (profileError) throw new Error(profileError.message);
 
-  // 2. Crear cuenta Efectivo
+  // 2. Crear cuenta Efectivo (tipo capitalizado según migration 006)
   const { error: cuentaError } = await supabase.from("cuentas").insert({
     user_id: userId,
     nombre: "Efectivo",
-    tipo: "efectivo",
+    tipo: "Efectivo",
     saldo: 0,
     moneda: "ARS",
   });
 
   if (cuentaError) throw new Error(cuentaError.message);
 
-  // 3. Crear categorías (base + específicas de la profesión)
-  const categoriasEspecificas = CATEGORIAS_POR_PROFESION[data.profesion] ?? [];
+  // 3. Crear categorías (base + específicas del área)
+  const categoriasEspecificas = CATEGORIAS_POR_AREA[data.profesion] ?? [];
   const todasLasCategorias = [...CATEGORIAS_BASE, ...categoriasEspecificas];
 
   const categoriasConUserId = todasLasCategorias.map((cat) => ({
