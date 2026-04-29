@@ -90,7 +90,12 @@ REGLAS:
 - Si no cumple eso → fechaVencimiento=null
 - Si menciona cuotas, detectá el número (ej "en 12 cuotas" → cuotas=12, clasificacion="Cuotas")
 - Inferí categoría y concepto del histórico y del sentido común: "chino" → Alimentos / Supermercado, "spotify" → Suscripciones / Streaming, "nafta" → Transporte / Combustible
-- cuentaId: si el usuario menciona nombre de cuenta (ej "del banco provincia", "con MP", "en efectivo") Y hay cuenta con ese nombre en la lista, devolvé el id. Si no es claro, cuentaId=null.
+- cuentaId: buscá el id en la lista de cuentas del usuario según estas reglas (en orden de prioridad):
+  1. Si el usuario menciona explícitamente el nombre de una cuenta → usá ese id
+  2. Si método=Efectivo → usá el id de la única cuenta tipo Efectivo (siempre existe)
+  3. Si método=Billetera virtual → usá el id de la cuenta tipo Billetera virtual si hay una sola
+  4. Si método=Transferencia o Débito → usá el id de la cuenta tipo Banco si hay una sola
+  5. Si hay ambigüedad o ninguna coincide → cuentaId=null
 - MONEDA: si menciona "USD", "dólares", "u$s", "verdes" → moneda="USD". Si menciona tipo de cambio explícito ("a 1200") → tipoCambio=número. Si no menciona TC y es USD → tipoCambio=null. Si es ARS → moneda="ARS", tipoCambio=null.
 - confianza: "alta" si TODO claro, "media" si inferiste ≥1 campo importante, "baja" si varios campos son dudosos
 - unitario: precio unitario (si hay cuotas, es el valor de cada cuota; si no, igual a final/cantidad)

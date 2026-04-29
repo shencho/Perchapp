@@ -13,7 +13,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
-import { deleteMovimiento, duplicateMovimiento, TIPOS_MOV, METODOS, AMBITOS } from "@/lib/supabase/actions/movimientos";
+import { deleteMovimiento, duplicateMovimiento } from "@/lib/supabase/actions/movimientos";
+import { TIPOS_MOV, METODOS, AMBITOS } from "@/lib/supabase/actions/movimientos-types";
 import { MovimientoEditor } from "./movimiento-editor";
 import type { Movimiento, Cuenta, Tarjeta, Categoria } from "@/types/supabase";
 

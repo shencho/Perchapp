@@ -1,68 +1,15 @@
 "use server";
 
 import { redirect } from "next/navigation";
-import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
+import {
+  movimientoSchema,
+  type MovimientoInput,
+  type MovimientosFiltros,
+} from "./movimientos-types";
 
-// ── Tipos ─────────────────────────────────────────────────────────────────────
-
-export const METODOS = [
-  "Efectivo",
-  "Transferencia",
-  "Billetera virtual",
-  "Crédito",
-  "Débito automático",
-  "Débito",
-] as const;
-
-export const TIPOS_MOV = ["Ingreso", "Egreso", "Transferencia"] as const;
-export const AMBITOS    = ["Personal", "Profesional"] as const;
-export const CLASIFICACIONES = ["Fijo", "Variable", "Cuotas"] as const;
-export const FRECUENCIAS = ["Corriente", "No corriente"] as const;
-
-// Schema de validación
-const movimientoSchema = z.object({
-  tipo:               z.enum(TIPOS_MOV),
-  ambito:             z.enum(AMBITOS).default("Personal"),
-  monto:              z.number().positive("El monto debe ser mayor a 0"),
-  moneda:             z.enum(["ARS", "USD"]).default("ARS"),
-  tipo_cambio:        z.number().positive().nullable().optional(),
-  concepto:           z.string().nullable().optional(),
-  descripcion:        z.string().nullable().optional(),
-  categoria_id:       z.string().uuid().nullable().optional(),
-  clasificacion:      z.enum(CLASIFICACIONES).default("Variable"),
-  cuotas:             z.number().int().min(1).default(1),
-  frecuencia:         z.enum(FRECUENCIAS).default("Corriente"),
-  necesidad:          z.number().int().min(1).max(5).nullable().optional(),
-  metodo:             z.enum(METODOS).nullable().optional(),
-  cuenta_id:          z.string().uuid().nullable().optional(),
-  tarjeta_id:         z.string().uuid().nullable().optional(),
-  fecha_vencimiento:  z.string().nullable().optional(),
-  debita_de:          z.enum(["cuenta", "tarjeta"]).nullable().optional(),
-  cuenta_destino_id:  z.string().uuid().nullable().optional(),
-  cantidad:           z.number().int().min(1).default(1),
-  unitario:           z.number().positive().nullable().optional(),
-  observaciones:      z.string().nullable().optional(),
-  cliente_id:         z.string().uuid().nullable().optional(),
-  fecha:              z.string().optional(),
-});
-
-export type MovimientoInput = z.infer<typeof movimientoSchema>;
-
-// ── Filtros para listado ──────────────────────────────────────────────────────
-
-export interface MovimientosFiltros {
-  mes?: string;        // "YYYY-MM"
-  tipo?: string;
-  ambito?: string;
-  categoria_id?: string;
-  metodo?: string;
-  cuenta_id?: string;
-  busqueda?: string;
-  pagina?: number;
-}
-
-// ── Helpers ───────────────────────────────────────────────────────────────────
+// Re-exportar para que los imports existentes en server components sigan funcionando
+export type { MovimientoInput, MovimientosFiltros };
 
 async function getAuthedUser() {
   const supabase = await createClient();
@@ -70,8 +17,6 @@ async function getAuthedUser() {
   if (!user) redirect("/login");
   return { supabase, userId: user.id };
 }
-
-// ── Actions ───────────────────────────────────────────────────────────────────
 
 export async function getMovimientos(filtros: MovimientosFiltros = {}) {
   const { supabase, userId } = await getAuthedUser();
@@ -102,11 +47,11 @@ export async function getMovimientos(filtros: MovimientosFiltros = {}) {
     query = query.gte("fecha", inicio).lte("fecha", fin);
   }
 
-  if (filtros.tipo)        query = query.eq("tipo", filtros.tipo);
-  if (filtros.ambito)      query = query.eq("ambito", filtros.ambito);
+  if (filtros.tipo)         query = query.eq("tipo", filtros.tipo);
+  if (filtros.ambito)       query = query.eq("ambito", filtros.ambito);
   if (filtros.categoria_id) query = query.eq("categoria_id", filtros.categoria_id);
-  if (filtros.metodo)      query = query.eq("metodo", filtros.metodo);
-  if (filtros.cuenta_id)   query = query.eq("cuenta_id", filtros.cuenta_id);
+  if (filtros.metodo)       query = query.eq("metodo", filtros.metodo);
+  if (filtros.cuenta_id)    query = query.eq("cuenta_id", filtros.cuenta_id);
 
   if (filtros.busqueda) {
     const b = filtros.busqueda.trim();
@@ -122,7 +67,6 @@ export async function createMovimiento(input: MovimientoInput) {
   const { supabase, userId } = await getAuthedUser();
   const parsed = movimientoSchema.parse(input);
 
-  // Para Transferencia: monto negativo en cuenta origen, sin categoría
   const row = {
     user_id:           userId,
     tipo:              parsed.tipo,
@@ -157,7 +101,6 @@ export async function createMovimiento(input: MovimientoInput) {
 export async function updateMovimiento(id: string, input: Partial<MovimientoInput>) {
   const { supabase, userId } = await getAuthedUser();
 
-  // Verificar que el movimiento pertenece al usuario
   const { data: existing, error: fetchError } = await supabase
     .from("movimientos")
     .select("id")

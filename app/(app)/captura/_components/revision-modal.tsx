@@ -26,13 +26,46 @@ const CONFIANZA_STYLES: Record<string, string> = {
   baja:  "bg-red-900/50 text-red-300 border-red-800",
 };
 
+// Infiere la cuenta más obvia según el método de pago.
+// Si Claude ya devolvió un cuentaId, ese tiene prioridad.
+function inferirCuentaId(
+  metodo: string | undefined,
+  cuentaIdDeClaude: string | null | undefined,
+  cuentas: Cuenta[],
+): string | undefined {
+  if (cuentaIdDeClaude) return cuentaIdDeClaude;
+  if (!metodo) return undefined;
+
+  const activasTipo = (tipo: string) => cuentas.filter((c) => c.tipo === tipo && !c.archivada);
+
+  if (metodo === "Efectivo") {
+    const efectivo = activasTipo("Efectivo");
+    return efectivo.length === 1 ? efectivo[0].id : undefined;
+  }
+  if (metodo === "Billetera virtual") {
+    const bv = activasTipo("Billetera virtual");
+    return bv.length === 1 ? bv[0].id : undefined;
+  }
+  if (metodo === "Transferencia" || metodo === "Débito") {
+    const banco = activasTipo("Banco");
+    return banco.length === 1 ? banco[0].id : undefined;
+  }
+  return undefined;
+}
+
 // Mapea campos del intérprete al formato del editor
-function parsedToEditorDefaults(p: ParsedMovimiento, categorias: Categoria[]): Record<string, unknown> {
-  // Buscar categoria_id por nombre
+function parsedToEditorDefaults(
+  p: ParsedMovimiento,
+  categorias: Categoria[],
+  cuentas: Cuenta[],
+): Record<string, unknown> {
+  // Buscar categoria_id por nombre (concepto o categoría)
   const catMatch = categorias.find(
     (c) => c.nombre.toLowerCase() === p.concepto?.toLowerCase() ||
            c.nombre.toLowerCase() === p.categoria?.toLowerCase()
   );
+
+  const cuenta_id = inferirCuentaId(p.metodo, p.cuentaId, cuentas);
 
   return {
     tipo:          p.tipo,
@@ -46,7 +79,7 @@ function parsedToEditorDefaults(p: ParsedMovimiento, categorias: Categoria[]): R
     frecuencia:    p.frecuencia,
     necesidad:     p.necesidad ?? undefined,
     metodo:        p.metodo as Parameters<typeof createMovimiento>[0]["metodo"],
-    cuenta_id:     p.cuentaId ?? undefined,
+    cuenta_id,
     concepto:      p.concepto,
     descripcion:   p.descripcion,
     cantidad:      p.cantidad,
@@ -82,7 +115,7 @@ export function RevisionModal({ open, onClose, parsed, cuentas, tarjetas, catego
         frecuencia:       parsed.frecuencia,
         necesidad:        parsed.necesidad ?? null,
         metodo:           parsed.metodo as Parameters<typeof createMovimiento>[0]["metodo"],
-        cuenta_id:        parsed.cuentaId ?? null,
+        cuenta_id:        inferirCuentaId(parsed.metodo, parsed.cuentaId, cuentas) ?? null,
         fecha:            parsed.fechaConsumo,
         fecha_vencimiento: parsed.fechaVencimiento ?? null,
         debita_de:        (parsed.debitaDe ?? null) as "cuenta" | "tarjeta" | null,
@@ -190,7 +223,7 @@ export function RevisionModal({ open, onClose, parsed, cuentas, tarjetas, catego
           cuentas={cuentas}
           tarjetas={tarjetas}
           categorias={categorias}
-          defaultValues={parsedToEditorDefaults(parsed, categorias) as Parameters<typeof MovimientoEditor>[0]["defaultValues"]}
+          defaultValues={parsedToEditorDefaults(parsed, categorias, cuentas) as Parameters<typeof MovimientoEditor>[0]["defaultValues"]}
         />
       )}
     </>

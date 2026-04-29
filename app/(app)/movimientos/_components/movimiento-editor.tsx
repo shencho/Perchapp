@@ -17,16 +17,15 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
+import { createMovimiento, updateMovimiento } from "@/lib/supabase/actions/movimientos";
 import {
-  createMovimiento,
-  updateMovimiento,
   TIPOS_MOV,
   AMBITOS,
   METODOS,
   CLASIFICACIONES,
   FRECUENCIAS,
   type MovimientoInput,
-} from "@/lib/supabase/actions/movimientos";
+} from "@/lib/supabase/actions/movimientos-types";
 import type { Movimiento, Cuenta, Tarjeta, Categoria } from "@/types/supabase";
 
 // ── Schema ────────────────────────────────────────────────────────────────────
