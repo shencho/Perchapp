@@ -365,6 +365,32 @@ export interface Database {
           created_at?: string
         }
       }
+      registros_pagos: {
+        Row: {
+          id: string
+          user_id: string
+          registro_id: string
+          pago_id: string
+          monto_asignado: number
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          registro_id: string
+          pago_id: string
+          monto_asignado: number
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          registro_id?: string
+          pago_id?: string
+          monto_asignado?: number
+          created_at?: string
+        }
+      }
       pagos_cliente: {
         Row: {
           id: string
@@ -583,6 +609,7 @@ export type Cliente = Database["public"]["Tables"]["clientes"]["Row"]
 export type ServicioCliente = Database["public"]["Tables"]["servicios_cliente"]["Row"]
 export type TarifaHistorial = Database["public"]["Tables"]["tarifas_historial"]["Row"]
 export type RegistroTrabajo = Database["public"]["Tables"]["registros_trabajo"]["Row"]
+export type RegistroPago = Database["public"]["Tables"]["registros_pagos"]["Row"]
 export type PagoCliente = Database["public"]["Tables"]["pagos_cliente"]["Row"]
 export type Movimiento = Database["public"]["Tables"]["movimientos"]["Row"]
 export type ConversacionIA = Database["public"]["Tables"]["conversaciones_ia"]["Row"]

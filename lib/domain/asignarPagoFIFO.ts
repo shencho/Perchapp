@@ -1,25 +1,30 @@
-import type { RegistroTrabajo } from "@/types/supabase";
+export interface RegistroParaFIFO {
+  id:              string;
+  fecha:           string;
+  monto_pendiente: number; // importe aún no cubierto por ningún pago
+}
 
 export interface AsignacionPago {
-  registro_id: string;
-  monto:       number;
+  registro_id:    string;
+  monto_asignado: number; // cuánto cubre este pago de ese registro
 }
 
 export interface ResultadoFIFO {
-  asignaciones:   AsignacionPago[];
-  saldoRestante:  number;
+  asignaciones:  AsignacionPago[];
+  saldoRestante: number; // sobrante del pago después de cubrir todos los pendientes
 }
 
 /**
  * Asigna un monto de pago a registros pendientes usando FIFO (más antiguo primero).
+ * Opera sobre monto_pendiente (importe real aún no cubierto por otros pagos).
  * Devuelve las asignaciones y el saldo restante (> 0 si el pago supera la deuda total).
  */
 export function asignarPagoFIFO(
-  registrosPendientes: RegistroTrabajo[],
+  registros: RegistroParaFIFO[],
   montoPago: number,
 ): ResultadoFIFO {
-  const ordenados = [...registrosPendientes]
-    .filter((r) => !r.pago_id && (r.monto ?? 0) > 0)
+  const ordenados = [...registros]
+    .filter((r) => r.monto_pendiente > 0)
     .sort((a, b) => a.fecha.localeCompare(b.fecha));
 
   const asignaciones: AsignacionPago[] = [];
@@ -27,10 +32,9 @@ export function asignarPagoFIFO(
 
   for (const r of ordenados) {
     if (restante <= 0) break;
-    const montoRegistro = r.monto ?? 0;
-    // Asignamos el registro completo (el monto del pago cubre el registro entero o lo que queda)
-    asignaciones.push({ registro_id: r.id, monto: montoRegistro });
-    restante -= montoRegistro;
+    const cubierto = Math.min(r.monto_pendiente, restante);
+    asignaciones.push({ registro_id: r.id, monto_asignado: cubierto });
+    restante -= cubierto;
   }
 
   return { asignaciones, saldoRestante: Math.max(0, restante) };

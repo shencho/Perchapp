@@ -11,7 +11,7 @@ import { createMovimiento } from "@/lib/supabase/actions/movimientos";
 import { getDataPagoModal, createPagoFromMovimiento } from "@/lib/supabase/actions/pagos";
 import { asignarPagoFIFO } from "@/lib/domain/asignarPagoFIFO";
 import type { MovimientoInput } from "@/lib/supabase/actions/movimientos-types";
-import type { RegistroTrabajo } from "@/types/supabase";
+import type { RegistroConMontoPendiente } from "@/lib/supabase/actions/pagos";
 
 function formatMonto(n: number, moneda = "ARS") {
   return new Intl.NumberFormat("es-AR", {
@@ -39,11 +39,11 @@ export function RegistrarPagoModal({ open, onClose, onConfirm, cliente, movimien
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const [registrosPendientes, setRegistrosPendientes] = useState<RegistroTrabajo[]>([]);
+  const [registrosPendientes, setRegistrosPendientes] = useState<RegistroConMontoPendiente[]>([]);
   const [saldoPendiente, setSaldoPendiente] = useState(0);
 
   const [opcion, setOpcion] = useState<"pago" | "suelto">("pago");
-  const [asignaciones, setAsignaciones] = useState<Set<string>>(new Set());
+  const [asignaciones, setAsignaciones] = useState<Map<string, number>>(new Map());
   const [verManual, setVerManual] = useState(false);
 
   const [servicioNuevoId, setServicioNuevoId] = useState("");
@@ -68,7 +68,7 @@ export function RegistrarPagoModal({ open, onClose, onConfirm, cliente, movimien
         setRegistrosPendientes(rp);
         setSaldoPendiente(sp);
         const fifo = asignarPagoFIFO(rp, montoPago);
-        setAsignaciones(new Set(fifo.asignaciones.map((a) => a.registro_id)));
+        setAsignaciones(new Map(fifo.asignaciones.map((a) => [a.registro_id, a.monto_asignado])));
       })
       .catch(() => setError("Error al cargar datos del cliente"))
       .finally(() => setLoading(false));
@@ -101,9 +101,9 @@ export function RegistrarPagoModal({ open, onClose, onConfirm, cliente, movimien
       } else {
         const registros_asignados =
           caso === 1
-            ? Array.from(asignaciones)
+            ? Array.from(asignaciones.entries()).map(([registro_id, monto_asignado]) => ({ registro_id, monto_asignado }))
             : caso === 2
-              ? registrosPendientes.map((r) => r.id)
+              ? registrosPendientes.map((r) => ({ registro_id: r.id, monto_asignado: r.monto_pendiente }))
               : [];
 
         const registro_nuevo =
@@ -215,7 +215,7 @@ export function RegistrarPagoModal({ open, onClose, onConfirm, cliente, movimien
                               className="flex items-center justify-between px-3 py-2 border-t border-border text-sm"
                             >
                               <span className="text-muted-foreground">{r.fecha}</span>
-                              <span className="font-medium text-green-400">{formatMonto(r.monto ?? 0, moneda)}</span>
+                              <span className="font-medium text-green-400">{formatMonto(asignaciones.get(r.id) ?? 0, moneda)}</span>
                             </div>
                           ))}
                         {asignaciones.size === 0 && (
@@ -246,10 +246,10 @@ export function RegistrarPagoModal({ open, onClose, onConfirm, cliente, movimien
                                 key={r.id}
                                 type="button"
                                 onClick={() => {
-                                  const s = new Set(asignaciones);
-                                  if (checked) s.delete(r.id);
-                                  else s.add(r.id);
-                                  setAsignaciones(s);
+                                  const m = new Map(asignaciones);
+                                  if (checked) m.delete(r.id);
+                                  else m.set(r.id, r.monto_pendiente);
+                                  setAsignaciones(m);
                                 }}
                                 className="flex items-center gap-2 w-full px-3 py-2 border-t border-border text-sm hover:bg-surface/50 transition-colors text-left"
                               >
@@ -263,7 +263,7 @@ export function RegistrarPagoModal({ open, onClose, onConfirm, cliente, movimien
                                   <span className="text-muted-foreground/60 text-xs truncate">{r.notas}</span>
                                 )}
                                 <span className="ml-auto font-medium tabular-nums">
-                                  {formatMonto(r.monto ?? 0, moneda)}
+                                  {formatMonto(r.monto_pendiente, moneda)}
                                 </span>
                               </button>
                             );

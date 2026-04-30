@@ -9,6 +9,14 @@ export type PagoConCuenta = PagoCliente & {
   cuenta_nombre: string | null;
 };
 
+export interface RegistroConMontoPendiente {
+  id:              string;
+  fecha:           string;
+  monto:           number;
+  monto_pendiente: number;
+  notas:           string | null;
+}
+
 // ── Queries ───────────────────────────────────────────────────────────────────
 
 export async function getPagos(clienteId: string): Promise<PagoConCuenta[]> {
@@ -49,25 +57,48 @@ export async function getRegistrosPendientes(clienteId: string) {
 }
 
 export async function getDataPagoModal(clienteId: string): Promise<{
-  registrosPendientes: RegistroTrabajo[];
+  registrosPendientes: RegistroConMontoPendiente[];
   saldoPendiente: number;
 }> {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error("No autenticado");
 
-  const { data, error } = await supabase
+  const { data: registros, error: regError } = await supabase
     .from("registros_trabajo")
-    .select("*")
+    .select("id, fecha, monto, notas")
     .eq("cliente_id", clienteId)
     .eq("user_id", user.id)
-    .is("pago_id", null)
     .order("fecha");
 
-  if (error) throw new Error(error.message);
+  if (regError) throw new Error(regError.message);
+  if (!registros || registros.length === 0) return { registrosPendientes: [], saldoPendiente: 0 };
 
-  const registrosPendientes = data ?? [];
-  const saldoPendiente = registrosPendientes.reduce((acc, r) => acc + (r.monto ?? 0), 0);
+  const registroIds = registros.map((r) => r.id);
+  const { data: pivot, error: pivotError } = await supabase
+    .from("registros_pagos")
+    .select("registro_id, monto_asignado")
+    .in("registro_id", registroIds)
+    .eq("user_id", user.id);
+
+  if (pivotError) throw new Error(pivotError.message);
+
+  const montoCubierto = new Map<string, number>();
+  for (const p of pivot ?? []) {
+    montoCubierto.set(p.registro_id, (montoCubierto.get(p.registro_id) ?? 0) + p.monto_asignado);
+  }
+
+  const registrosPendientes: RegistroConMontoPendiente[] = [];
+  let saldoPendiente = 0;
+
+  for (const r of registros) {
+    const cubierto = montoCubierto.get(r.id) ?? 0;
+    const monto_pendiente = Math.max(0, (r.monto ?? 0) - cubierto);
+    if (monto_pendiente > 0) {
+      registrosPendientes.push({ id: r.id, fecha: r.fecha, monto: r.monto ?? 0, monto_pendiente, notas: r.notas });
+      saldoPendiente += monto_pendiente;
+    }
+  }
 
   return { registrosPendientes, saldoPendiente };
 }
@@ -104,7 +135,7 @@ export interface CreatePagoInput {
 
 export interface ResultadoPago {
   pago_id:      string;
-  asignaciones: { registro_id: string; monto: number }[];
+  asignaciones: { registro_id: string; monto_asignado: number }[];
   saldo_restante: number;
 }
 
@@ -161,11 +192,10 @@ export async function createPago(data: CreatePagoInput): Promise<ResultadoPago> 
       .eq("id", pago.id);
   }
 
-  // (d) Asignación FIFO
-  const pendientes = await getRegistrosPendientes(data.cliente_id);
-  const { asignaciones, saldoRestante } = asignarPagoFIFO(pendientes, data.monto);
+  // (d) Asignación FIFO usando registros_pagos como fuente de monto_pendiente
+  const { registrosPendientes } = await getDataPagoModal(data.cliente_id);
+  const { asignaciones, saldoRestante } = asignarPagoFIFO(registrosPendientes, data.monto);
 
-  // Marcar registros asignados con pago_id
   if (asignaciones.length > 0) {
     const ids = asignaciones.map((a) => a.registro_id);
     await supabase
@@ -173,6 +203,15 @@ export async function createPago(data: CreatePagoInput): Promise<ResultadoPago> 
       .update({ pago_id: pago.id, facturado: true })
       .in("id", ids)
       .eq("user_id", user.id);
+
+    await supabase.from("registros_pagos").insert(
+      asignaciones.map((a) => ({
+        user_id:        user.id,
+        registro_id:    a.registro_id,
+        pago_id:        pago.id,
+        monto_asignado: a.monto_asignado,
+      })),
+    );
   }
 
   return { pago_id: pago.id, asignaciones, saldo_restante: saldoRestante };
@@ -182,7 +221,7 @@ export interface CreatePagoFromMovimientoInput {
   movimientoData:      MovimientoInput;
   cliente_id:          string;
   cliente_nombre:      string;
-  registros_asignados: string[];
+  registros_asignados: { registro_id: string; monto_asignado: number }[];
   registro_nuevo?: {
     servicio_id: string;
     fecha:       string;
@@ -282,17 +321,29 @@ export async function createPagoFromMovimiento(data: CreatePagoFromMovimientoInp
   if (pagoErr || !pago) throw new Error(pagoErr?.message ?? "Error al crear pago");
 
   // 4. Asignar registros + registro_nuevo al pago
-  const todosIds = [
+  const todosAsignados: { registro_id: string; monto_asignado: number }[] = [
     ...data.registros_asignados,
-    ...(registroCreadoId ? [registroCreadoId] : []),
+    ...(registroCreadoId
+      ? [{ registro_id: registroCreadoId, monto_asignado: data.registro_nuevo?.monto ?? 0 }]
+      : []),
   ];
 
-  if (todosIds.length > 0) {
+  if (todosAsignados.length > 0) {
+    const ids = todosAsignados.map((a) => a.registro_id);
     await supabase
       .from("registros_trabajo")
       .update({ pago_id: pago.id, facturado: true })
-      .in("id", todosIds)
+      .in("id", ids)
       .eq("user_id", user.id);
+
+    await supabase.from("registros_pagos").insert(
+      todosAsignados.map((a) => ({
+        user_id:        user.id,
+        registro_id:    a.registro_id,
+        pago_id:        pago.id,
+        monto_asignado: a.monto_asignado,
+      })),
+    );
   }
 }
 
@@ -304,21 +355,64 @@ export async function reasignarPago(
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error("No autenticado");
 
-  // Desasignar todos los registros del pago
+  // 1. Limpiar pivot + pago_id previos
+  await supabase.from("registros_pagos").delete().eq("pago_id", pagoId).eq("user_id", user.id);
   await supabase
     .from("registros_trabajo")
     .update({ pago_id: null, facturado: false })
     .eq("pago_id", pagoId)
     .eq("user_id", user.id);
 
-  // Asignar los nuevos
-  if (nuevasAsignaciones.length > 0) {
-    const ids = nuevasAsignaciones.map((a) => a.registro_id);
+  if (nuevasAsignaciones.length === 0) return;
+
+  const ids = nuevasAsignaciones.map((a) => a.registro_id);
+
+  // 2. Obtener monto del pago
+  const { data: pago } = await supabase
+    .from("pagos_cliente")
+    .select("monto")
+    .eq("id", pagoId)
+    .eq("user_id", user.id)
+    .single();
+
+  if (!pago) throw new Error("Pago no encontrado");
+
+  // 3. Obtener montos de los registros + cobertura de otros pagos
+  const [{ data: registros }, { data: cubiertos }] = await Promise.all([
+    supabase.from("registros_trabajo").select("id, fecha, monto").in("id", ids).eq("user_id", user.id),
+    supabase.from("registros_pagos").select("registro_id, monto_asignado").in("registro_id", ids).eq("user_id", user.id),
+  ]);
+
+  const montoCubierto = new Map<string, number>();
+  for (const c of cubiertos ?? []) {
+    montoCubierto.set(c.registro_id, (montoCubierto.get(c.registro_id) ?? 0) + c.monto_asignado);
+  }
+
+  const registrosParaFIFO = (registros ?? []).map((r) => ({
+    id:              r.id,
+    fecha:           r.fecha,
+    monto_pendiente: Math.max(0, (r.monto ?? 0) - (montoCubierto.get(r.id) ?? 0)),
+  }));
+
+  // 4. FIFO + persistir
+  const { asignaciones } = asignarPagoFIFO(registrosParaFIFO, pago.monto);
+
+  if (asignaciones.length > 0) {
+    const asignadosIds = asignaciones.map((a) => a.registro_id);
     await supabase
       .from("registros_trabajo")
       .update({ pago_id: pagoId, facturado: true })
-      .in("id", ids)
+      .in("id", asignadosIds)
       .eq("user_id", user.id);
+
+    await supabase.from("registros_pagos").insert(
+      asignaciones.map((a) => ({
+        user_id:        user.id,
+        registro_id:    a.registro_id,
+        pago_id:        pagoId,
+        monto_asignado: a.monto_asignado,
+      })),
+    );
   }
 }
 
