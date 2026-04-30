@@ -67,21 +67,24 @@ export async function getDataPagoModal(clienteId: string): Promise<{
       .order("fecha"),
     supabase
       .from("servicios_cliente")
-      .select("id, nombre, modalidad")
+      .select("id, nombre, modalidad, archivado")
       .eq("cliente_id", clienteId)
       .eq("user_id", user.id)
-      .eq("archivado", false)
       .order("nombre"),
   ]);
+
+  if (pendientesRes.error) throw new Error(pendientesRes.error.message);
+  if (serviciosRes.error) throw new Error(serviciosRes.error.message);
 
   const registrosPendientes = pendientesRes.data ?? [];
   const saldoPendiente = registrosPendientes.reduce((acc, r) => acc + (r.monto ?? 0), 0);
 
-  return {
-    registrosPendientes,
-    serviciosActivos: (serviciosRes.data ?? []) as { id: string; nombre: string; modalidad: string }[],
-    saldoPendiente,
-  };
+  // Filter in memory: archivado !== true handles both false AND null values
+  const serviciosActivos = (serviciosRes.data ?? [])
+    .filter((s) => !s.archivado)
+    .map(({ id, nombre, modalidad }) => ({ id, nombre, modalidad: modalidad ?? "sesion" }));
+
+  return { registrosPendientes, serviciosActivos, saldoPendiente };
 }
 
 export async function getPagoByMovimientoId(

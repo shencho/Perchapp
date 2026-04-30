@@ -85,10 +85,13 @@ export function RegistrarPagoModal({ open, onClose, onConfirm, cliente, movimien
   const tipoRegistroNuevo =
     servicioNuevo?.modalidad === "comision" ? ("comision" as const) : ("sesion" as const);
 
+  const sinServicios = opcion === "pago" && (caso === 2 || caso === 3) && serviciosActivos.length === 0;
+
   const puedeConfirmar =
-    opcion === "suelto" ||
-    caso === 1 ||
-    ((caso === 2 || caso === 3) && !!servicioNuevoId);
+    !sinServicios &&
+    (opcion === "suelto" ||
+      caso === 1 ||
+      ((caso === 2 || caso === 3) && !!servicioNuevoId));
 
   async function handleConfirmar() {
     setSubmitting(true);
@@ -372,6 +375,16 @@ function RegistroNuevoFields({
   notasNueva: string;
   setNotasNueva: (v: string) => void;
 }) {
+  if (serviciosActivos.length === 0) {
+    return (
+      <p className="text-sm text-muted-foreground border border-dashed border-border rounded-md px-4 py-3">
+        Este cliente no tiene servicios activos. Andá al tab{" "}
+        <a href="#servicios" className="underline hover:text-foreground">Servicios</a>{" "}
+        para crear uno antes de registrar el pago.
+      </p>
+    );
+  }
+
   return (
     <div className="space-y-3">
       <div className="space-y-1.5">

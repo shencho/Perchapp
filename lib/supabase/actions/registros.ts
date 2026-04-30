@@ -8,6 +8,8 @@ export type RegistroConServicio = RegistroTrabajo & {
   servicio_nombre: string | null;
 };
 
+export type EstadoCobro = "Cobrado" | "Parcial" | "Pendiente";
+
 // ── Queries ───────────────────────────────────────────────────────────────────
 
 export async function getRegistros(
@@ -63,6 +65,66 @@ export async function getRegistrosMes(
 
   if (error) throw new Error(error.message);
   return data ?? [];
+}
+
+/**
+ * Para cada registro con pago_id, determina si está Cobrado o Parcial.
+ * Carga todos los registros asignados a los pagos dados (cross-month) y
+ * aplica FIFO para determinar qué parte del pago cubre cada registro.
+ */
+export async function getEstadosCobro(
+  pagoIds: string[],
+): Promise<Record<string, EstadoCobro>> {
+  if (pagoIds.length === 0) return {};
+
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error("No autenticado");
+
+  const [registrosRes, pagosRes] = await Promise.all([
+    supabase
+      .from("registros_trabajo")
+      .select("id, pago_id, monto, fecha")
+      .in("pago_id", pagoIds)
+      .eq("user_id", user.id),
+    supabase
+      .from("pagos_cliente")
+      .select("id, monto")
+      .in("id", pagoIds)
+      .eq("user_id", user.id),
+  ]);
+
+  const registros = registrosRes.data ?? [];
+  const pagos = pagosRes.data ?? [];
+  const pagoMap = new Map(pagos.map((p) => [p.id, p.monto as number]));
+  const estados: Record<string, EstadoCobro> = {};
+
+  // Agrupar registros por pago_id
+  const grupos = new Map<string, typeof registros>();
+  for (const r of registros) {
+    if (!r.pago_id) continue;
+    if (!grupos.has(r.pago_id)) grupos.set(r.pago_id, []);
+    grupos.get(r.pago_id)!.push(r);
+  }
+
+  // Walk FIFO por cada grupo
+  for (const [pagoId, regs] of grupos) {
+    const pagoMonto = pagoMap.get(pagoId) ?? 0;
+    const ordenados = [...regs].sort((a, b) => a.fecha.localeCompare(b.fecha));
+    let restante = pagoMonto;
+    for (const r of ordenados) {
+      const montoReg = (r.monto as number | null) ?? 0;
+      if (restante >= montoReg) {
+        estados[r.id] = "Cobrado";
+        restante -= montoReg;
+      } else {
+        estados[r.id] = "Parcial";
+        restante = 0;
+      }
+    }
+  }
+
+  return estados;
 }
 
 // ── Auto-cálculo de tarifa ────────────────────────────────────────────────────

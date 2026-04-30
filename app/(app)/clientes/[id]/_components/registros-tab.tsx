@@ -14,6 +14,7 @@ import { FormDialog } from "@/components/shared/form-dialog";
 import { DeleteConfirm } from "@/components/shared/delete-confirm";
 import {
   getRegistros,
+  getEstadosCobro,
   createRegistro,
   updateRegistro,
   eliminarRegistro,
@@ -21,7 +22,7 @@ import {
 } from "@/lib/supabase/actions/registros";
 import type { ClienteConSaldo } from "@/lib/supabase/actions/clientes";
 import type { ServicioConHistorial } from "@/lib/supabase/actions/servicios";
-import type { RegistroConServicio } from "@/lib/supabase/actions/registros";
+import type { RegistroConServicio, EstadoCobro } from "@/lib/supabase/actions/registros";
 import { cn } from "@/lib/utils";
 
 const TIPOS = ["sesion", "hora", "hito", "comision"] as const;
@@ -32,6 +33,12 @@ const TIPO_BADGE_CLASS: Record<string, string> = {
   hora:     "bg-surface border-border text-foreground",
   hito:     "bg-surface border-border text-foreground",
   comision: "bg-violet-900/30 text-violet-300 border-violet-800",
+};
+
+const COBRO_CONFIG: Record<EstadoCobro, { label: string; cls: string }> = {
+  Cobrado:  { label: "Cobrado",  cls: "bg-green-900/30 text-green-300 border-green-800" },
+  Parcial:  { label: "Parcial",  cls: "bg-amber-900/30 text-amber-300 border-amber-800" },
+  Pendiente:{ label: "Pendiente",cls: "bg-surface border-border text-muted-foreground" },
 };
 
 const schema = z.object({
@@ -88,6 +95,7 @@ export function RegistrosTab({ cliente, servicios }: Props) {
   const [warning, setWarning] = useState<string | null>(null);
   const [montoCalculado, setMontoCalculado] = useState<number | null>(null);
   const [calculando, setCalculando] = useState(false);
+  const [estadosCobro, setEstadosCobro] = useState<Record<string, EstadoCobro>>({});
 
   const serviciosActivos = servicios.filter((s) => !s.archivado);
 
@@ -129,12 +137,21 @@ export function RegistrosTab({ cliente, servicios }: Props) {
     return () => { cancelled = true; };
   }, [servicioId, fecha, cantidad, cliente.id, esComision]);
 
-  // Cargar registros del mes
+  // Cargar registros del mes y calcular estados de cobro
   useEffect(() => {
     setLoading(true);
     getRegistros(cliente.id, mes, anio)
-      .then(setRegistros)
-      .catch(() => setRegistros([]))
+      .then(async (lista) => {
+        setRegistros(lista);
+        const pagoIds = [...new Set(lista.filter((r) => r.pago_id).map((r) => r.pago_id!))];
+        if (pagoIds.length > 0) {
+          const estados = await getEstadosCobro(pagoIds).catch(() => ({}));
+          setEstadosCobro(estados);
+        } else {
+          setEstadosCobro({});
+        }
+      })
+      .catch(() => { setRegistros([]); setEstadosCobro({}); })
       .finally(() => setLoading(false));
   }, [cliente.id, mes, anio]);
 
@@ -172,6 +189,18 @@ export function RegistrosTab({ cliente, servicios }: Props) {
     setDialogOpen(true);
   }
 
+  async function recargarRegistros() {
+    const lista = await getRegistros(cliente.id, mes, anio);
+    setRegistros(lista);
+    const pagoIds = [...new Set(lista.filter((r) => r.pago_id).map((r) => r.pago_id!))];
+    if (pagoIds.length > 0) {
+      const estados = await getEstadosCobro(pagoIds).catch(() => ({}));
+      setEstadosCobro(estados);
+    } else {
+      setEstadosCobro({});
+    }
+  }
+
   async function onSubmit(data: FormData) {
     setIsSubmitting(true);
     setActionError(null);
@@ -200,9 +229,7 @@ export function RegistrosTab({ cliente, servicios }: Props) {
       }
       setDialogOpen(false);
       if (result.warning) setWarning(result.warning);
-      // Recargar lista
-      const nuevos = await getRegistros(cliente.id, mes, anio);
-      setRegistros(nuevos);
+      await recargarRegistros();
       router.refresh();
     } catch (e) {
       setActionError(e instanceof Error ? e.message : "Error al guardar");
@@ -218,8 +245,7 @@ export function RegistrosTab({ cliente, servicios }: Props) {
     try {
       await eliminarRegistro(toDelete.id);
       setDeleteOpen(false);
-      const nuevos = await getRegistros(cliente.id, mes, anio);
-      setRegistros(nuevos);
+      await recargarRegistros();
       router.refresh();
     } catch (e) {
       setActionError(e instanceof Error ? e.message : "Error al eliminar");
@@ -310,14 +336,17 @@ export function RegistrosTab({ cliente, servicios }: Props) {
                     <td className="px-4 py-2.5 text-right">{r.cantidad}</td>
                     <td className="px-4 py-2.5 text-right font-medium">{formatMonto(r.monto)}</td>
                     <td className="px-4 py-2.5 text-center">
-                      <span className={cn(
-                        "text-xs px-2 py-0.5 rounded-full border",
-                        r.pago_id
-                          ? "bg-green-900/30 text-green-300 border-green-800"
-                          : "bg-amber-900/30 text-amber-300 border-amber-800"
-                      )}>
-                        {r.pago_id ? "Cobrado" : "Pendiente"}
-                      </span>
+                      {(() => {
+                        const estado: EstadoCobro = r.pago_id
+                          ? (estadosCobro[r.id] ?? "Cobrado")
+                          : "Pendiente";
+                        const cfg = COBRO_CONFIG[estado];
+                        return (
+                          <span className={cn("text-xs px-2 py-0.5 rounded-full border", cfg.cls)}>
+                            {cfg.label}
+                          </span>
+                        );
+                      })()}
                     </td>
                     <td className="px-4 py-2.5">
                       <div className="flex items-center justify-end gap-1">
@@ -357,14 +386,17 @@ export function RegistrosTab({ cliente, servicios }: Props) {
                 </div>
                 <div className="flex flex-col items-end gap-1">
                   <span className="font-medium text-sm">{formatMonto(r.monto)}</span>
-                  <span className={cn(
-                    "text-xs px-1.5 py-0.5 rounded-full border",
-                    r.pago_id
-                      ? "bg-green-900/30 text-green-300 border-green-800"
-                      : "bg-amber-900/30 text-amber-300 border-amber-800"
-                  )}>
-                    {r.pago_id ? "Cobrado" : "Pendiente"}
-                  </span>
+                  {(() => {
+                    const estado: EstadoCobro = r.pago_id
+                      ? (estadosCobro[r.id] ?? "Cobrado")
+                      : "Pendiente";
+                    const cfg = COBRO_CONFIG[estado];
+                    return (
+                      <span className={cn("text-xs px-1.5 py-0.5 rounded-full border", cfg.cls)}>
+                        {cfg.label}
+                      </span>
+                    );
+                  })()}
                 </div>
                 <div className="flex gap-1">
                   <Button size="icon-sm" variant="ghost" onClick={() => openEdit(r)}><Pencil className="h-3.5 w-3.5" /></Button>
