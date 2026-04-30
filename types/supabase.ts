@@ -179,30 +179,39 @@ export interface Database {
           id: string
           user_id: string
           nombre: string
+          tipo: "Persona" | "Empresa" | "Familia"
+          parent_cliente_id: string | null
           email: string | null
           telefono: string | null
+          whatsapp: string | null
           notas: string | null
-          activo: boolean
+          archivado: boolean
           created_at: string
         }
         Insert: {
           id?: string
           user_id: string
           nombre: string
+          tipo?: "Persona" | "Empresa" | "Familia"
+          parent_cliente_id?: string | null
           email?: string | null
           telefono?: string | null
+          whatsapp?: string | null
           notas?: string | null
-          activo?: boolean
+          archivado?: boolean
           created_at?: string
         }
         Update: {
           id?: string
           user_id?: string
           nombre?: string
+          tipo?: "Persona" | "Empresa" | "Familia"
+          parent_cliente_id?: string | null
           email?: string | null
           telefono?: string | null
+          whatsapp?: string | null
           notas?: string | null
-          activo?: boolean
+          archivado?: boolean
           created_at?: string
         }
       }
@@ -213,10 +222,17 @@ export interface Database {
           cliente_id: string
           nombre: string
           descripcion: string | null
+          modalidad: "sesion" | "hora" | "abono" | "proyecto"
           tarifa_actual: number | null
-          moneda: string
-          frecuencia: "mensual" | "semanal" | "por_sesion" | "otro" | null
-          activo: boolean
+          tarifa_moneda: string
+          ciclo_facturacion: "mensual" | "quincenal" | "al_cierre" | "por_hito" | "inmediato"
+          dia_cierre_ciclo: number | null
+          tope_unidades_periodo: number | null
+          tarifa_unidad_extra: number | null
+          proyecto_total: number | null
+          proyecto_estado: "activo" | "finalizado" | "pausado"
+          notas: string | null
+          archivado: boolean
           created_at: string
         }
         Insert: {
@@ -225,10 +241,17 @@ export interface Database {
           cliente_id: string
           nombre: string
           descripcion?: string | null
+          modalidad: "sesion" | "hora" | "abono" | "proyecto"
           tarifa_actual?: number | null
-          moneda?: string
-          frecuencia?: "mensual" | "semanal" | "por_sesion" | "otro" | null
-          activo?: boolean
+          tarifa_moneda?: string
+          ciclo_facturacion?: "mensual" | "quincenal" | "al_cierre" | "por_hito" | "inmediato"
+          dia_cierre_ciclo?: number | null
+          tope_unidades_periodo?: number | null
+          tarifa_unidad_extra?: number | null
+          proyecto_total?: number | null
+          proyecto_estado?: "activo" | "finalizado" | "pausado"
+          notas?: string | null
+          archivado?: boolean
           created_at?: string
         }
         Update: {
@@ -237,10 +260,17 @@ export interface Database {
           cliente_id?: string
           nombre?: string
           descripcion?: string | null
+          modalidad?: "sesion" | "hora" | "abono" | "proyecto"
           tarifa_actual?: number | null
-          moneda?: string
-          frecuencia?: "mensual" | "semanal" | "por_sesion" | "otro" | null
-          activo?: boolean
+          tarifa_moneda?: string
+          ciclo_facturacion?: "mensual" | "quincenal" | "al_cierre" | "por_hito" | "inmediato"
+          dia_cierre_ciclo?: number | null
+          tope_unidades_periodo?: number | null
+          tarifa_unidad_extra?: number | null
+          proyecto_total?: number | null
+          proyecto_estado?: "activo" | "finalizado" | "pausado"
+          notas?: string | null
+          archivado?: boolean
           created_at?: string
         }
       }
@@ -251,7 +281,8 @@ export interface Database {
           servicio_id: string
           tarifa: number
           moneda: string
-          fecha_desde: string
+          vigente_desde: string
+          vigente_hasta: string | null
           created_at: string
         }
         Insert: {
@@ -260,7 +291,8 @@ export interface Database {
           servicio_id: string
           tarifa: number
           moneda?: string
-          fecha_desde?: string
+          vigente_desde?: string
+          vigente_hasta?: string | null
           created_at?: string
         }
         Update: {
@@ -269,7 +301,8 @@ export interface Database {
           servicio_id?: string
           tarifa?: number
           moneda?: string
-          fecha_desde?: string
+          vigente_desde?: string
+          vigente_hasta?: string | null
           created_at?: string
         }
       }
@@ -279,11 +312,18 @@ export interface Database {
           user_id: string
           cliente_id: string | null
           servicio_id: string | null
+          tipo: "sesion" | "hora" | "hito" | null
           fecha: string
-          duracion_minutos: number | null
-          notas: string | null
-          cobrado: boolean
+          cantidad: number
+          tarifa_aplicada: number | null
           monto: number | null
+          monto_override: boolean
+          facturado: boolean
+          pago_id: string | null
+          duracion_minutos: number | null
+          origen: "manual" | "voz" | "google_calendar" | "api"
+          origen_ref: string | null
+          notas: string | null
           created_at: string
         }
         Insert: {
@@ -291,11 +331,18 @@ export interface Database {
           user_id: string
           cliente_id?: string | null
           servicio_id?: string | null
+          tipo?: "sesion" | "hora" | "hito" | null
           fecha?: string
-          duracion_minutos?: number | null
-          notas?: string | null
-          cobrado?: boolean
+          cantidad?: number
+          tarifa_aplicada?: number | null
           monto?: number | null
+          monto_override?: boolean
+          facturado?: boolean
+          pago_id?: string | null
+          duracion_minutos?: number | null
+          origen?: "manual" | "voz" | "google_calendar" | "api"
+          origen_ref?: string | null
+          notas?: string | null
           created_at?: string
         }
         Update: {
@@ -303,11 +350,18 @@ export interface Database {
           user_id?: string
           cliente_id?: string | null
           servicio_id?: string | null
+          tipo?: "sesion" | "hora" | "hito" | null
           fecha?: string
-          duracion_minutos?: number | null
-          notas?: string | null
-          cobrado?: boolean
+          cantidad?: number
+          tarifa_aplicada?: number | null
           monto?: number | null
+          monto_override?: boolean
+          facturado?: boolean
+          pago_id?: string | null
+          duracion_minutos?: number | null
+          origen?: "manual" | "voz" | "google_calendar" | "api"
+          origen_ref?: string | null
+          notas?: string | null
           created_at?: string
         }
       }
@@ -320,7 +374,9 @@ export interface Database {
           moneda: string
           fecha: string
           metodo: string | null
-          notas: string | null
+          cuenta_destino_id: string | null
+          observaciones: string | null
+          movimiento_id: string | null
           created_at: string
         }
         Insert: {
@@ -331,7 +387,9 @@ export interface Database {
           moneda?: string
           fecha?: string
           metodo?: string | null
-          notas?: string | null
+          cuenta_destino_id?: string | null
+          observaciones?: string | null
+          movimiento_id?: string | null
           created_at?: string
         }
         Update: {
@@ -342,7 +400,9 @@ export interface Database {
           moneda?: string
           fecha?: string
           metodo?: string | null
-          notas?: string | null
+          cuenta_destino_id?: string | null
+          observaciones?: string | null
+          movimiento_id?: string | null
           created_at?: string
         }
       }

@@ -20,7 +20,7 @@ export default async function AppLayout({
   // Verificar que el usuario completó el onboarding
   const { data: profile } = await supabase
     .from("profiles")
-    .select("onboarding_completado")
+    .select("onboarding_completado, modo")
     .eq("id", user.id)
     .single();
 
@@ -30,7 +30,7 @@ export default async function AppLayout({
 
   return (
     <div className="min-h-screen flex flex-col">
-      <Header userEmail={user.email} />
+      <Header userEmail={user.email} modo={profile.modo ?? "personal"} />
       <main className="flex-1 p-4 md:p-6">{children}</main>
     </div>
   );

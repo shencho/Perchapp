@@ -10,15 +10,20 @@ import { cn } from "@/lib/utils";
 
 interface HeaderProps {
   userEmail?: string;
+  modo?: string;
 }
 
-const NAV_LINKS = [
-  { href: "/dashboard",    label: "Inicio" },
-  { href: "/movimientos",  label: "Movimientos" },
-  { href: "/captura",      label: "Captura" },
+const NAV_BASE = [
+  { href: "/dashboard",   label: "Inicio" },
+  { href: "/movimientos", label: "Movimientos" },
+  { href: "/captura",     label: "Captura" },
 ];
 
-export function Header({ userEmail }: HeaderProps) {
+export function Header({ userEmail, modo }: HeaderProps) {
+  const showClientes = modo === "profesional" || modo === "ambos";
+  const NAV_LINKS = showClientes
+    ? [...NAV_BASE, { href: "/clientes", label: "Clientes" }]
+    : NAV_BASE;
   const router = useRouter();
   const pathname = usePathname();
   const [menuOpen, setMenuOpen] = useState(false);
