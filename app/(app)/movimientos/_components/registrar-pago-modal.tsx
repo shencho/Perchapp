@@ -374,10 +374,6 @@ function RegistroNuevoFields({
   notasNueva: string;
   setNotasNueva: (v: string) => void;
 }) {
-  console.log("[modal-debug] componente renderizado");
-  console.log("[modal-debug] props recibidas:", JSON.stringify({ serviciosDisponibles }, null, 2));
-  console.log("[modal-debug] options que se van a renderizar:", JSON.stringify(serviciosDisponibles?.filter((s) => !(s as { archivado?: boolean }).archivado), null, 2));
-
   if (serviciosDisponibles.length === 0) {
     return (
       <p className="text-sm text-muted-foreground border border-dashed border-border rounded-md px-4 py-3">
