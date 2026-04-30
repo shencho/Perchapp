@@ -31,15 +31,15 @@ interface Props {
   onConfirm: () => void;
   cliente: { id: string; nombre: string };
   movimientoData: MovimientoInput;
+  serviciosDisponibles: { id: string; nombre: string; modalidad: string }[];
 }
 
-export function RegistrarPagoModal({ open, onClose, onConfirm, cliente, movimientoData }: Props) {
+export function RegistrarPagoModal({ open, onClose, onConfirm, cliente, movimientoData, serviciosDisponibles }: Props) {
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const [registrosPendientes, setRegistrosPendientes] = useState<RegistroTrabajo[]>([]);
-  const [serviciosActivos, setServiciosActivos] = useState<{ id: string; nombre: string; modalidad: string }[]>([]);
   const [saldoPendiente, setSaldoPendiente] = useState(0);
 
   const [opcion, setOpcion] = useState<"pago" | "suelto">("pago");
@@ -64,9 +64,8 @@ export function RegistrarPagoModal({ open, onClose, onConfirm, cliente, movimien
     setNotasNueva("");
 
     getDataPagoModal(cliente.id)
-      .then(({ registrosPendientes: rp, serviciosActivos: sa, saldoPendiente: sp }) => {
+      .then(({ registrosPendientes: rp, saldoPendiente: sp }) => {
         setRegistrosPendientes(rp);
-        setServiciosActivos(sa);
         setSaldoPendiente(sp);
         const fifo = asignarPagoFIFO(rp, montoPago);
         setAsignaciones(new Set(fifo.asignaciones.map((a) => a.registro_id)));
@@ -81,11 +80,11 @@ export function RegistrarPagoModal({ open, onClose, onConfirm, cliente, movimien
   const caso: 1 | 2 | 3 = saldoPendiente === 0 ? 3 : saldoPendiente >= montoPago ? 1 : 2;
   const sobrante = montoPago - saldoPendiente;
 
-  const servicioNuevo = serviciosActivos.find((s) => s.id === servicioNuevoId);
+  const servicioNuevo = serviciosDisponibles.find((s) => s.id === servicioNuevoId);
   const tipoRegistroNuevo =
     servicioNuevo?.modalidad === "comision" ? ("comision" as const) : ("sesion" as const);
 
-  const sinServicios = opcion === "pago" && (caso === 2 || caso === 3) && serviciosActivos.length === 0;
+  const sinServicios = opcion === "pago" && (caso === 2 || caso === 3) && serviciosDisponibles.length === 0;
 
   const puedeConfirmar =
     !sinServicios &&
@@ -294,7 +293,7 @@ export function RegistrarPagoModal({ open, onClose, onConfirm, cliente, movimien
                         se registrará como un nuevo trabajo:
                       </p>
                       <RegistroNuevoFields
-                        serviciosActivos={serviciosActivos}
+                        serviciosDisponibles={serviciosDisponibles}
                         servicioNuevoId={servicioNuevoId}
                         setServicioNuevoId={setServicioNuevoId}
                         fechaNueva={fechaNueva}
@@ -316,7 +315,7 @@ export function RegistrarPagoModal({ open, onClose, onConfirm, cliente, movimien
                         </p>
                       </div>
                       <RegistroNuevoFields
-                        serviciosActivos={serviciosActivos}
+                        serviciosDisponibles={serviciosDisponibles}
                         servicioNuevoId={servicioNuevoId}
                         setServicioNuevoId={setServicioNuevoId}
                         fechaNueva={fechaNueva}
@@ -359,7 +358,7 @@ export function RegistrarPagoModal({ open, onClose, onConfirm, cliente, movimien
 // ── Sub-componente para campos de registro nuevo (CASO 2 y 3) ─────────────────
 
 function RegistroNuevoFields({
-  serviciosActivos,
+  serviciosDisponibles,
   servicioNuevoId,
   setServicioNuevoId,
   fechaNueva,
@@ -367,7 +366,7 @@ function RegistroNuevoFields({
   notasNueva,
   setNotasNueva,
 }: {
-  serviciosActivos: { id: string; nombre: string; modalidad: string }[];
+  serviciosDisponibles: { id: string; nombre: string; modalidad: string }[];
   servicioNuevoId: string;
   setServicioNuevoId: (v: string) => void;
   fechaNueva: string;
@@ -375,7 +374,7 @@ function RegistroNuevoFields({
   notasNueva: string;
   setNotasNueva: (v: string) => void;
 }) {
-  if (serviciosActivos.length === 0) {
+  if (serviciosDisponibles.length === 0) {
     return (
       <p className="text-sm text-muted-foreground border border-dashed border-border rounded-md px-4 py-3">
         Este cliente no tiene servicios activos. Andá al tab{" "}
@@ -392,7 +391,7 @@ function RegistroNuevoFields({
           Servicio <span className="text-destructive">*</span>
         </Label>
         <NamedSelect
-          options={serviciosActivos.map((s) => ({ value: s.id, label: s.nombre }))}
+          options={serviciosDisponibles.map((s) => ({ value: s.id, label: s.nombre }))}
           value={servicioNuevoId}
           onValueChange={(v) => setServicioNuevoId(v ?? "")}
           placeholder="Seleccionar servicio…"

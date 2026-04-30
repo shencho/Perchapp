@@ -50,45 +50,26 @@ export async function getRegistrosPendientes(clienteId: string) {
 
 export async function getDataPagoModal(clienteId: string): Promise<{
   registrosPendientes: RegistroTrabajo[];
-  serviciosActivos: { id: string; nombre: string; modalidad: string }[];
   saldoPendiente: number;
 }> {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error("No autenticado");
 
-  const [pendientesRes, serviciosRes] = await Promise.all([
-    supabase
-      .from("registros_trabajo")
-      .select("*")
-      .eq("cliente_id", clienteId)
-      .eq("user_id", user.id)
-      .is("pago_id", null)
-      .order("fecha"),
-    supabase
-      .from("servicios_cliente")
-      .select("*")
-      .eq("cliente_id", clienteId)
-      .eq("user_id", user.id)
-      .order("nombre"),
-  ]);
+  const { data, error } = await supabase
+    .from("registros_trabajo")
+    .select("*")
+    .eq("cliente_id", clienteId)
+    .eq("user_id", user.id)
+    .is("pago_id", null)
+    .order("fecha");
 
-  // DEBUG TEMPORAL — revisar en terminal Next.js
-  console.log("[getDataPagoModal] clienteId:", clienteId, "userId:", user.id);
-  console.log("[getDataPagoModal] serviciosRes.error:", serviciosRes.error);
-  console.log("[getDataPagoModal] serviciosRes.data:", JSON.stringify(serviciosRes.data));
+  if (error) throw new Error(error.message);
 
-  if (pendientesRes.error) throw new Error(pendientesRes.error.message);
-  if (serviciosRes.error) throw new Error(serviciosRes.error.message);
-
-  const registrosPendientes = pendientesRes.data ?? [];
+  const registrosPendientes = data ?? [];
   const saldoPendiente = registrosPendientes.reduce((acc, r) => acc + (r.monto ?? 0), 0);
 
-  const serviciosActivos = (serviciosRes.data ?? [])
-    .filter((s) => !s.archivado)
-    .map((s) => ({ id: s.id, nombre: s.nombre, modalidad: s.modalidad ?? "sesion" }));
-
-  return { registrosPendientes, serviciosActivos, saldoPendiente };
+  return { registrosPendientes, saldoPendiente };
 }
 
 export async function getPagoByMovimientoId(

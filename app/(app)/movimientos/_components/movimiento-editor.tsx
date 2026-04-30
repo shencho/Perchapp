@@ -115,7 +115,7 @@ export function MovimientoEditor({ open, onClose, editing, cuentas, tarjetas, ca
   const [localCategorias, setLocalCategorias] = useState<Categoria[]>(categorias);
   const [padreId, setPadreId] = useState<string | null>(null);
   const [subcatId, setSubcatId] = useState<string | null>(null);
-  const [serviciosCliente, setServiciosCliente] = useState<{ id: string; nombre: string }[]>([]);
+  const [serviciosCliente, setServiciosCliente] = useState<{ id: string; nombre: string; modalidad: string }[]>([]);
   const [pagoModalOpen, setPagoModalOpen] = useState(false);
   const [pendingPayload, setPendingPayload] = useState<MovimientoInput | null>(null);
   const [linkedPago, setLinkedPago] = useState<{ id: string; registro_creado_id: string | null } | null>(null);
@@ -241,7 +241,7 @@ export function MovimientoEditor({ open, onClose, editing, cuentas, tarjetas, ca
   useEffect(() => {
     if (!clienteId) { setServiciosCliente([]); return; }
     getServicios(clienteId)
-      .then((s) => setServiciosCliente(s.filter((sv) => !sv.archivado).map((sv) => ({ id: sv.id, nombre: sv.nombre }))))
+      .then((s) => setServiciosCliente(s.filter((sv) => !sv.archivado).map((sv) => ({ id: sv.id, nombre: sv.nombre, modalidad: sv.modalidad }))))
       .catch(() => setServiciosCliente([]));
   }, [clienteId]);
 
@@ -352,6 +352,7 @@ export function MovimientoEditor({ open, onClose, editing, cuentas, tarjetas, ca
           nombre: clientes.find((c) => c.id === pendingPayload.cliente_id)?.nombre ?? "",
         }}
         movimientoData={pendingPayload}
+        serviciosDisponibles={serviciosCliente}
       />
     )}
     {open && (
