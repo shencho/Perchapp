@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Plus, CheckSquare, Square, AlertCircle } from "lucide-react";
+import { Plus, CheckSquare, Square, AlertCircle, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -16,6 +16,7 @@ import {
   createPago,
   reasignarPago,
   getRegistrosPendientes,
+  deletePago,
 } from "@/lib/supabase/actions/pagos";
 import type { ClienteConSaldo } from "@/lib/supabase/actions/clientes";
 import type { PagoConCuenta } from "@/lib/supabase/actions/pagos";
@@ -107,6 +108,21 @@ export function PagosTab({ cliente, cuentas }: Props) {
     }
   }
 
+  async function handleEliminarPago(p: PagoConCuenta) {
+    const msg = p.movimiento_id
+      ? "¿Eliminar este pago? También se eliminará el movimiento de ingreso vinculado."
+      : "¿Eliminar este pago?";
+    if (!confirm(msg)) return;
+    try {
+      await deletePago(p.id);
+      const nuevosPagos = await getPagos(cliente.id);
+      setPagos(nuevosPagos);
+      router.refresh();
+    } catch (e) {
+      setActionError(e instanceof Error ? e.message : "Error al eliminar pago");
+    }
+  }
+
   async function confirmarReasignacion() {
     if (!ultimoPagoId) return;
     try {
@@ -184,7 +200,7 @@ export function PagosTab({ cliente, cuentas }: Props) {
         <div className="flex flex-col divide-y divide-border rounded-lg border border-border">
           {pagos.map((p) => (
             <div key={p.id} className="flex items-center justify-between px-4 py-3 gap-3">
-              <div className="flex flex-col gap-0.5">
+              <div className="flex flex-col gap-0.5 flex-1 min-w-0">
                 <span className="text-sm font-medium">{formatMonto(p.monto, p.moneda)}</span>
                 <span className="text-xs text-muted-foreground">
                   {p.fecha} · {p.metodo}
@@ -194,6 +210,14 @@ export function PagosTab({ cliente, cuentas }: Props) {
                   <span className="text-xs text-muted-foreground italic">{p.observaciones}</span>
                 )}
               </div>
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                onClick={() => handleEliminarPago(p)}
+                className="text-destructive hover:text-destructive flex-shrink-0"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+              </Button>
             </div>
           ))}
         </div>

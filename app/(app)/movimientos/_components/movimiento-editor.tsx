@@ -14,6 +14,12 @@ import { cn } from "@/lib/utils";
 import { createMovimiento, updateMovimiento } from "@/lib/supabase/actions/movimientos";
 import { getServicios } from "@/lib/supabase/actions/servicios";
 import {
+  getPagoByMovimientoId,
+  syncPagoFromMovimiento,
+  unlinkPagoFromMovimiento,
+} from "@/lib/supabase/actions/pagos";
+import { RegistrarPagoModal } from "./registrar-pago-modal";
+import {
   TIPOS_MOV,
   AMBITOS,
   METODOS,
@@ -110,6 +116,9 @@ export function MovimientoEditor({ open, onClose, editing, cuentas, tarjetas, ca
   const [padreId, setPadreId] = useState<string | null>(null);
   const [subcatId, setSubcatId] = useState<string | null>(null);
   const [serviciosCliente, setServiciosCliente] = useState<{ id: string; nombre: string }[]>([]);
+  const [pagoModalOpen, setPagoModalOpen] = useState(false);
+  const [pendingPayload, setPendingPayload] = useState<MovimientoInput | null>(null);
+  const [linkedPago, setLinkedPago] = useState<{ id: string; registro_creado_id: string | null } | null>(null);
 
   const {
     register,
@@ -185,8 +194,21 @@ export function MovimientoEditor({ open, onClose, editing, cuentas, tarjetas, ca
       setSubcatId(null);
       reset({ tipo: "Egreso", ambito: "Personal", moneda: "ARS", clasificacion: "Variable", cuotas: 1, frecuencia: "Corriente", cantidad: 1, fecha: todayStr() });
     }
+    setPagoModalOpen(false);
+    setPendingPayload(null);
+    setLinkedPago(null);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editing, open]);
+
+  // Cargar pago vinculado cuando se edita un movimiento Profesional
+  useEffect(() => {
+    if (editing?.id && editing?.ambito === "Profesional") {
+      getPagoByMovimientoId(editing.id)
+        .then((p) => setLinkedPago(p))
+        .catch(() => setLinkedPago(null));
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editing?.id]);
 
   // Valores observados para condicionales
   const tipo         = watch("tipo");
@@ -199,6 +221,11 @@ export function MovimientoEditor({ open, onClose, editing, cuentas, tarjetas, ca
   const monto        = watch("monto");
   const cantidad     = watch("cantidad");
   const clienteId    = watch("cliente_id");
+
+  // REGLA 1: detectar si el pago vinculado se desvinculará al guardar
+  const pagoSeDesvinculara =
+    !!editing && !!linkedPago &&
+    (ambito !== (editing.ambito as string) || clienteId !== editing.cliente_id);
 
   // Limpiar cliente/servicio cuando se cambia a Personal
   useEffect(() => {
@@ -268,7 +295,29 @@ export function MovimientoEditor({ open, onClose, editing, cuentas, tarjetas, ca
         unitario:          clasificacion === "Cuotas" ? unitario : values.monto,
       };
 
+      // Interceptar Ingreso Profesional nuevo → modal de pago
+      if (!editing && values.tipo === "Ingreso" && values.ambito === "Profesional" && values.cliente_id) {
+        setPendingPayload(payload);
+        setPagoModalOpen(true);
+        setIsSubmitting(false);
+        return;
+      }
+
       if (editing) {
+        // REGLA 1: sincronizar o desvincular pago vinculado
+        if (linkedPago) {
+          const ambitoChanged = values.ambito !== (editing.ambito as string);
+          const clienteChanged = values.cliente_id !== editing.cliente_id;
+          if (ambitoChanged || clienteChanged) {
+            await unlinkPagoFromMovimiento(editing.id);
+          } else {
+            await syncPagoFromMovimiento(editing.id, {
+              monto:             values.monto,
+              fecha:             values.fecha ?? new Date().toISOString().slice(0, 10),
+              cuenta_destino_id: values.cuenta_id ?? null,
+            });
+          }
+        }
         await updateMovimiento(editing.id, payload);
       } else {
         await createMovimiento(payload);
@@ -283,11 +332,29 @@ export function MovimientoEditor({ open, onClose, editing, cuentas, tarjetas, ca
     }
   }
 
-  if (!open) return null;
-
   // ── Render ─────────────────────────────────────────────────────────────────
 
   return (
+    <>
+    {/* Modal de pago — z-[60], por encima del editor z-50 */}
+    {pagoModalOpen && pendingPayload && (
+      <RegistrarPagoModal
+        open={pagoModalOpen}
+        onClose={() => { setPagoModalOpen(false); setPendingPayload(null); }}
+        onConfirm={() => {
+          setPagoModalOpen(false);
+          setPendingPayload(null);
+          router.refresh();
+          onClose();
+        }}
+        cliente={{
+          id: pendingPayload.cliente_id!,
+          nombre: clientes.find((c) => c.id === pendingPayload.cliente_id)?.nombre ?? "",
+        }}
+        movimientoData={pendingPayload}
+      />
+    )}
+    {open && (
     <div className="fixed inset-0 z-50 flex items-start justify-center p-4 pt-10 sm:items-center sm:pt-4">
       {/* Backdrop */}
       <div className="absolute inset-0 bg-black/60" onClick={onClose} />
@@ -729,19 +796,35 @@ export function MovimientoEditor({ open, onClose, editing, cuentas, tarjetas, ca
           </div>
 
           {/* Footer */}
-          <div className="px-5 py-4 border-t border-border flex-shrink-0 flex items-center justify-between gap-3">
-            {error && <p className="text-xs text-destructive flex-1">{error}</p>}
-            <div className="flex gap-2 ml-auto">
-              <Button type="button" variant="ghost" onClick={onClose} disabled={isSubmitting}>
-                Cancelar
-              </Button>
-              <Button type="submit" disabled={isSubmitting}>
-                {isSubmitting ? "Guardando…" : editing ? "Guardar cambios" : "Crear"}
-              </Button>
+          <div className="px-5 py-4 border-t border-border flex-shrink-0 space-y-2">
+            {editing && linkedPago && (
+              <p className={cn(
+                "text-xs px-2 py-1.5 rounded border",
+                pagoSeDesvinculara
+                  ? "bg-amber-950/30 border-amber-800/40 text-amber-300"
+                  : "bg-surface border-border text-muted-foreground",
+              )}>
+                {pagoSeDesvinculara
+                  ? "Al guardar se desvinculará el pago del cliente asociado a este movimiento."
+                  : "Este movimiento tiene un pago vinculado. Los cambios de monto y fecha se sincronizarán."}
+              </p>
+            )}
+            <div className="flex items-center justify-between gap-3">
+              {error && <p className="text-xs text-destructive flex-1">{error}</p>}
+              <div className="flex gap-2 ml-auto">
+                <Button type="button" variant="ghost" onClick={onClose} disabled={isSubmitting}>
+                  Cancelar
+                </Button>
+                <Button type="submit" disabled={isSubmitting}>
+                  {isSubmitting ? "Guardando…" : editing ? "Guardar cambios" : "Crear"}
+                </Button>
+              </div>
             </div>
           </div>
         </form>
       </div>
     </div>
+    )}
+    </>
   );
 }

@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { NamedSelect } from "@/components/ui/named-select";
 import { deleteMovimiento, duplicateMovimiento } from "@/lib/supabase/actions/movimientos";
+import { deletePagoFromMovimiento } from "@/lib/supabase/actions/pagos";
 import { TIPOS_MOV, METODOS, AMBITOS } from "@/lib/supabase/actions/movimientos-types";
 import { MovimientoEditor } from "./movimiento-editor";
 import type { Movimiento, Cuenta, Tarjeta, Categoria } from "@/types/supabase";
@@ -122,9 +123,17 @@ export function MovimientosClient({ movimientos, total, cuentas, tarjetas, categ
     startTransition(() => router.refresh());
   }
 
-  async function handleEliminar(id: string) {
-    if (!confirm("¿Eliminar este movimiento?")) return;
-    await deleteMovimiento(id);
+  async function handleEliminar(m: MovimientoConRelaciones) {
+    const isProfesionalIngreso = m.tipo === "Ingreso" && m.ambito === "Profesional";
+    const msg = isProfesionalIngreso
+      ? "¿Eliminar este movimiento? Si tiene un pago vinculado, también se eliminará junto a las asignaciones de registros."
+      : "¿Eliminar este movimiento?";
+    if (!confirm(msg)) return;
+    if (isProfesionalIngreso) {
+      await deletePagoFromMovimiento(m.id);
+    } else {
+      await deleteMovimiento(m.id);
+    }
     startTransition(() => router.refresh());
   }
 
@@ -308,7 +317,7 @@ export function MovimientosClient({ movimientos, total, cuentas, tarjetas, categ
                         <Button variant="ghost" size="icon-sm" onClick={() => handleDuplicar(m.id)} title="Duplicar">
                           <Copy className="h-3.5 w-3.5" />
                         </Button>
-                        <Button variant="ghost" size="icon-sm" onClick={() => handleEliminar(m.id)} title="Eliminar" className="text-destructive hover:text-destructive">
+                        <Button variant="ghost" size="icon-sm" onClick={() => handleEliminar(m)} title="Eliminar" className="text-destructive hover:text-destructive">
                           <Trash2 className="h-3.5 w-3.5" />
                         </Button>
                       </div>
@@ -368,7 +377,7 @@ export function MovimientosClient({ movimientos, total, cuentas, tarjetas, categ
                     <Button variant="ghost" size="icon-sm" onClick={() => handleDuplicar(m.id)}>
                       <Copy className="h-3.5 w-3.5" />
                     </Button>
-                    <Button variant="ghost" size="icon-sm" onClick={() => handleEliminar(m.id)} className="text-destructive hover:text-destructive">
+                    <Button variant="ghost" size="icon-sm" onClick={() => handleEliminar(m)} className="text-destructive hover:text-destructive">
                       <Trash2 className="h-3.5 w-3.5" />
                     </Button>
                   </div>

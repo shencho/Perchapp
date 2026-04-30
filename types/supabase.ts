@@ -377,6 +377,7 @@ export interface Database {
           cuenta_destino_id: string | null
           observaciones: string | null
           movimiento_id: string | null
+          registro_creado_id: string | null
           created_at: string
         }
         Insert: {
@@ -390,6 +391,7 @@ export interface Database {
           cuenta_destino_id?: string | null
           observaciones?: string | null
           movimiento_id?: string | null
+          registro_creado_id?: string | null
           created_at?: string
         }
         Update: {
@@ -403,6 +405,7 @@ export interface Database {
           cuenta_destino_id?: string | null
           observaciones?: string | null
           movimiento_id?: string | null
+          registro_creado_id?: string | null
           created_at?: string
         }
       }
