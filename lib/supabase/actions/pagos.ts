@@ -67,11 +67,16 @@ export async function getDataPagoModal(clienteId: string): Promise<{
       .order("fecha"),
     supabase
       .from("servicios_cliente")
-      .select("id, nombre, modalidad, archivado")
+      .select("*")
       .eq("cliente_id", clienteId)
       .eq("user_id", user.id)
       .order("nombre"),
   ]);
+
+  // DEBUG TEMPORAL — revisar en terminal Next.js
+  console.log("[getDataPagoModal] clienteId:", clienteId, "userId:", user.id);
+  console.log("[getDataPagoModal] serviciosRes.error:", serviciosRes.error);
+  console.log("[getDataPagoModal] serviciosRes.data:", JSON.stringify(serviciosRes.data));
 
   if (pendientesRes.error) throw new Error(pendientesRes.error.message);
   if (serviciosRes.error) throw new Error(serviciosRes.error.message);
@@ -79,10 +84,9 @@ export async function getDataPagoModal(clienteId: string): Promise<{
   const registrosPendientes = pendientesRes.data ?? [];
   const saldoPendiente = registrosPendientes.reduce((acc, r) => acc + (r.monto ?? 0), 0);
 
-  // Filter in memory: archivado !== true handles both false AND null values
   const serviciosActivos = (serviciosRes.data ?? [])
     .filter((s) => !s.archivado)
-    .map(({ id, nombre, modalidad }) => ({ id, nombre, modalidad: modalidad ?? "sesion" }));
+    .map((s) => ({ id: s.id, nombre: s.nombre, modalidad: s.modalidad ?? "sesion" }));
 
   return { registrosPendientes, serviciosActivos, saldoPendiente };
 }
