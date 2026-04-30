@@ -23,7 +23,7 @@ import type { ServicioConHistorial } from "@/lib/supabase/actions/servicios";
 import type { TarifaHistorial } from "@/types/supabase";
 import { cn } from "@/lib/utils";
 
-const MODALIDADES = ["sesion", "hora", "abono", "proyecto"] as const;
+const MODALIDADES = ["sesion", "hora", "abono", "proyecto", "comision"] as const;
 const CICLOS      = ["mensual", "quincenal", "al_cierre", "por_hito", "inmediato"] as const;
 const MONEDAS     = ["ARS", "USD"] as const;
 const ESTADOS_PROYECTO = ["activo", "finalizado", "pausado"] as const;
@@ -33,6 +33,7 @@ const MODALIDAD_LABEL: Record<string, string> = {
   hora:     "Por hora",
   abono:    "Abono",
   proyecto: "Proyecto",
+  comision: "Comisión variable",
 };
 
 const CICLO_LABEL: Record<string, string> = {
@@ -309,7 +310,11 @@ export function ServiciosTab({ cliente, serviciosIniciales }: Props) {
           </div>
 
           {/* Tarifa */}
-          {modalidad !== "proyecto" ? (
+          {modalidad === "comision" ? (
+            <p className="text-xs text-muted-foreground border border-dashed border-border rounded-md px-3 py-2">
+              Las comisiones se cargan con monto variable en cada registro. No requiere tarifa fija.
+            </p>
+          ) : modalidad !== "proyecto" ? (
             <div className="grid grid-cols-2 gap-3">
               <div className="flex flex-col gap-1.5">
                 <Label htmlFor="srv-tarifa">
@@ -387,7 +392,7 @@ export function ServiciosTab({ cliente, serviciosIniciales }: Props) {
           )}
 
           {/* Tope mensual */}
-          {modalidad !== "proyecto" && (
+          {modalidad !== "proyecto" && modalidad !== "comision" && (
             <div className="flex flex-col gap-3 border border-border rounded-lg p-3">
               <div className="flex flex-col gap-1.5">
                 <Label htmlFor="srv-tope">Tope mensual de unidades (opcional)</Label>
@@ -462,9 +467,11 @@ function ServicioRow({
   onArchive?: () => void;
   onToggleHistorial: () => void;
 }) {
-  const tarifaStr = servicio.tarifa_actual != null
-    ? `${servicio.tarifa_moneda} ${new Intl.NumberFormat("es-AR").format(servicio.tarifa_actual)}`
-    : "Sin tarifa";
+  const tarifaStr = servicio.modalidad === "comision"
+    ? "Comisión variable"
+    : servicio.tarifa_actual != null
+      ? `${servicio.tarifa_moneda} ${new Intl.NumberFormat("es-AR").format(servicio.tarifa_actual)}`
+      : "Sin tarifa";
 
   return (
     <div className="flex flex-col">

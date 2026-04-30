@@ -12,6 +12,7 @@ import { Label } from "@/components/ui/label";
 import { NamedSelect } from "@/components/ui/named-select";
 import { cn } from "@/lib/utils";
 import { createMovimiento, updateMovimiento } from "@/lib/supabase/actions/movimientos";
+import { getServicios } from "@/lib/supabase/actions/servicios";
 import {
   TIPOS_MOV,
   AMBITOS,
@@ -47,6 +48,12 @@ const schema = z.object({
   cantidad:          z.number().int().min(1),
   observaciones:     z.string().nullable().optional(),
   fecha:             z.string().optional(),
+  cliente_id:        z.string().nullable().optional(),
+  servicio_id:       z.string().nullable().optional(),
+}).superRefine((data, ctx) => {
+  if (data.ambito === "Profesional" && data.tipo !== "Transferencia" && !data.cliente_id) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message: "El cliente es requerido", path: ["cliente_id"] });
+  }
 });
 
 type FormData = z.infer<typeof schema>;
@@ -60,6 +67,7 @@ interface Props {
   cuentas: Cuenta[];
   tarjetas: Tarjeta[];
   categorias: Categoria[];
+  clientes?: { id: string; nombre: string }[];
   defaultValues?: Partial<FormData>;
   suggestCategoria?: string;
 }
@@ -94,13 +102,14 @@ function todayStr() {
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
-export function MovimientoEditor({ open, onClose, editing, cuentas, tarjetas, categorias, defaultValues, suggestCategoria }: Props) {
+export function MovimientoEditor({ open, onClose, editing, cuentas, tarjetas, categorias, clientes = [], defaultValues, suggestCategoria }: Props) {
   const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [localCategorias, setLocalCategorias] = useState<Categoria[]>(categorias);
   const [padreId, setPadreId] = useState<string | null>(null);
   const [subcatId, setSubcatId] = useState<string | null>(null);
+  const [serviciosCliente, setServiciosCliente] = useState<{ id: string; nombre: string }[]>([]);
 
   const {
     register,
@@ -121,6 +130,8 @@ export function MovimientoEditor({ open, onClose, editing, cuentas, tarjetas, ca
       frecuencia:    "Corriente",
       cantidad:      1,
       fecha:         todayStr(),
+      cliente_id:    null,
+      servicio_id:   null,
       ...defaultValues,
     },
   });
@@ -163,6 +174,8 @@ export function MovimientoEditor({ open, onClose, editing, cuentas, tarjetas, ca
         cantidad:          editing.cantidad ?? 1,
         observaciones:     editing.observaciones ?? undefined,
         fecha:             editing.fecha ?? todayStr(),
+        cliente_id:        editing.cliente_id ?? null,
+        servicio_id:       editing.servicio_id ?? null,
       });
     } else if (defaultValues) {
       resolveCatId(defaultValues.categoria_id as string | null | undefined);
@@ -185,6 +198,25 @@ export function MovimientoEditor({ open, onClose, editing, cuentas, tarjetas, ca
   const cuotas       = watch("cuotas");
   const monto        = watch("monto");
   const cantidad     = watch("cantidad");
+  const clienteId    = watch("cliente_id");
+
+  // Limpiar cliente/servicio cuando se cambia a Personal
+  useEffect(() => {
+    if (ambito !== "Profesional") {
+      setValue("cliente_id", null);
+      setValue("servicio_id", null);
+      setServiciosCliente([]);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ambito]);
+
+  // Cargar servicios cuando cambia el cliente
+  useEffect(() => {
+    if (!clienteId) { setServiciosCliente([]); return; }
+    getServicios(clienteId)
+      .then((s) => setServiciosCliente(s.filter((sv) => !sv.archivado).map((sv) => ({ id: sv.id, nombre: sv.nombre }))))
+      .catch(() => setServiciosCliente([]));
+  }, [clienteId]);
 
   // Categorías padre (sin parent_id)
   const catsPadre = localCategorias.filter((c) => !c.parent_id && (
@@ -231,7 +263,8 @@ export function MovimientoEditor({ open, onClose, editing, cuentas, tarjetas, ca
         debita_de:         showDebitaDe ? (values.debita_de ?? null) : null,
         cuenta_destino_id: showCuentaDestino ? (values.cuenta_destino_id ?? null) : null,
         observaciones:     values.observaciones ?? null,
-        cliente_id:        null,
+        cliente_id:        values.ambito === "Profesional" ? (values.cliente_id ?? null) : null,
+        servicio_id:       values.ambito === "Profesional" ? (values.servicio_id ?? null) : null,
         unitario:          clasificacion === "Cuotas" ? unitario : values.monto,
       };
 
@@ -313,9 +346,55 @@ export function MovimientoEditor({ open, onClose, editing, cuentas, tarjetas, ca
 
               {ambito === "Profesional" && tipo !== "Transferencia" && (
                 <div className="col-span-2">
-                  <p className="text-xs text-muted-foreground border border-dashed border-border rounded-md px-3 py-2">
-                    Vinculación a cliente/servicio disponible en Sesión 5.
-                  </p>
+                  {clientes.length === 0 ? (
+                    <p className="text-xs text-muted-foreground border border-dashed border-border rounded-md px-3 py-2">
+                      Aún no tenés clientes. Agregalos en{" "}
+                      <a href="/clientes" className="underline hover:text-foreground">/clientes</a>{" "}
+                      para vincularlos a movimientos.
+                    </p>
+                  ) : (
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-1.5">
+                        <Label>Cliente</Label>
+                        <Controller
+                          name="cliente_id"
+                          control={control}
+                          render={({ field }) => (
+                            <NamedSelect
+                              options={clientes.map((c) => ({ value: c.id, label: c.nombre }))}
+                              value={field.value ?? ""}
+                              onValueChange={(v) => {
+                                field.onChange(v || null);
+                                setValue("servicio_id", null);
+                              }}
+                              placeholder="Seleccionar cliente…"
+                              className="w-full"
+                            />
+                          )}
+                        />
+                        {errors.cliente_id && (
+                          <p className="text-xs text-destructive">{errors.cliente_id.message}</p>
+                        )}
+                      </div>
+                      <div className="space-y-1.5">
+                        <Label>Servicio</Label>
+                        <Controller
+                          name="servicio_id"
+                          control={control}
+                          render={({ field }) => (
+                            <NamedSelect
+                              options={serviciosCliente.map((s) => ({ value: s.id, label: s.nombre }))}
+                              value={field.value ?? ""}
+                              onValueChange={(v) => field.onChange(v || null)}
+                              placeholder="Opcional…"
+                              disabled={!clienteId}
+                              className="w-full"
+                            />
+                          )}
+                        />
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
             </div>

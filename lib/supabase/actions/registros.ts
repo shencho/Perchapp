@@ -72,7 +72,7 @@ export async function calcularTarifaParaRegistro(
   clienteId: string,
   fecha: string,
   cantidad: number,
-): Promise<{ tarifa_aplicada: number; monto: number; es_extra: boolean }> {
+): Promise<{ tarifa_aplicada: number | null; monto: number; es_extra: boolean }> {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error("No autenticado");
@@ -109,7 +109,7 @@ export async function calcularTarifaParaRegistro(
 export interface CreateRegistroInput {
   cliente_id:     string;
   servicio_id:    string;
-  tipo:           "sesion" | "hora" | "hito";
+  tipo:           "sesion" | "hora" | "hito" | "comision";
   fecha:          string;
   cantidad:       number;
   monto_override?: boolean;
@@ -122,12 +122,12 @@ export async function createRegistro(data: CreateRegistroInput): Promise<{ warni
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error("No autenticado");
 
-  let tarifa_aplicada: number;
+  let tarifa_aplicada: number | null;
   let monto: number;
 
-  if (data.monto_override && data.monto_manual != null) {
-    tarifa_aplicada = data.monto_manual / data.cantidad;
-    monto = data.monto_manual;
+  if (data.tipo === "comision" || (data.monto_override && data.monto_manual != null)) {
+    tarifa_aplicada = data.tipo === "comision" ? null : data.monto_manual! / data.cantidad;
+    monto = data.monto_manual ?? 0;
   } else {
     const calc = await calcularTarifaParaRegistro(
       data.servicio_id,
@@ -148,7 +148,7 @@ export async function createRegistro(data: CreateRegistroInput): Promise<{ warni
     cantidad:        data.cantidad,
     tarifa_aplicada,
     monto,
-    monto_override:  !!data.monto_override,
+    monto_override:  data.tipo === "comision" ? true : !!data.monto_override,
     notas:           data.notas ?? null,
     origen:          "manual",
   });
@@ -158,7 +158,7 @@ export async function createRegistro(data: CreateRegistroInput): Promise<{ warni
 }
 
 export interface UpdateRegistroInput {
-  tipo?:           "sesion" | "hora" | "hito";
+  tipo?:           "sesion" | "hora" | "hito" | "comision";
   fecha?:          string;
   cantidad?:       number;
   monto_override?: boolean;

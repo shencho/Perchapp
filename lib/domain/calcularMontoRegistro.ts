@@ -2,7 +2,7 @@ import type { ServicioCliente, TarifaHistorial, RegistroTrabajo } from "@/types/
 import { calcularTarifaVigente } from "./calcularTarifaVigente";
 
 export interface ResultadoCalculo {
-  tarifa_aplicada: number;
+  tarifa_aplicada: number | null;
   monto: number;
   es_extra: boolean;
 }
@@ -21,6 +21,11 @@ export function calcularMontoRegistro(params: {
   registrosMes: RegistroTrabajo[];
 }): ResultadoCalculo {
   const { servicio, historial, fecha, cantidad, registrosMes } = params;
+
+  // Comisión: monto variable, no hay tarifa fija
+  if (servicio.modalidad === "comision") {
+    return { tarifa_aplicada: null, monto: 0, es_extra: false };
+  }
 
   const tarifaVigente = calcularTarifaVigente(historial, fecha);
   const tarifaBase = tarifaVigente?.tarifa ?? servicio.tarifa_actual ?? 0;

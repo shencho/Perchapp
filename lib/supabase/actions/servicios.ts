@@ -68,7 +68,7 @@ function yesterdayStr() {
 export interface CreateServicioInput {
   cliente_id: string;
   nombre: string;
-  modalidad: "sesion" | "hora" | "abono" | "proyecto";
+  modalidad: "sesion" | "hora" | "abono" | "proyecto" | "comision";
   tarifa_actual?: number | null;
   tarifa_moneda?: string;
   ciclo_facturacion?: "mensual" | "quincenal" | "al_cierre" | "por_hito" | "inmediato";
@@ -124,7 +124,7 @@ export async function createServicio(data: CreateServicioInput): Promise<Servici
 
 export interface UpdateServicioInput {
   nombre?: string;
-  modalidad?: "sesion" | "hora" | "abono" | "proyecto";
+  modalidad?: "sesion" | "hora" | "abono" | "proyecto" | "comision";
   tarifa_actual?: number | null;
   tarifa_moneda?: string;
   ciclo_facturacion?: "mensual" | "quincenal" | "al_cierre" | "por_hito" | "inmediato";

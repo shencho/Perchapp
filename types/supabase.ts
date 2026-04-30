@@ -222,7 +222,7 @@ export interface Database {
           cliente_id: string
           nombre: string
           descripcion: string | null
-          modalidad: "sesion" | "hora" | "abono" | "proyecto"
+          modalidad: "sesion" | "hora" | "abono" | "proyecto" | "comision"
           tarifa_actual: number | null
           tarifa_moneda: string
           ciclo_facturacion: "mensual" | "quincenal" | "al_cierre" | "por_hito" | "inmediato"
@@ -241,7 +241,7 @@ export interface Database {
           cliente_id: string
           nombre: string
           descripcion?: string | null
-          modalidad: "sesion" | "hora" | "abono" | "proyecto"
+          modalidad: "sesion" | "hora" | "abono" | "proyecto" | "comision"
           tarifa_actual?: number | null
           tarifa_moneda?: string
           ciclo_facturacion?: "mensual" | "quincenal" | "al_cierre" | "por_hito" | "inmediato"
@@ -260,7 +260,7 @@ export interface Database {
           cliente_id?: string
           nombre?: string
           descripcion?: string | null
-          modalidad?: "sesion" | "hora" | "abono" | "proyecto"
+          modalidad?: "sesion" | "hora" | "abono" | "proyecto" | "comision"
           tarifa_actual?: number | null
           tarifa_moneda?: string
           ciclo_facturacion?: "mensual" | "quincenal" | "al_cierre" | "por_hito" | "inmediato"
@@ -312,7 +312,7 @@ export interface Database {
           user_id: string
           cliente_id: string | null
           servicio_id: string | null
-          tipo: "sesion" | "hora" | "hito" | null
+          tipo: "sesion" | "hora" | "hito" | "comision" | null
           fecha: string
           cantidad: number
           tarifa_aplicada: number | null
@@ -331,7 +331,7 @@ export interface Database {
           user_id: string
           cliente_id?: string | null
           servicio_id?: string | null
-          tipo?: "sesion" | "hora" | "hito" | null
+          tipo?: "sesion" | "hora" | "hito" | "comision" | null
           fecha?: string
           cantidad?: number
           tarifa_aplicada?: number | null
@@ -432,6 +432,7 @@ export interface Database {
           unitario: number | null
           observaciones: string | null
           cliente_id: string | null
+          servicio_id: string | null
           fecha: string
           created_at: string
         }
@@ -460,6 +461,7 @@ export interface Database {
           unitario?: number | null
           observaciones?: string | null
           cliente_id?: string | null
+          servicio_id?: string | null
           fecha?: string
           created_at?: string
         }
@@ -488,6 +490,7 @@ export interface Database {
           unitario?: number | null
           observaciones?: string | null
           cliente_id?: string | null
+          servicio_id?: string | null
           fecha?: string
           created_at?: string
         }

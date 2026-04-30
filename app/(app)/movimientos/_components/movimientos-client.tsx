@@ -19,6 +19,8 @@ type MovimientoConRelaciones = Movimiento & {
   cuentas?: { id: string; nombre: string; tipo: string } | null;
   cuenta_destino?: { id: string; nombre: string } | null;
   tarjetas?: { id: string; nombre: string } | null;
+  clientes?: { id: string; nombre: string } | null;
+  servicios_cliente?: { id: string; nombre: string } | null;
 };
 
 interface Props {
@@ -27,6 +29,7 @@ interface Props {
   cuentas: Cuenta[];
   tarjetas: Tarjeta[];
   categorias: Categoria[];
+  clientes: { id: string; nombre: string }[];
   mesActual: string;
 }
 
@@ -71,7 +74,7 @@ function getMeses() {
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
-export function MovimientosClient({ movimientos, total, cuentas, tarjetas, categorias, mesActual }: Props) {
+export function MovimientosClient({ movimientos, total, cuentas, tarjetas, categorias, clientes, mesActual }: Props) {
   const router = useRouter();
   const [, startTransition] = useTransition();
 
@@ -265,6 +268,16 @@ export function MovimientosClient({ movimientos, total, cuentas, tarjetas, categ
                       {m.categorias && (
                         <div className="text-xs text-muted-foreground">{m.categorias.nombre}</div>
                       )}
+                      {m.ambito === "Profesional" && m.clientes && (
+                        <div className="flex items-center gap-1 mt-0.5 flex-wrap">
+                          <span className="text-xs text-blue-300 bg-blue-900/20 border border-blue-800/40 px-1.5 py-0.5 rounded">
+                            {m.clientes.nombre}
+                          </span>
+                          {m.servicios_cliente && (
+                            <span className="text-xs text-muted-foreground">· {m.servicios_cliente.nombre}</span>
+                          )}
+                        </div>
+                      )}
                     </td>
                     <td className="px-4 py-3 text-muted-foreground text-xs">
                       {m.metodo ?? "—"}
@@ -337,6 +350,16 @@ export function MovimientosClient({ movimientos, total, cuentas, tarjetas, categ
                       {m.metodo && <><span>·</span><span>{m.metodo}</span></>}
                       {m.categorias && <><span>·</span><span>{m.categorias.nombre}</span></>}
                     </div>
+                    {m.ambito === "Profesional" && m.clientes && (
+                      <div className="flex items-center gap-1 mt-1 flex-wrap">
+                        <span className="text-xs text-blue-300 bg-blue-900/20 border border-blue-800/40 px-1.5 py-0.5 rounded">
+                          {m.clientes.nombre}
+                        </span>
+                        {m.servicios_cliente && (
+                          <span className="text-xs text-muted-foreground">· {m.servicios_cliente.nombre}</span>
+                        )}
+                      </div>
+                    )}
                   </div>
                   <div className="flex gap-1 flex-shrink-0">
                     <Button variant="ghost" size="icon-sm" onClick={() => handleEditar(m)}>
@@ -381,6 +404,7 @@ export function MovimientosClient({ movimientos, total, cuentas, tarjetas, categ
         cuentas={cuentas}
         tarjetas={tarjetas}
         categorias={categorias}
+        clientes={clientes}
       />
     </div>
   );

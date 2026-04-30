@@ -30,7 +30,9 @@ export async function getMovimientos(filtros: MovimientosFiltros = {}) {
       categorias ( id, nombre, tipo, parent_id ),
       cuentas:cuenta_id ( id, nombre, tipo ),
       cuenta_destino:cuenta_destino_id ( id, nombre ),
-      tarjetas:tarjeta_id ( id, nombre )
+      tarjetas:tarjeta_id ( id, nombre ),
+      clientes:cliente_id ( id, nombre ),
+      servicios_cliente:servicio_id ( id, nombre )
     `, { count: "exact" })
     .eq("user_id", userId)
     .order("fecha", { ascending: false })
@@ -87,7 +89,8 @@ export async function createMovimiento(input: MovimientoInput) {
     cantidad:          parsed.cantidad,
     unitario:          parsed.unitario ?? null,
     observaciones:     parsed.observaciones ?? null,
-    cliente_id:        parsed.cliente_id ?? null,
+    cliente_id:        parsed.ambito === "Profesional" ? (parsed.cliente_id ?? null) : null,
+    servicio_id:       parsed.ambito === "Profesional" ? (parsed.servicio_id ?? null) : null,
     fecha:             parsed.fecha ?? new Date().toISOString().slice(0, 10),
   };
 

@@ -24,7 +24,7 @@ export default async function MovimientosPage({ searchParams }: Props) {
   const fin = new Date(Number(anio), Number(mes), 0).toISOString().slice(0, 10);
 
   // Cargar movimientos + relaciones + datos de filtros en paralelo
-  const [movRes, cuentasRes, tarjetasRes, categoriasRes] = await Promise.all([
+  const [movRes, cuentasRes, tarjetasRes, categoriasRes, clientesRes] = await Promise.all([
     supabase
       .from("movimientos")
       .select(`
@@ -32,7 +32,9 @@ export default async function MovimientosPage({ searchParams }: Props) {
         categorias ( id, nombre, tipo, parent_id ),
         cuentas:cuenta_id ( id, nombre, tipo ),
         cuenta_destino:cuenta_destino_id ( id, nombre ),
-        tarjetas:tarjeta_id ( id, nombre )
+        tarjetas:tarjeta_id ( id, nombre ),
+        clientes:cliente_id ( id, nombre ),
+        servicios_cliente:servicio_id ( id, nombre )
       `, { count: "exact" })
       .eq("user_id", user.id)
       .gte("fecha", inicio)
@@ -57,6 +59,12 @@ export default async function MovimientosPage({ searchParams }: Props) {
       .eq("user_id", user.id)
       .eq("archivada", false)
       .order("nombre"),
+    supabase
+      .from("clientes")
+      .select("id, nombre")
+      .eq("user_id", user.id)
+      .eq("archivado", false)
+      .order("nombre"),
   ]);
 
   return (
@@ -66,6 +74,7 @@ export default async function MovimientosPage({ searchParams }: Props) {
       cuentas={cuentasRes.data ?? []}
       tarjetas={tarjetasRes.data ?? []}
       categorias={categoriasRes.data ?? []}
+      clientes={(clientesRes.data ?? []) as { id: string; nombre: string }[]}
       mesActual={mesActual}
     />
   );

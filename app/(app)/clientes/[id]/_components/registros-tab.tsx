@@ -24,8 +24,15 @@ import type { ServicioConHistorial } from "@/lib/supabase/actions/servicios";
 import type { RegistroConServicio } from "@/lib/supabase/actions/registros";
 import { cn } from "@/lib/utils";
 
-const TIPOS = ["sesion", "hora", "hito"] as const;
-const TIPO_LABEL: Record<string, string> = { sesion: "Sesión", hora: "Hora", hito: "Hito" };
+const TIPOS = ["sesion", "hora", "hito", "comision"] as const;
+const TIPO_LABEL: Record<string, string> = { sesion: "Sesión", hora: "Hora", hito: "Hito", comision: "Comisión" };
+
+const TIPO_BADGE_CLASS: Record<string, string> = {
+  sesion:   "bg-surface border-border text-foreground",
+  hora:     "bg-surface border-border text-foreground",
+  hito:     "bg-surface border-border text-foreground",
+  comision: "bg-violet-900/30 text-violet-300 border-violet-800",
+};
 
 const schema = z.object({
   servicio_id:    z.string().min(1, "Seleccioná un servicio"),
@@ -102,9 +109,17 @@ export function RegistrosTab({ cliente, servicios }: Props) {
   const cantidad      = watch("cantidad");
   const montoOverride = watch("monto_override");
 
-  // Recalcular monto cuando cambian servicio/fecha/cantidad
+  const servicioSeleccionado = serviciosActivos.find((s) => s.id === servicioId);
+  const esComision = servicioSeleccionado?.modalidad === "comision";
+
+  // Auto-set tipo=comision cuando el servicio es de tipo comisión
   useEffect(() => {
-    if (!servicioId || !fecha || !cantidad) { setMontoCalculado(null); return; }
+    if (esComision) setValue("tipo", "comision");
+  }, [esComision, setValue]);
+
+  // Recalcular monto cuando cambian servicio/fecha/cantidad (no aplica para comisión)
+  useEffect(() => {
+    if (!servicioId || !fecha || !cantidad || esComision) { setMontoCalculado(null); return; }
     let cancelled = false;
     setCalculando(true);
     calcularTarifaParaRegistro(servicioId, cliente.id, fecha, cantidad)
@@ -112,7 +127,7 @@ export function RegistrosTab({ cliente, servicios }: Props) {
       .catch(() => { if (!cancelled) setMontoCalculado(null); })
       .finally(() => { if (!cancelled) setCalculando(false); });
     return () => { cancelled = true; };
-  }, [servicioId, fecha, cantidad, cliente.id]);
+  }, [servicioId, fecha, cantidad, cliente.id, esComision]);
 
   // Cargar registros del mes
   useEffect(() => {
@@ -178,8 +193,8 @@ export function RegistrosTab({ cliente, servicios }: Props) {
           tipo:           data.tipo,
           fecha:          data.fecha,
           cantidad:       data.cantidad,
-          monto_override: data.monto_override,
-          monto_manual:   data.monto_override ? data.monto_manual : null,
+          monto_override: esComision ? true : data.monto_override,
+          monto_manual:   esComision ? (data.monto_manual ?? null) : (data.monto_override ? data.monto_manual : null),
           notas:          data.notas ?? null,
         });
       }
@@ -285,7 +300,10 @@ export function RegistrosTab({ cliente, servicios }: Props) {
                     <td className="px-4 py-2.5 text-muted-foreground">{r.fecha}</td>
                     <td className="px-4 py-2.5">{r.servicio_nombre ?? "—"}</td>
                     <td className="px-4 py-2.5">
-                      <span className="text-xs px-2 py-0.5 rounded-full bg-surface border border-border">
+                      <span className={cn(
+                        "text-xs px-2 py-0.5 rounded-full border",
+                        TIPO_BADGE_CLASS[r.tipo ?? "sesion"] ?? TIPO_BADGE_CLASS.sesion
+                      )}>
                         {TIPO_LABEL[r.tipo ?? "sesion"] ?? r.tipo}
                       </span>
                     </td>
@@ -414,6 +432,7 @@ export function RegistrosTab({ cliente, servicios }: Props) {
                     options={TIPOS.map((t) => ({ value: t, label: TIPO_LABEL[t] }))}
                     value={field.value}
                     onValueChange={(v) => v && field.onChange(v)}
+                    disabled={esComision}
                     className="w-full"
                   />
                 )}
@@ -437,34 +456,47 @@ export function RegistrosTab({ cliente, servicios }: Props) {
             />
           </div>
 
-          {/* Monto auto-calculado */}
-          <div className="flex flex-col gap-2 bg-surface/50 rounded-lg p-3 border border-border">
-            <div className="flex items-center justify-between">
-              <Label className="text-xs text-muted-foreground">Monto calculado</Label>
-              <span className="text-sm font-medium">
-                {calculando ? "Calculando…" : montoCalculado != null ? formatMonto(montoCalculado) : "—"}
-              </span>
-            </div>
-            <div className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                id="reg-override"
-                {...register("monto_override")}
-                className="rounded border-border"
-              />
-              <label htmlFor="reg-override" className="text-xs text-muted-foreground cursor-pointer">
-                Modificar monto manualmente
-              </label>
-            </div>
-            {montoOverride && (
+          {/* Monto: directo para comisión, auto-calculado para el resto */}
+          {esComision ? (
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="reg-monto-comision">Monto de la comisión</Label>
               <Input
+                id="reg-monto-comision"
                 type="number"
                 step="0.01"
-                placeholder="Monto manual"
+                placeholder="0"
                 {...register("monto_manual", { valueAsNumber: true })}
               />
-            )}
-          </div>
+            </div>
+          ) : (
+            <div className="flex flex-col gap-2 bg-surface/50 rounded-lg p-3 border border-border">
+              <div className="flex items-center justify-between">
+                <Label className="text-xs text-muted-foreground">Monto calculado</Label>
+                <span className="text-sm font-medium">
+                  {calculando ? "Calculando…" : montoCalculado != null ? formatMonto(montoCalculado) : "—"}
+                </span>
+              </div>
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  id="reg-override"
+                  {...register("monto_override")}
+                  className="rounded border-border"
+                />
+                <label htmlFor="reg-override" className="text-xs text-muted-foreground cursor-pointer">
+                  Modificar monto manualmente
+                </label>
+              </div>
+              {montoOverride && (
+                <Input
+                  type="number"
+                  step="0.01"
+                  placeholder="Monto manual"
+                  {...register("monto_manual", { valueAsNumber: true })}
+                />
+              )}
+            </div>
+          )}
 
           {/* Notas */}
           <div className="flex flex-col gap-1.5">
