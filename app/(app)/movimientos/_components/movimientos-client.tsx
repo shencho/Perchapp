@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useState, useTransition, Fragment } from "react";
 import { useRouter } from "next/navigation";
 import { Plus, Pencil, Copy, Trash2, Search, ChevronDown, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -444,8 +444,8 @@ export function MovimientosClient({ movimientos, total, cuentas, tarjetas, categ
                   const partsCobrados = m.gastos_compartidos_participantes?.filter((p) => p.estado === "cobrado").length ?? 0;
                   const isExpanded = expandedId === m.id;
                   return (
-                    <>
-                    <tr key={m.id} className="border-b border-border last:border-0 hover:bg-surface/50 transition-colors">
+                    <Fragment key={m.id}>
+                    <tr className="border-b border-border last:border-0 hover:bg-surface/50 transition-colors">
                       <td className="px-4 py-3 text-muted-foreground whitespace-nowrap">
                         {formatFecha(m.fecha)}
                       </td>
@@ -547,7 +547,7 @@ export function MovimientosClient({ movimientos, total, cuentas, tarjetas, categ
                       </td>
                     </tr>
                     {isExpanded && (
-                      <tr key={`${m.id}-panel`} className="border-b border-border bg-surface/30">
+                      <tr className="border-b border-border bg-surface/30">
                         <td colSpan={7} className="px-6 py-2">
                           <CompartidoPanel
                             movimientoId={m.id}
@@ -558,7 +558,7 @@ export function MovimientosClient({ movimientos, total, cuentas, tarjetas, categ
                         </td>
                       </tr>
                     )}
-                    </>
+                    </Fragment>
                   );
                 })}
               </tbody>
