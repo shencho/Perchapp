@@ -1,6 +1,8 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { AjustesClient } from "./_components/ajustes-client";
+import type { GrupoConMiembros } from "@/lib/supabase/actions/grupos";
+import type { Persona } from "@/types/supabase";
 
 export default async function AjustesPage() {
   const supabase = await createClient();
@@ -15,31 +17,29 @@ export default async function AjustesPage() {
     { data: tarjetas },
     { data: categorias },
     { data: profesiones },
+    { data: personasRaw },
+    { data: gruposRaw },
   ] = await Promise.all([
     supabase.from("profiles").select("*").eq("id", user.id).single(),
+    supabase.from("cuentas").select("*").eq("user_id", user.id).eq("archivada", false).order("orden"),
+    supabase.from("tarjetas").select("*").eq("user_id", user.id).eq("archivada", false).order("created_at"),
+    supabase.from("categorias").select("*").eq("user_id", user.id).eq("archivada", false).order("orden"),
+    supabase.from("profesiones_templates").select("nombre, slug").order("nombre"),
+    supabase.from("personas").select("*").eq("user_id", user.id).eq("archivado", false).order("nombre"),
     supabase
-      .from("cuentas")
-      .select("*")
+      .from("grupos")
+      .select("*, grupo_miembros(persona_id, personas(*))")
       .eq("user_id", user.id)
-      .eq("archivada", false)
-      .order("orden"),
-    supabase
-      .from("tarjetas")
-      .select("*")
-      .eq("user_id", user.id)
-      .eq("archivada", false)
-      .order("created_at"),
-    supabase
-      .from("categorias")
-      .select("*")
-      .eq("user_id", user.id)
-      .eq("archivada", false)
-      .order("orden"),
-    supabase
-      .from("profesiones_templates")
-      .select("nombre, slug")
+      .eq("archivado", false)
       .order("nombre"),
   ]);
+
+  const grupos: GrupoConMiembros[] = (gruposRaw ?? []).map((g) => ({
+    ...g,
+    miembros: (g.grupo_miembros as { persona_id: string; personas: Persona | null }[])
+      .map((m) => m.personas)
+      .filter((p): p is Persona => p !== null),
+  }));
 
   return (
     <AjustesClient
@@ -48,6 +48,8 @@ export default async function AjustesPage() {
       tarjetas={tarjetas ?? []}
       categorias={categorias ?? []}
       profesiones={profesiones ?? []}
+      personas={personasRaw ?? []}
+      grupos={grupos}
     />
   );
 }

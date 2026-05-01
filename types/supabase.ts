@@ -463,6 +463,8 @@ export interface Database {
           cliente_id: string | null
           servicio_id: string | null
           fecha: string
+          es_compartido: boolean
+          gc_mi_parte: number | null
           created_at: string
         }
         Insert: {
@@ -492,6 +494,8 @@ export interface Database {
           cliente_id?: string | null
           servicio_id?: string | null
           fecha?: string
+          es_compartido?: boolean
+          gc_mi_parte?: number | null
           created_at?: string
         }
         Update: {
@@ -521,6 +525,8 @@ export interface Database {
           cliente_id?: string | null
           servicio_id?: string | null
           fecha?: string
+          es_compartido?: boolean
+          gc_mi_parte?: number | null
           created_at?: string
         }
       }
@@ -593,6 +599,107 @@ export interface Database {
           created_at?: string
         }
       }
+      personas: {
+        Row: {
+          id: string
+          user_id: string
+          nombre: string
+          notas: string | null
+          archivado: boolean
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          nombre: string
+          notas?: string | null
+          archivado?: boolean
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          nombre?: string
+          notas?: string | null
+          archivado?: boolean
+          created_at?: string
+        }
+      }
+      grupos: {
+        Row: {
+          id: string
+          user_id: string
+          nombre: string
+          archivado: boolean
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          nombre: string
+          archivado?: boolean
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          nombre?: string
+          archivado?: boolean
+          created_at?: string
+        }
+      }
+      grupo_miembros: {
+        Row: {
+          grupo_id: string
+          persona_id: string
+        }
+        Insert: {
+          grupo_id: string
+          persona_id: string
+        }
+        Update: {
+          grupo_id?: string
+          persona_id?: string
+        }
+      }
+      gastos_compartidos_participantes: {
+        Row: {
+          id: string
+          user_id: string
+          movimiento_id: string
+          persona_nombre: string
+          persona_id: string | null
+          monto: number
+          estado: "pendiente" | "cobrado"
+          cuenta_destino_id: string | null
+          movimiento_ingreso_id: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          movimiento_id: string
+          persona_nombre: string
+          persona_id?: string | null
+          monto: number
+          estado?: "pendiente" | "cobrado"
+          cuenta_destino_id?: string | null
+          movimiento_ingreso_id?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          movimiento_id?: string
+          persona_nombre?: string
+          persona_id?: string | null
+          monto?: number
+          estado?: "pendiente" | "cobrado"
+          cuenta_destino_id?: string | null
+          movimiento_ingreso_id?: string | null
+          created_at?: string
+        }
+      }
     }
     Views: Record<string, never>
     Functions: Record<string, never>
@@ -615,3 +722,7 @@ export type Movimiento = Database["public"]["Tables"]["movimientos"]["Row"]
 export type ConversacionIA = Database["public"]["Tables"]["conversaciones_ia"]["Row"]
 export type ProfesionTemplate = Database["public"]["Tables"]["profesiones_templates"]["Row"]
 export type FeatureFlags = Database["public"]["Tables"]["feature_flags"]["Row"]
+export type Persona = Database["public"]["Tables"]["personas"]["Row"]
+export type Grupo = Database["public"]["Tables"]["grupos"]["Row"]
+export type GrupoMiembro = Database["public"]["Tables"]["grupo_miembros"]["Row"]
+export type GastoCompartidoParticipante = Database["public"]["Tables"]["gastos_compartidos_participantes"]["Row"]

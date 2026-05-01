@@ -1,11 +1,13 @@
 "use client";
 
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import type { Profile, Cuenta, Tarjeta, Categoria } from "@/types/supabase";
+import type { Profile, Cuenta, Tarjeta, Categoria, Persona } from "@/types/supabase";
+import type { GrupoConMiembros } from "@/lib/supabase/actions/grupos";
 import { PerfilTab } from "./perfil-tab";
 import { CuentasTab } from "./cuentas-tab";
 import { TarjetasTab } from "./tarjetas-tab";
 import { CategoriasTab } from "./categorias-tab";
+import { PersonasGruposTab } from "./personas-grupos-tab";
 
 interface Props {
   profile: Profile | null;
@@ -13,6 +15,8 @@ interface Props {
   tarjetas: Tarjeta[];
   categorias: Categoria[];
   profesiones: { nombre: string; slug: string }[];
+  personas: Persona[];
+  grupos: GrupoConMiembros[];
 }
 
 export function AjustesClient({
@@ -21,6 +25,8 @@ export function AjustesClient({
   tarjetas,
   categorias,
   profesiones,
+  personas,
+  grupos,
 }: Props) {
   return (
     <div className="flex flex-col gap-6">
@@ -37,6 +43,7 @@ export function AjustesClient({
           <TabsTrigger value="cuentas">Cuentas</TabsTrigger>
           <TabsTrigger value="tarjetas">Tarjetas</TabsTrigger>
           <TabsTrigger value="categorias">Categorías</TabsTrigger>
+          <TabsTrigger value="personas">Personas y grupos</TabsTrigger>
         </TabsList>
 
         <TabsContent value="perfil" className="mt-6">
@@ -53,6 +60,10 @@ export function AjustesClient({
 
         <TabsContent value="categorias" className="mt-6">
           <CategoriasTab categorias={categorias} />
+        </TabsContent>
+
+        <TabsContent value="personas" className="mt-6">
+          <PersonasGruposTab personas={personas} grupos={grupos} />
         </TabsContent>
       </Tabs>
     </div>
