@@ -45,7 +45,7 @@ export async function getPagosPrestamo(prestamoId: string): Promise<PrestamoPago
 
   const { data, error } = await supabase
     .from("prestamos_pagos")
-    .select("*, movimientos(id, cuenta_id)")
+    .select("*, movimientos!movimiento_id(id, cuenta_id)")
     .eq("prestamo_id", prestamoId)
     .order("fecha", { ascending: false });
 

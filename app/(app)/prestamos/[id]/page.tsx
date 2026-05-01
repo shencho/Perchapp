@@ -33,8 +33,13 @@ export default async function PrestamoDetallePage({ params }: PageProps) {
       getPrestamo(id),
       getPagosPrestamo(id),
     ]);
-  } catch {
-    notFound();
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : "";
+    // Solo devolver 404 si el préstamo genuinamente no existe
+    if (msg.includes("no rows") || msg.includes("not found") || msg.includes("PGRST116")) {
+      notFound();
+    }
+    throw e; // Propagar errores reales (DB offline, FK ambigua, etc.)
   }
 
   const personas = await getPersonas();
