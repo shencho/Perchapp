@@ -32,7 +32,9 @@ export async function getMovimientos(filtros: MovimientosFiltros = {}) {
       cuenta_destino:cuenta_destino_id ( id, nombre ),
       tarjetas:tarjeta_id ( id, nombre ),
       clientes:cliente_id ( id, nombre ),
-      servicios_cliente:servicio_id ( id, nombre )
+      servicios_cliente:servicio_id ( id, nombre ),
+      prestamos:prestamo_id ( id, tipo, institucion_nombre, persona_id, personas ( nombre ) ),
+      gastos_compartidos_participantes ( id, estado, monto )
     `, { count: "exact" })
     .eq("user_id", userId)
     .order("fecha", { ascending: false })

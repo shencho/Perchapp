@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useTransition, Fragment } from "react";
 import { useRouter } from "next/navigation";
-import { Plus, Pencil, Copy, Trash2, Search, ChevronDown, Users } from "lucide-react";
+import { Plus, Pencil, Copy, Trash2, Search, ChevronDown, Users, Landmark } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
@@ -29,6 +29,7 @@ type MovimientoConRelaciones = Movimiento & {
   clientes?: { id: string; nombre: string } | null;
   servicios_cliente?: { id: string; nombre: string } | null;
   gastos_compartidos_participantes?: { id: string; estado: string; monto: number }[] | null;
+  prestamos?: { id: string; tipo: string; institucion_nombre: string | null; persona_id: string | null; personas?: { nombre: string } | null } | null;
 };
 
 interface Props {
@@ -71,6 +72,14 @@ function formatFecha(d: string) {
 
 function todayStr() {
   return new Date().toISOString().slice(0, 10);
+}
+
+function nombrePrestamo(m: MovimientoConRelaciones): string | null {
+  if (!m.prestamos) return null;
+  const p = m.prestamos;
+  if (p.tipo === "bancario") return p.institucion_nombre ?? "Institución";
+  const persona = p.personas?.nombre ?? "Persona";
+  return p.tipo === "otorgado" ? `Préstamo a ${persona}` : `Préstamo de ${persona}`;
 }
 
 // ── CompartidoPanel ───────────────────────────────────────────────────────────
@@ -309,9 +318,17 @@ export function MovimientosClient({ movimientos, total, cuentas, tarjetas, categ
 
   async function handleEliminar(m: MovimientoConRelaciones) {
     const isProfesionalIngreso = m.tipo === "Ingreso" && m.ambito === "Profesional";
-    const msg = isProfesionalIngreso
-      ? "¿Eliminar este movimiento? Si tiene un pago vinculado, también se eliminará junto a las asignaciones de registros."
-      : "¿Eliminar este movimiento?";
+    const prestamo = nombrePrestamo(m);
+
+    let msg: string;
+    if (prestamo) {
+      msg = `⚠ Este movimiento está vinculado al préstamo "${prestamo}". Eliminarlo desvinculará el pago del préstamo. ¿Confirmás?`;
+    } else if (isProfesionalIngreso) {
+      msg = "¿Eliminar este movimiento? Si tiene un pago vinculado, también se eliminará junto a las asignaciones de registros.";
+    } else {
+      msg = "¿Eliminar este movimiento?";
+    }
+
     if (!confirm(msg)) return;
     if (isProfesionalIngreso) {
       await deletePagoFromMovimiento(m.id);
@@ -500,6 +517,16 @@ export function MovimientosClient({ movimientos, total, cuentas, tarjetas, categ
                             })()}
                           </div>
                         )}
+                        {m.prestamos && (
+                          <a
+                            href={`/prestamos/${m.prestamos.id}`}
+                            onClick={(e) => { e.stopPropagation(); }}
+                            className="inline-flex items-center gap-1 mt-0.5 text-xs text-violet-300 bg-violet-900/20 border border-violet-800/40 px-1.5 py-0.5 rounded hover:bg-violet-900/40 transition-colors"
+                          >
+                            <Landmark className="h-3 w-3" />
+                            {nombrePrestamo(m)}
+                          </a>
+                        )}
                       </td>
                       <td className="px-4 py-3 text-muted-foreground text-xs">
                         {m.metodo ?? "—"}
@@ -634,6 +661,16 @@ export function MovimientosClient({ movimientos, total, cuentas, tarjetas, categ
                               );
                             })()}
                           </div>
+                        )}
+                        {m.prestamos && (
+                          <a
+                            href={`/prestamos/${m.prestamos.id}`}
+                            onClick={(e) => e.stopPropagation()}
+                            className="inline-flex items-center gap-1 mt-1 text-xs text-violet-300 bg-violet-900/20 border border-violet-800/40 px-1.5 py-0.5 rounded hover:bg-violet-900/40 transition-colors"
+                          >
+                            <Landmark className="h-3 w-3" />
+                            {nombrePrestamo(m)}
+                          </a>
                         )}
                       </div>
                       <div className="flex gap-1 flex-shrink-0">

@@ -465,6 +465,8 @@ export interface Database {
           fecha: string
           es_compartido: boolean
           gc_mi_parte: number | null
+          prestamo_id: string | null
+          prestamo_pago_id: string | null
           created_at: string
         }
         Insert: {
@@ -496,6 +498,8 @@ export interface Database {
           fecha?: string
           es_compartido?: boolean
           gc_mi_parte?: number | null
+          prestamo_id?: string | null
+          prestamo_pago_id?: string | null
           created_at?: string
         }
         Update: {
@@ -527,6 +531,8 @@ export interface Database {
           fecha?: string
           es_compartido?: boolean
           gc_mi_parte?: number | null
+          prestamo_id?: string | null
+          prestamo_pago_id?: string | null
           created_at?: string
         }
       }
@@ -703,6 +709,97 @@ export interface Database {
           created_at?: string
         }
       }
+      prestamos: {
+        Row: {
+          id: string
+          user_id: string
+          tipo: "otorgado" | "recibido" | "bancario"
+          persona_id: string | null
+          institucion_nombre: string | null
+          monto_inicial: number
+          moneda: string
+          fecha_inicio: string
+          fecha_vencimiento: string | null
+          cantidad_cuotas: number | null
+          tasa_interes_anual: number | null
+          cuota_mensual: number | null
+          dia_vencimiento_cuota: number | null
+          estado: "activo" | "cancelado"
+          notas: string | null
+          archivado: boolean
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          tipo: "otorgado" | "recibido" | "bancario"
+          persona_id?: string | null
+          institucion_nombre?: string | null
+          monto_inicial: number
+          moneda?: string
+          fecha_inicio?: string
+          fecha_vencimiento?: string | null
+          cantidad_cuotas?: number | null
+          tasa_interes_anual?: number | null
+          cuota_mensual?: number | null
+          dia_vencimiento_cuota?: number | null
+          estado?: "activo" | "cancelado"
+          notas?: string | null
+          archivado?: boolean
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          tipo?: "otorgado" | "recibido" | "bancario"
+          persona_id?: string | null
+          institucion_nombre?: string | null
+          monto_inicial?: number
+          moneda?: string
+          fecha_inicio?: string
+          fecha_vencimiento?: string | null
+          cantidad_cuotas?: number | null
+          tasa_interes_anual?: number | null
+          cuota_mensual?: number | null
+          dia_vencimiento_cuota?: number | null
+          estado?: "activo" | "cancelado"
+          notas?: string | null
+          archivado?: boolean
+          created_at?: string
+        }
+      }
+      prestamos_pagos: {
+        Row: {
+          id: string
+          prestamo_id: string
+          fecha: string
+          monto: number
+          cuota_numero: number | null
+          movimiento_id: string | null
+          notas: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          prestamo_id: string
+          fecha?: string
+          monto: number
+          cuota_numero?: number | null
+          movimiento_id?: string | null
+          notas?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          prestamo_id?: string
+          fecha?: string
+          monto?: number
+          cuota_numero?: number | null
+          movimiento_id?: string | null
+          notas?: string | null
+          created_at?: string
+        }
+      }
     }
     Views: Record<string, never>
     Functions: Record<string, never>
@@ -729,3 +826,5 @@ export type Persona = Database["public"]["Tables"]["personas"]["Row"]
 export type Grupo = Database["public"]["Tables"]["grupos"]["Row"]
 export type GrupoMiembro = Database["public"]["Tables"]["grupo_miembros"]["Row"]
 export type GastoCompartidoParticipante = Database["public"]["Tables"]["gastos_compartidos_participantes"]["Row"]
+export type Prestamo = Database["public"]["Tables"]["prestamos"]["Row"]
+export type PrestamoPago = Database["public"]["Tables"]["prestamos_pagos"]["Row"]
