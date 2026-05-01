@@ -2,8 +2,7 @@
 
 import { createClient } from "@/lib/supabase/server";
 import type { Grupo, Persona } from "@/types/supabase";
-
-export type GrupoConMiembros = Grupo & { miembros: Persona[] };
+import type { GrupoConMiembros } from "./grupos-types";
 
 export async function getGrupos(): Promise<GrupoConMiembros[]> {
   const supabase = await createClient();

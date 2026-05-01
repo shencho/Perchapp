@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { AjustesClient } from "./_components/ajustes-client";
-import type { GrupoConMiembros } from "@/lib/supabase/actions/grupos";
+import type { GrupoConMiembros } from "@/lib/supabase/actions/grupos-types";
 import type { Persona } from "@/types/supabase";
 
 export default async function AjustesPage() {

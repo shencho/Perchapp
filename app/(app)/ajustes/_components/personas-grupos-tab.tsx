@@ -19,7 +19,7 @@ import {
   deleteGrupo,
 } from "@/lib/supabase/actions/grupos";
 import type { Persona } from "@/types/supabase";
-import type { GrupoConMiembros } from "@/lib/supabase/actions/grupos";
+import type { GrupoConMiembros } from "@/lib/supabase/actions/grupos-types";
 
 interface Props {
   personas: Persona[];

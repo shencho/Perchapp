@@ -17,7 +17,7 @@ import {
 import { TIPOS_MOV, METODOS, AMBITOS } from "@/lib/supabase/actions/movimientos-types";
 import { MovimientoEditor } from "./movimiento-editor";
 import type { Movimiento, Cuenta, Tarjeta, Categoria, Persona, GastoCompartidoParticipante } from "@/types/supabase";
-import type { GrupoConMiembros } from "@/lib/supabase/actions/grupos";
+import type { GrupoConMiembros } from "@/lib/supabase/actions/grupos-types";
 
 // ── Tipos ─────────────────────────────────────────────────────────────────────
 

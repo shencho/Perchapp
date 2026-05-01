@@ -671,6 +671,7 @@ export interface Database {
           persona_id: string | null
           monto: number
           estado: "pendiente" | "cobrado"
+          modo: "fijo" | "a_repartir"
           cuenta_destino_id: string | null
           movimiento_ingreso_id: string | null
           created_at: string
@@ -683,6 +684,7 @@ export interface Database {
           persona_id?: string | null
           monto: number
           estado?: "pendiente" | "cobrado"
+          modo?: "fijo" | "a_repartir"
           cuenta_destino_id?: string | null
           movimiento_ingreso_id?: string | null
           created_at?: string
@@ -695,6 +697,7 @@ export interface Database {
           persona_id?: string | null
           monto?: number
           estado?: "pendiente" | "cobrado"
+          modo?: "fijo" | "a_repartir"
           cuenta_destino_id?: string | null
           movimiento_ingreso_id?: string | null
           created_at?: string

@@ -5,6 +5,7 @@ export interface ParticipanteInput {
   persona_id?:       string | null;
   monto:             number;
   cuenta_destino_id?: string | null;
+  modo?:             "fijo" | "a_repartir";
 }
 
 export interface MarcarCobradoInput {

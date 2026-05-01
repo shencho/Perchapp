@@ -1,7 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import { MovimientosClient } from "./_components/movimientos-client";
-import type { GrupoConMiembros } from "@/lib/supabase/actions/grupos";
+import type { GrupoConMiembros } from "@/lib/supabase/actions/grupos-types";
 import type { Persona } from "@/types/supabase";
 
 interface Props {
@@ -37,7 +37,7 @@ export default async function MovimientosPage({ searchParams }: Props) {
         tarjetas:tarjeta_id ( id, nombre ),
         clientes:cliente_id ( id, nombre ),
         servicios_cliente:servicio_id ( id, nombre ),
-        gastos_compartidos_participantes ( id, estado )
+        gastos_compartidos_participantes!movimiento_id ( id, estado )
       `, { count: "exact" })
       .eq("user_id", user.id)
       .gte("fecha", inicio)

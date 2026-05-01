@@ -2,7 +2,7 @@
 
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import type { Profile, Cuenta, Tarjeta, Categoria, Persona } from "@/types/supabase";
-import type { GrupoConMiembros } from "@/lib/supabase/actions/grupos";
+import type { GrupoConMiembros } from "@/lib/supabase/actions/grupos-types";
 import { PerfilTab } from "./perfil-tab";
 import { CuentasTab } from "./cuentas-tab";
 import { TarjetasTab } from "./tarjetas-tab";

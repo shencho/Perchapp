@@ -5,7 +5,7 @@ import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useRouter } from "next/navigation";
-import { X, Plus, Trash2, Users, AlertTriangle } from "lucide-react";
+import { X, Plus, Trash2, Users, AlertTriangle, Lock, Unlock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -34,7 +34,7 @@ import {
   type MovimientoInput,
 } from "@/lib/supabase/actions/movimientos-types";
 import type { Movimiento, Cuenta, Tarjeta, Categoria, Persona } from "@/types/supabase";
-import type { GrupoConMiembros } from "@/lib/supabase/actions/grupos";
+import type { GrupoConMiembros } from "@/lib/supabase/actions/grupos-types";
 import { CreatableSelect, type CatOption } from "./creatable-select";
 
 // ── Tipos internos gasto compartido ───────────────────────────────────────────
@@ -46,6 +46,7 @@ interface ParticipanteForm {
   persona_id:      string | null;
   monto:           number;
   montoEditado:    boolean;
+  modo:            "fijo" | "a_repartir";
   estado:          "pendiente" | "cobrado";
   guardarEnAgenda: boolean;
 }
@@ -146,6 +147,7 @@ export function MovimientoEditor({ open, onClose, editing, cuentas, tarjetas, ca
   const [esCompartido, setEsCompartido] = useState(false);
   const [gcMiParte, setGcMiParte] = useState<number>(0);
   const [gcMiParteEditada, setGcMiParteEditada] = useState(false);
+  const [gcMiParteModo, setGcMiParteModo] = useState<"fijo" | "a_repartir">("a_repartir");
   const [participantes, setParticipantes] = useState<ParticipanteForm[]>([]);
   const [nuevaNombre, setNuevaNombre] = useState("");
   const [nuevaPersonaId, setNuevaPersonaId] = useState<string | null>(null);
@@ -233,6 +235,7 @@ export function MovimientoEditor({ open, onClose, editing, cuentas, tarjetas, ca
     setEsCompartido(editing?.es_compartido ?? false);
     setGcMiParte(editing?.gc_mi_parte ?? 0);
     setGcMiParteEditada(false);
+    setGcMiParteModo("a_repartir");
     setNuevaNombre("");
     setNuevaPersonaId(null);
     setNuevaGuardarEnAgenda(false);
@@ -246,6 +249,7 @@ export function MovimientoEditor({ open, onClose, editing, cuentas, tarjetas, ca
           persona_id:      p.persona_id,
           monto:           p.monto,
           montoEditado:    false,
+          modo:            ((p as { modo?: string }).modo as "fijo" | "a_repartir") ?? "a_repartir",
           estado:          p.estado,
           guardarEnAgenda: false,
         }))))
@@ -347,6 +351,7 @@ export function MovimientoEditor({ open, onClose, editing, cuentas, tarjetas, ca
         persona_id:      nuevaPersonaId,
         monto:           0,
         montoEditado:    false,
+        modo:            "a_repartir" as const,
         estado:          "pendiente" as const,
         guardarEnAgenda: nuevaGuardarEnAgenda,
       },
@@ -354,6 +359,33 @@ export function MovimientoEditor({ open, onClose, editing, cuentas, tarjetas, ca
     setNuevaNombre("");
     setNuevaPersonaId(null);
     setNuevaGuardarEnAgenda(false);
+  }
+
+  function repartirResto() {
+    const fixedUser = gcMiParteModo === "fijo" ? gcMiParte : 0;
+    const fixedParts = participantes
+      .filter((p) => p.estado === "pendiente" && p.modo === "fijo")
+      .reduce((acc, p) => acc + p.monto, 0);
+    const montoARepartir = monto - fixedUser - fixedParts;
+    if (montoARepartir < 0 || !monto) return;
+
+    const repartirParts = participantes.filter((p) => p.estado === "pendiente" && p.modo === "a_repartir");
+    const incluirUsuario = gcMiParteModo === "a_repartir";
+    const n = repartirParts.length + (incluirUsuario ? 1 : 0);
+    if (n === 0) return;
+
+    const parte = Math.round((montoARepartir / n) * 100) / 100;
+    if (incluirUsuario) {
+      setGcMiParte(parte);
+      setGcMiParteEditada(false);
+    }
+    setParticipantes((prev) =>
+      prev.map((p) =>
+        p.estado === "pendiente" && p.modo === "a_repartir"
+          ? { ...p, monto: parte, montoEditado: false }
+          : p
+      )
+    );
   }
 
   // ── Submit ─────────────────────────────────────────────────────────────────
@@ -405,6 +437,7 @@ export function MovimientoEditor({ open, onClose, editing, cuentas, tarjetas, ca
             persona_nombre: p.persona_nombre,
             persona_id:     personaId,
             monto:          p.monto,
+            modo:           p.modo,
           });
         }
       }
@@ -933,21 +966,41 @@ export function MovimientoEditor({ open, onClose, editing, cuentas, tarjetas, ca
                 {esCompartido && (
                   <div className="space-y-4 pl-4 border-l-2 border-border/50">
 
-                    {/* Mi parte + Repartir igual */}
-                    <div className="flex items-end gap-3">
-                      <div className="space-y-1.5 flex-1">
-                        <Label>Mi parte ({moneda})</Label>
+                    {/* Mi parte + modo toggle */}
+                    <div className="space-y-1.5">
+                      <Label>Mi parte ({moneda})</Label>
+                      <div className="flex items-center gap-2">
                         <Input
                           type="number"
                           step="0.01"
                           placeholder="0.00"
                           value={gcMiParte || ""}
+                          className="flex-1"
                           onChange={(e) => {
                             setGcMiParte(parseFloat(e.target.value) || 0);
                             setGcMiParteEditada(true);
                           }}
                         />
+                        <button
+                          type="button"
+                          title={gcMiParteModo === "fijo" ? "Fijo — click para liberar" : "A repartir — click para fijar"}
+                          className={cn(
+                            "flex items-center gap-1 px-2 py-1.5 rounded-md border text-xs transition-colors",
+                            gcMiParteModo === "fijo"
+                              ? "bg-amber-900/30 border-amber-700/50 text-amber-300"
+                              : "border-border text-muted-foreground hover:border-foreground/40"
+                          )}
+                          onClick={() => setGcMiParteModo((m) => m === "fijo" ? "a_repartir" : "fijo")}
+                        >
+                          {gcMiParteModo === "fijo"
+                            ? <><Lock className="h-3 w-3" /> Fijo</>
+                            : <><Unlock className="h-3 w-3" /> ÷</>}
+                        </button>
                       </div>
+                    </div>
+
+                    {/* Botones de distribución */}
+                    <div className="flex gap-2">
                       <Button
                         type="button"
                         variant="outline"
@@ -969,6 +1022,16 @@ export function MovimientoEditor({ open, onClose, editing, cuentas, tarjetas, ca
                         }}
                       >
                         Repartir igual
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        disabled={!monto || monto <= 0}
+                        onClick={repartirResto}
+                        title="Resta los montos fijos y divide el resto entre los participantes marcados como ÷"
+                      >
+                        Repartir resto
                       </Button>
                     </div>
 
@@ -996,6 +1059,7 @@ export function MovimientoEditor({ open, onClose, editing, cuentas, tarjetas, ca
                               persona_id:      m.id,
                               monto:           parte,
                               montoEditado:    false,
+                              modo:            "a_repartir" as const,
                               estado:          "pendiente" as const,
                               guardarEnAgenda: false,
                             }));
@@ -1034,10 +1098,31 @@ export function MovimientoEditor({ open, onClose, editing, cuentas, tarjetas, ca
                                 </>
                               ) : (
                                 <>
+                                  <button
+                                    type="button"
+                                    title={p.modo === "fijo" ? "Fijo — click para liberar" : "A repartir — click para fijar"}
+                                    className={cn(
+                                      "flex items-center px-1.5 py-1 rounded border text-xs transition-colors shrink-0",
+                                      p.modo === "fijo"
+                                        ? "bg-amber-900/30 border-amber-700/50 text-amber-300"
+                                        : "border-border text-muted-foreground hover:border-foreground/40"
+                                    )}
+                                    onClick={() =>
+                                      setParticipantes((prev) =>
+                                        prev.map((x) =>
+                                          x.tempId === p.tempId
+                                            ? { ...x, modo: x.modo === "fijo" ? "a_repartir" : "fijo" }
+                                            : x
+                                        )
+                                      )
+                                    }
+                                  >
+                                    {p.modo === "fijo" ? <Lock className="h-3 w-3" /> : <Unlock className="h-3 w-3" />}
+                                  </button>
                                   <Input
                                     type="number"
                                     step="0.01"
-                                    className="w-28 h-7 text-sm"
+                                    className="w-24 h-7 text-sm"
                                     value={p.monto || ""}
                                     onChange={(e) => {
                                       const v = parseFloat(e.target.value) || 0;

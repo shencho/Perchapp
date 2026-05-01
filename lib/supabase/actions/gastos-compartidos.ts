@@ -78,6 +78,7 @@ export async function upsertParticipantes(
         persona_id:       p.persona_id ?? null,
         monto:            p.monto,
         estado:           "pendiente" as const,
+        modo:             p.modo ?? "a_repartir",
         cuenta_destino_id: p.cuenta_destino_id ?? null,
       })),
     );
