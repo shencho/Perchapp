@@ -1,11 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useRouter } from "next/navigation";
-import { X } from "lucide-react";
+import { X, Plus, Trash2, Users, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -18,6 +18,12 @@ import {
   syncPagoFromMovimiento,
   unlinkPagoFromMovimiento,
 } from "@/lib/supabase/actions/pagos";
+import {
+  getParticipantes,
+  upsertParticipantes,
+  type ParticipanteInput,
+} from "@/lib/supabase/actions/gastos-compartidos";
+import { createPersona } from "@/lib/supabase/actions/personas";
 import { RegistrarPagoModal } from "./registrar-pago-modal";
 import {
   TIPOS_MOV,
@@ -27,8 +33,22 @@ import {
   FRECUENCIAS,
   type MovimientoInput,
 } from "@/lib/supabase/actions/movimientos-types";
-import type { Movimiento, Cuenta, Tarjeta, Categoria } from "@/types/supabase";
+import type { Movimiento, Cuenta, Tarjeta, Categoria, Persona } from "@/types/supabase";
+import type { GrupoConMiembros } from "@/lib/supabase/actions/grupos";
 import { CreatableSelect, type CatOption } from "./creatable-select";
+
+// ── Tipos internos gasto compartido ───────────────────────────────────────────
+
+interface ParticipanteForm {
+  tempId:          string;
+  dbId?:           string;
+  persona_nombre:  string;
+  persona_id:      string | null;
+  monto:           number;
+  montoEditado:    boolean;
+  estado:          "pendiente" | "cobrado";
+  guardarEnAgenda: boolean;
+}
 
 // ── Schema ────────────────────────────────────────────────────────────────────
 
@@ -76,6 +96,8 @@ interface Props {
   clientes?: { id: string; nombre: string }[];
   defaultValues?: Partial<FormData>;
   suggestCategoria?: string;
+  personas?: Persona[];
+  grupos?: GrupoConMiembros[];
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -108,7 +130,7 @@ function todayStr() {
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
-export function MovimientoEditor({ open, onClose, editing, cuentas, tarjetas, categorias, clientes = [], defaultValues, suggestCategoria }: Props) {
+export function MovimientoEditor({ open, onClose, editing, cuentas, tarjetas, categorias, clientes = [], defaultValues, suggestCategoria, personas = [], grupos = [] }: Props) {
   const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -119,6 +141,15 @@ export function MovimientoEditor({ open, onClose, editing, cuentas, tarjetas, ca
   const [pagoModalOpen, setPagoModalOpen] = useState(false);
   const [pendingPayload, setPendingPayload] = useState<MovimientoInput | null>(null);
   const [linkedPago, setLinkedPago] = useState<{ id: string; registro_creado_id: string | null } | null>(null);
+
+  // Gasto compartido
+  const [esCompartido, setEsCompartido] = useState(false);
+  const [gcMiParte, setGcMiParte] = useState<number>(0);
+  const [gcMiParteEditada, setGcMiParteEditada] = useState(false);
+  const [participantes, setParticipantes] = useState<ParticipanteForm[]>([]);
+  const [nuevaNombre, setNuevaNombre] = useState("");
+  const [nuevaPersonaId, setNuevaPersonaId] = useState<string | null>(null);
+  const [nuevaGuardarEnAgenda, setNuevaGuardarEnAgenda] = useState(false);
 
   const {
     register,
@@ -197,6 +228,31 @@ export function MovimientoEditor({ open, onClose, editing, cuentas, tarjetas, ca
     setPagoModalOpen(false);
     setPendingPayload(null);
     setLinkedPago(null);
+
+    // Gasto compartido
+    setEsCompartido(editing?.es_compartido ?? false);
+    setGcMiParte(editing?.gc_mi_parte ?? 0);
+    setGcMiParteEditada(false);
+    setNuevaNombre("");
+    setNuevaPersonaId(null);
+    setNuevaGuardarEnAgenda(false);
+
+    if (editing?.es_compartido && editing.id) {
+      getParticipantes(editing.id)
+        .then((ps) => setParticipantes(ps.map((p) => ({
+          tempId:          p.id,
+          dbId:            p.id,
+          persona_nombre:  p.persona_nombre,
+          persona_id:      p.persona_id,
+          monto:           p.monto,
+          montoEditado:    false,
+          estado:          p.estado,
+          guardarEnAgenda: false,
+        }))))
+        .catch(() => setParticipantes([]));
+    } else {
+      setParticipantes([]);
+    }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editing, open]);
 
@@ -226,6 +282,15 @@ export function MovimientoEditor({ open, onClose, editing, cuentas, tarjetas, ca
   const pagoSeDesvinculara =
     !!editing && !!linkedPago &&
     (ambito !== (editing.ambito as string) || clienteId !== editing.cliente_id);
+
+  // Resetear gasto compartido si se cambia el tipo
+  useEffect(() => {
+    if (tipo !== "Egreso") {
+      setEsCompartido(false);
+      setParticipantes([]);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tipo]);
 
   // Limpiar cliente/servicio cuando se cambia a Personal
   useEffect(() => {
@@ -270,6 +335,27 @@ export function MovimientoEditor({ open, onClose, editing, cuentas, tarjetas, ca
   const unitario = monto && cuotas ? (monto / (cuotas || 1)) : 0;
   const total    = cantidad && monto ? cantidad * monto : monto;
 
+  const datalistId = useId();
+
+  function agregarParticipante() {
+    if (!nuevaNombre.trim()) return;
+    setParticipantes((prev) => [
+      ...prev,
+      {
+        tempId:          `temp-${Date.now()}`,
+        persona_nombre:  nuevaNombre.trim(),
+        persona_id:      nuevaPersonaId,
+        monto:           0,
+        montoEditado:    false,
+        estado:          "pendiente" as const,
+        guardarEnAgenda: nuevaGuardarEnAgenda,
+      },
+    ]);
+    setNuevaNombre("");
+    setNuevaPersonaId(null);
+    setNuevaGuardarEnAgenda(false);
+  }
+
   // ── Submit ─────────────────────────────────────────────────────────────────
 
   async function onSubmit(values: FormData) {
@@ -293,6 +379,8 @@ export function MovimientoEditor({ open, onClose, editing, cuentas, tarjetas, ca
         cliente_id:        values.ambito === "Profesional" ? (values.cliente_id ?? null) : null,
         servicio_id:       values.ambito === "Profesional" ? (values.servicio_id ?? null) : null,
         unitario:          clasificacion === "Cuotas" ? unitario : values.monto,
+        es_compartido:     esCompartido,
+        gc_mi_parte:       esCompartido ? gcMiParte : null,
       };
 
       // Interceptar Ingreso Profesional nuevo → modal de pago
@@ -301,6 +389,24 @@ export function MovimientoEditor({ open, onClose, editing, cuentas, tarjetas, ca
         setPagoModalOpen(true);
         setIsSubmitting(false);
         return;
+      }
+
+      // Preparar participantes para upsert: resolver "guardar en agenda" primero
+      const participantesInput: ParticipanteInput[] = [];
+      if (esCompartido) {
+        const pendientes = participantes.filter((p) => p.estado === "pendiente");
+        for (const p of pendientes) {
+          let personaId = p.persona_id;
+          if (!personaId && p.guardarEnAgenda && p.persona_nombre.trim()) {
+            const nueva = await createPersona(p.persona_nombre.trim());
+            personaId = nueva.id;
+          }
+          participantesInput.push({
+            persona_nombre: p.persona_nombre,
+            persona_id:     personaId,
+            monto:          p.monto,
+          });
+        }
       }
 
       if (editing) {
@@ -319,8 +425,12 @@ export function MovimientoEditor({ open, onClose, editing, cuentas, tarjetas, ca
           }
         }
         await updateMovimiento(editing.id, payload);
+        if (esCompartido) await upsertParticipantes(editing.id, participantesInput);
       } else {
-        await createMovimiento(payload);
+        const { id: nuevoId } = await createMovimiento(payload);
+        if (esCompartido && participantesInput.length > 0) {
+          await upsertParticipantes(nuevoId, participantesInput);
+        }
       }
 
       router.refresh();
@@ -793,6 +903,256 @@ export function MovimientoEditor({ open, onClose, editing, cuentas, tarjetas, ca
               <Label>Observaciones</Label>
               <Input placeholder="Notas adicionales" {...register("observaciones")} />
             </div>
+
+            {/* ── GASTO COMPARTIDO ─────────────────────────────────────── */}
+            {tipo === "Egreso" && (
+              <>
+                <hr className="border-border" />
+
+                {/* Toggle */}
+                <div className="flex items-center gap-2.5">
+                  <input
+                    id="es-compartido"
+                    type="checkbox"
+                    className="h-4 w-4 rounded border-border accent-primary cursor-pointer"
+                    checked={esCompartido}
+                    onChange={(e) => {
+                      setEsCompartido(e.target.checked);
+                      if (e.target.checked && monto > 0) {
+                        setGcMiParte(monto);
+                        setGcMiParteEditada(false);
+                      }
+                    }}
+                  />
+                  <Label htmlFor="es-compartido" className="font-normal cursor-pointer flex items-center gap-1.5">
+                    <Users className="h-3.5 w-3.5 text-muted-foreground" />
+                    Es un gasto compartido
+                  </Label>
+                </div>
+
+                {esCompartido && (
+                  <div className="space-y-4 pl-4 border-l-2 border-border/50">
+
+                    {/* Mi parte + Repartir igual */}
+                    <div className="flex items-end gap-3">
+                      <div className="space-y-1.5 flex-1">
+                        <Label>Mi parte ({moneda})</Label>
+                        <Input
+                          type="number"
+                          step="0.01"
+                          placeholder="0.00"
+                          value={gcMiParte || ""}
+                          onChange={(e) => {
+                            setGcMiParte(parseFloat(e.target.value) || 0);
+                            setGcMiParteEditada(true);
+                          }}
+                        />
+                      </div>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        disabled={!monto || monto <= 0}
+                        onClick={() => {
+                          const pendientes = participantes.filter((p) => p.estado === "pendiente");
+                          const n = pendientes.length + 1;
+                          const parte = Math.round((monto / n) * 100) / 100;
+                          setGcMiParte(parte);
+                          setGcMiParteEditada(false);
+                          setParticipantes((prev) =>
+                            prev.map((p) =>
+                              p.estado === "pendiente"
+                                ? { ...p, monto: parte, montoEditado: false }
+                                : p
+                            )
+                          );
+                        }}
+                      >
+                        Repartir igual
+                      </Button>
+                    </div>
+
+                    {/* Cargar grupo */}
+                    {grupos.length > 0 && (
+                      <div className="space-y-1.5">
+                        <Label>Cargar grupo</Label>
+                        <NamedSelect
+                          options={grupos.map((g) => ({
+                            value: g.id,
+                            label: `${g.nombre} (${g.miembros.length})`,
+                          }))}
+                          value=""
+                          onValueChange={(grupoId) => {
+                            if (!grupoId) return;
+                            const grupo = grupos.find((g) => g.id === grupoId);
+                            if (!grupo) return;
+                            const n = grupo.miembros.length + 1;
+                            const parte = monto > 0 ? Math.round((monto / n) * 100) / 100 : 0;
+                            if (!gcMiParteEditada) setGcMiParte(parte);
+                            const cobrados = participantes.filter((p) => p.estado === "cobrado");
+                            const nuevos: ParticipanteForm[] = grupo.miembros.map((m) => ({
+                              tempId:          `temp-${m.id}`,
+                              persona_nombre:  m.nombre,
+                              persona_id:      m.id,
+                              monto:           parte,
+                              montoEditado:    false,
+                              estado:          "pendiente" as const,
+                              guardarEnAgenda: false,
+                            }));
+                            setParticipantes([...cobrados, ...nuevos]);
+                          }}
+                          placeholder="Cargar miembros de un grupo…"
+                          className="w-full"
+                        />
+                      </div>
+                    )}
+
+                    {/* Lista de participantes */}
+                    {participantes.length > 0 && (
+                      <div className="space-y-1.5">
+                        <Label className="text-xs text-muted-foreground">Participantes</Label>
+                        <div className="space-y-1.5">
+                          {participantes.map((p) => (
+                            <div
+                              key={p.tempId}
+                              className={cn(
+                                "flex items-center gap-2 rounded-md px-3 py-2 border text-sm",
+                                p.estado === "cobrado"
+                                  ? "bg-surface/50 border-border/40 opacity-80"
+                                  : "bg-surface border-border"
+                              )}
+                            >
+                              <span className="flex-1 truncate">{p.persona_nombre}</span>
+                              {p.estado === "cobrado" ? (
+                                <>
+                                  <span className="text-xs text-muted-foreground">
+                                    {formatMonto(p.monto, moneda)}
+                                  </span>
+                                  <span className="text-xs px-1.5 py-0.5 rounded-full bg-emerald-900/40 text-emerald-400 border border-emerald-800/40">
+                                    Cobrado
+                                  </span>
+                                </>
+                              ) : (
+                                <>
+                                  <Input
+                                    type="number"
+                                    step="0.01"
+                                    className="w-28 h-7 text-sm"
+                                    value={p.monto || ""}
+                                    onChange={(e) => {
+                                      const v = parseFloat(e.target.value) || 0;
+                                      setParticipantes((prev) =>
+                                        prev.map((x) =>
+                                          x.tempId === p.tempId
+                                            ? { ...x, monto: v, montoEditado: true }
+                                            : x
+                                        )
+                                      );
+                                    }}
+                                  />
+                                  <button
+                                    type="button"
+                                    className="text-muted-foreground hover:text-destructive transition-colors"
+                                    onClick={() =>
+                                      setParticipantes((prev) =>
+                                        prev.filter((x) => x.tempId !== p.tempId)
+                                      )
+                                    }
+                                  >
+                                    <Trash2 className="h-3.5 w-3.5" />
+                                  </button>
+                                </>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Agregar participante */}
+                    <div className="space-y-2">
+                      <Label className="text-xs text-muted-foreground">Agregar participante</Label>
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="text"
+                          list={datalistId}
+                          placeholder="Nombre…"
+                          className="flex h-9 flex-1 rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                          value={nuevaNombre}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            setNuevaNombre(val);
+                            const match = personas.find(
+                              (p) => p.nombre.toLowerCase() === val.toLowerCase()
+                            );
+                            setNuevaPersonaId(match?.id ?? null);
+                          }}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") {
+                              e.preventDefault();
+                              agregarParticipante();
+                            }
+                          }}
+                        />
+                        <datalist id={datalistId}>
+                          {personas.map((p) => (
+                            <option key={p.id} value={p.nombre} />
+                          ))}
+                        </datalist>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          disabled={!nuevaNombre.trim()}
+                          onClick={agregarParticipante}
+                        >
+                          <Plus className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
+                      {nuevaNombre.trim() && !nuevaPersonaId && (
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="checkbox"
+                            id="guardar-agenda"
+                            className="h-3.5 w-3.5 rounded border-border accent-primary cursor-pointer"
+                            checked={nuevaGuardarEnAgenda}
+                            onChange={(e) => setNuevaGuardarEnAgenda(e.target.checked)}
+                          />
+                          <label
+                            htmlFor="guardar-agenda"
+                            className="text-xs text-muted-foreground cursor-pointer"
+                          >
+                            Guardar en mi agenda de personas
+                          </label>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Soft warning: suma de partes ≠ monto total */}
+                    {(() => {
+                      const sumPartes =
+                        gcMiParte +
+                        participantes
+                          .filter((p) => p.estado === "pendiente")
+                          .reduce((acc, p) => acc + p.monto, 0);
+                      const delta = Math.abs(sumPartes - monto);
+                      if (delta > 0.01 && monto > 0) {
+                        return (
+                          <div className="flex items-start gap-2 rounded-md border border-amber-800/40 bg-amber-950/20 px-3 py-2 text-xs text-amber-300">
+                            <AlertTriangle className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+                            <span>
+                              La suma de partes ({formatMonto(sumPartes, moneda)}) difiere del
+                              total ({formatMonto(monto, moneda)}) por {formatMonto(delta, moneda)}.
+                            </span>
+                          </div>
+                        );
+                      }
+                      return null;
+                    })()}
+                  </div>
+                )}
+              </>
+            )}
 
           </div>
 

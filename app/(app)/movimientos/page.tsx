@@ -1,6 +1,8 @@
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import { MovimientosClient } from "./_components/movimientos-client";
+import type { GrupoConMiembros } from "@/lib/supabase/actions/grupos";
+import type { Persona } from "@/types/supabase";
 
 interface Props {
   searchParams: Promise<{ mes?: string; pagina?: string }>;
@@ -24,7 +26,7 @@ export default async function MovimientosPage({ searchParams }: Props) {
   const fin = new Date(Number(anio), Number(mes), 0).toISOString().slice(0, 10);
 
   // Cargar movimientos + relaciones + datos de filtros en paralelo
-  const [movRes, cuentasRes, tarjetasRes, categoriasRes, clientesRes] = await Promise.all([
+  const [movRes, cuentasRes, tarjetasRes, categoriasRes, clientesRes, personasRes, gruposRes] = await Promise.all([
     supabase
       .from("movimientos")
       .select(`
@@ -65,7 +67,26 @@ export default async function MovimientosPage({ searchParams }: Props) {
       .eq("user_id", user.id)
       .eq("archivado", false)
       .order("nombre"),
+    supabase
+      .from("personas")
+      .select("*")
+      .eq("user_id", user.id)
+      .eq("archivado", false)
+      .order("nombre"),
+    supabase
+      .from("grupos")
+      .select("*, grupo_miembros(persona_id, personas(*))")
+      .eq("user_id", user.id)
+      .eq("archivado", false)
+      .order("nombre"),
   ]);
+
+  const grupos: GrupoConMiembros[] = (gruposRes.data ?? []).map((g) => ({
+    ...g,
+    miembros: (g.grupo_miembros as { persona_id: string; personas: Persona | null }[])
+      .map((m) => m.personas)
+      .filter((p): p is Persona => p !== null),
+  }));
 
   return (
     <MovimientosClient
@@ -75,6 +96,8 @@ export default async function MovimientosPage({ searchParams }: Props) {
       tarjetas={tarjetasRes.data ?? []}
       categorias={categoriasRes.data ?? []}
       clientes={(clientesRes.data ?? []) as { id: string; nombre: string }[]}
+      personas={(personasRes.data ?? []) as Persona[]}
+      grupos={grupos}
       mesActual={mesActual}
     />
   );

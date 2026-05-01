@@ -11,7 +11,8 @@ import { deleteMovimiento, duplicateMovimiento } from "@/lib/supabase/actions/mo
 import { deletePagoFromMovimiento } from "@/lib/supabase/actions/pagos";
 import { TIPOS_MOV, METODOS, AMBITOS } from "@/lib/supabase/actions/movimientos-types";
 import { MovimientoEditor } from "./movimiento-editor";
-import type { Movimiento, Cuenta, Tarjeta, Categoria } from "@/types/supabase";
+import type { Movimiento, Cuenta, Tarjeta, Categoria, Persona } from "@/types/supabase";
+import type { GrupoConMiembros } from "@/lib/supabase/actions/grupos";
 
 // ── Tipos ─────────────────────────────────────────────────────────────────────
 
@@ -31,6 +32,8 @@ interface Props {
   tarjetas: Tarjeta[];
   categorias: Categoria[];
   clientes: { id: string; nombre: string }[];
+  personas: Persona[];
+  grupos: GrupoConMiembros[];
   mesActual: string;
 }
 
@@ -75,7 +78,7 @@ function getMeses() {
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
-export function MovimientosClient({ movimientos, total, cuentas, tarjetas, categorias, clientes, mesActual }: Props) {
+export function MovimientosClient({ movimientos, total, cuentas, tarjetas, categorias, clientes, personas, grupos, mesActual }: Props) {
   const router = useRouter();
   const [, startTransition] = useTransition();
 
@@ -414,6 +417,8 @@ export function MovimientosClient({ movimientos, total, cuentas, tarjetas, categ
         tarjetas={tarjetas}
         categorias={categorias}
         clientes={clientes}
+        personas={personas}
+        grupos={grupos}
       />
     </div>
   );

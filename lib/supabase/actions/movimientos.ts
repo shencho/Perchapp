@@ -62,7 +62,7 @@ export async function getMovimientos(filtros: MovimientosFiltros = {}) {
   return { movimientos: data ?? [], total: count ?? 0 };
 }
 
-export async function createMovimiento(input: MovimientoInput) {
+export async function createMovimiento(input: MovimientoInput): Promise<{ id: string }> {
   const { supabase, userId } = await getAuthedUser();
   const parsed = movimientoSchema.parse(input);
 
@@ -92,10 +92,13 @@ export async function createMovimiento(input: MovimientoInput) {
     cliente_id:        parsed.ambito === "Profesional" ? (parsed.cliente_id ?? null) : null,
     servicio_id:       parsed.ambito === "Profesional" ? (parsed.servicio_id ?? null) : null,
     fecha:             parsed.fecha ?? new Date().toISOString().slice(0, 10),
+    es_compartido:     parsed.es_compartido ?? false,
+    gc_mi_parte:       parsed.gc_mi_parte ?? null,
   };
 
-  const { error } = await supabase.from("movimientos").insert(row);
-  if (error) throw new Error(error.message);
+  const { data, error } = await supabase.from("movimientos").insert(row).select("id").single();
+  if (error || !data) throw new Error(error?.message ?? "Error al crear movimiento");
+  return { id: data.id };
 }
 
 export async function updateMovimiento(id: string, input: Partial<MovimientoInput>) {
@@ -147,6 +150,34 @@ export async function duplicateMovimiento(id: string) {
   const { id: _id, created_at: _c, ...rest } = data;
   const hoy = new Date().toISOString().slice(0, 10);
 
-  const { error } = await supabase.from("movimientos").insert({ ...rest, fecha: hoy });
-  if (error) throw new Error(error.message);
+  const { data: nuevo, error } = await supabase
+    .from("movimientos")
+    .insert({ ...rest, fecha: hoy })
+    .select("id")
+    .single();
+  if (error || !nuevo) throw new Error(error?.message ?? "Error al duplicar");
+
+  // Si era gasto compartido, copiar participantes como pendientes
+  if (data.es_compartido) {
+    const { data: parts } = await supabase
+      .from("gastos_compartidos_participantes")
+      .select("persona_nombre, persona_id, monto, cuenta_destino_id")
+      .eq("movimiento_id", id)
+      .eq("user_id", userId);
+
+    if (parts && parts.length > 0) {
+      await supabase.from("gastos_compartidos_participantes").insert(
+        parts.map((p) => ({
+          user_id:          userId,
+          movimiento_id:    nuevo.id,
+          persona_nombre:   p.persona_nombre,
+          persona_id:       p.persona_id,
+          monto:            p.monto,
+          estado:           "pendiente" as const,
+          cuenta_destino_id: p.cuenta_destino_id,
+          movimiento_ingreso_id: null,
+        })),
+      );
+    }
+  }
 }
