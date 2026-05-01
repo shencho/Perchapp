@@ -17,6 +17,7 @@ const NAV_BASE = [
   { href: "/dashboard",   label: "Inicio" },
   { href: "/movimientos", label: "Movimientos" },
   { href: "/captura",     label: "Captura" },
+  { href: "/cuentas",     label: "Cuentas" },
 ];
 
 export function Header({ userEmail, modo }: HeaderProps) {

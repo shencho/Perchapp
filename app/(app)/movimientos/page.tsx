@@ -37,7 +37,7 @@ export default async function MovimientosPage({ searchParams }: Props) {
         tarjetas:tarjeta_id ( id, nombre ),
         clientes:cliente_id ( id, nombre ),
         servicios_cliente:servicio_id ( id, nombre ),
-        gastos_compartidos_participantes!movimiento_id ( id, estado )
+        gastos_compartidos_participantes!movimiento_id ( id, estado, monto )
       `, { count: "exact" })
       .eq("user_id", user.id)
       .gte("fecha", inicio)

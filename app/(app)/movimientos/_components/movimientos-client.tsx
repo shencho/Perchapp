@@ -28,7 +28,7 @@ type MovimientoConRelaciones = Movimiento & {
   tarjetas?: { id: string; nombre: string } | null;
   clientes?: { id: string; nombre: string } | null;
   servicios_cliente?: { id: string; nombre: string } | null;
-  gastos_compartidos_participantes?: { id: string; estado: string }[] | null;
+  gastos_compartidos_participantes?: { id: string; estado: string; monto: number }[] | null;
 };
 
 interface Props {
@@ -477,9 +477,27 @@ export function MovimientosClient({ movimientos, total, cuentas, tarjetas, categ
                           </div>
                         )}
                         {m.es_compartido && partsTotal > 0 && (
-                          <div className="flex items-center gap-1 mt-0.5 text-xs text-muted-foreground">
-                            <Users className="h-3 w-3" />
-                            <span>Compartido · {partsCobrados}/{partsTotal} cobrado</span>
+                          <div className="mt-0.5 space-y-1">
+                            <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                              <Users className="h-3 w-3" />
+                              <span>Compartido · {partsCobrados}/{partsTotal} cobrado</span>
+                            </div>
+                            {(() => {
+                              const totalMonto = m.gastos_compartidos_participantes?.reduce((acc, p) => acc + p.monto, 0) ?? 0;
+                              const cobradoMonto = m.gastos_compartidos_participantes?.filter(p => p.estado === "cobrado").reduce((acc, p) => acc + p.monto, 0) ?? 0;
+                              const pct = totalMonto > 0 ? Math.min(100, Math.round((cobradoMonto / totalMonto) * 100)) : 0;
+                              if (totalMonto === 0) return null;
+                              return (
+                                <div className="space-y-0.5">
+                                  <div className="h-1.5 w-full rounded-full bg-surface overflow-hidden border border-border/40">
+                                    <div className="h-full bg-emerald-500 rounded-full transition-all" style={{ width: `${pct}%` }} />
+                                  </div>
+                                  <div className="text-xs text-muted-foreground">
+                                    {formatMonto(cobradoMonto, m.moneda ?? "ARS")} cobrado de {formatMonto(totalMonto, m.moneda ?? "ARS")}
+                                  </div>
+                                </div>
+                              );
+                            })()}
                           </div>
                         )}
                       </td>
@@ -594,9 +612,27 @@ export function MovimientosClient({ movimientos, total, cuentas, tarjetas, categ
                           </div>
                         )}
                         {m.es_compartido && partsTotal > 0 && (
-                          <div className="flex items-center gap-1 mt-1 text-xs text-muted-foreground">
-                            <Users className="h-3 w-3" />
-                            <span>Compartido · {partsCobrados}/{partsTotal} cobrado</span>
+                          <div className="mt-0.5 space-y-1">
+                            <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                              <Users className="h-3 w-3" />
+                              <span>Compartido · {partsCobrados}/{partsTotal} cobrado</span>
+                            </div>
+                            {(() => {
+                              const totalMonto = m.gastos_compartidos_participantes?.reduce((acc, p) => acc + p.monto, 0) ?? 0;
+                              const cobradoMonto = m.gastos_compartidos_participantes?.filter(p => p.estado === "cobrado").reduce((acc, p) => acc + p.monto, 0) ?? 0;
+                              const pct = totalMonto > 0 ? Math.min(100, Math.round((cobradoMonto / totalMonto) * 100)) : 0;
+                              if (totalMonto === 0) return null;
+                              return (
+                                <div className="space-y-0.5">
+                                  <div className="h-1.5 w-full rounded-full bg-surface overflow-hidden border border-border/40">
+                                    <div className="h-full bg-emerald-500 rounded-full transition-all" style={{ width: `${pct}%` }} />
+                                  </div>
+                                  <div className="text-xs text-muted-foreground">
+                                    {formatMonto(cobradoMonto, m.moneda ?? "ARS")} cobrado de {formatMonto(totalMonto, m.moneda ?? "ARS")}
+                                  </div>
+                                </div>
+                              );
+                            })()}
                           </div>
                         )}
                       </div>
