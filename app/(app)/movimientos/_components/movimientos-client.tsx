@@ -1,17 +1,22 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Plus, Pencil, Copy, Trash2, Search, ChevronDown } from "lucide-react";
+import { Plus, Pencil, Copy, Trash2, Search, ChevronDown, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { NamedSelect } from "@/components/ui/named-select";
 import { deleteMovimiento, duplicateMovimiento } from "@/lib/supabase/actions/movimientos";
 import { deletePagoFromMovimiento } from "@/lib/supabase/actions/pagos";
+import {
+  getParticipantes,
+  marcarCobrado,
+  marcarPendiente,
+} from "@/lib/supabase/actions/gastos-compartidos";
 import { TIPOS_MOV, METODOS, AMBITOS } from "@/lib/supabase/actions/movimientos-types";
 import { MovimientoEditor } from "./movimiento-editor";
-import type { Movimiento, Cuenta, Tarjeta, Categoria, Persona } from "@/types/supabase";
+import type { Movimiento, Cuenta, Tarjeta, Categoria, Persona, GastoCompartidoParticipante } from "@/types/supabase";
 import type { GrupoConMiembros } from "@/lib/supabase/actions/grupos";
 
 // ── Tipos ─────────────────────────────────────────────────────────────────────
@@ -23,6 +28,7 @@ type MovimientoConRelaciones = Movimiento & {
   tarjetas?: { id: string; nombre: string } | null;
   clientes?: { id: string; nombre: string } | null;
   servicios_cliente?: { id: string; nombre: string } | null;
+  gastos_compartidos_participantes?: { id: string; estado: string }[] | null;
 };
 
 interface Props {
@@ -63,6 +69,180 @@ function formatFecha(d: string) {
   });
 }
 
+function todayStr() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+// ── CompartidoPanel ───────────────────────────────────────────────────────────
+
+function CompartidoPanel({
+  movimientoId,
+  concepto,
+  moneda,
+  cuentas,
+}: {
+  movimientoId: string;
+  concepto: string | null;
+  moneda: string;
+  cuentas: Cuenta[];
+}) {
+  const router = useRouter();
+  const [, startTransition] = useTransition();
+  const [participantes, setParticipantes] = useState<GastoCompartidoParticipante[] | null>(null);
+  const [cobradoFormId, setCobradoFormId] = useState<string | null>(null);
+  const [fecha, setFecha] = useState(todayStr());
+  const [cuentaDestinoId, setCuentaDestinoId] = useState<string | null>(null);
+  const [observacion, setObservacion] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    getParticipantes(movimientoId)
+      .then(setParticipantes)
+      .catch(() => setParticipantes([]));
+  }, [movimientoId]);
+
+  async function reload() {
+    const updated = await getParticipantes(movimientoId);
+    setParticipantes(updated);
+    startTransition(() => router.refresh());
+  }
+
+  async function handleMarcarCobrado(p: GastoCompartidoParticipante) {
+    setSubmitting(true);
+    try {
+      await marcarCobrado({
+        participanteId: p.id,
+        fecha,
+        cuentaDestinoId,
+        observacion: observacion.trim() || null,
+        conceptoGasto: concepto || "gasto compartido",
+        montoGasto: p.monto,
+        moneda,
+      });
+      setCobradoFormId(null);
+      await reload();
+    } catch (e) {
+      alert(e instanceof Error ? e.message : "Error");
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  async function handleMarcarPendiente(p: GastoCompartidoParticipante) {
+    if (!confirm(`¿Desmarcar el cobro de ${p.persona_nombre}? Se eliminará el movimiento de reembolso.`)) return;
+    try {
+      await marcarPendiente(p.id);
+      await reload();
+    } catch (e) {
+      alert(e instanceof Error ? e.message : "Error");
+    }
+  }
+
+  if (!participantes) {
+    return <p className="text-xs text-muted-foreground py-2">Cargando…</p>;
+  }
+  if (participantes.length === 0) {
+    return <p className="text-xs text-muted-foreground py-2">Sin participantes registrados.</p>;
+  }
+
+  return (
+    <div className="space-y-2 py-1">
+      {participantes.map((p) => (
+        <div key={p.id} className="space-y-2">
+          <div className="flex items-center gap-2">
+            <span className="flex-1 text-sm">{p.persona_nombre}</span>
+            <span className="text-sm tabular-nums text-muted-foreground">
+              {formatMonto(p.monto, moneda)}
+            </span>
+            {p.estado === "cobrado" ? (
+              <div className="flex items-center gap-1.5">
+                <span className="text-xs px-1.5 py-0.5 rounded-full bg-emerald-900/40 text-emerald-400 border border-emerald-800/40">
+                  Cobrado
+                </span>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-6 text-xs px-2"
+                  onClick={() => handleMarcarPendiente(p)}
+                >
+                  Desmarcar
+                </Button>
+              </div>
+            ) : (
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-6 text-xs px-2"
+                onClick={() => {
+                  setCobradoFormId(cobradoFormId === p.id ? null : p.id);
+                  setFecha(todayStr());
+                  setCuentaDestinoId(null);
+                  setObservacion("");
+                }}
+              >
+                Marcar cobrado
+              </Button>
+            )}
+          </div>
+
+          {cobradoFormId === p.id && (
+            <div className="ml-4 p-3 rounded-md border border-border bg-surface/60 space-y-2">
+              <div className="grid grid-cols-2 gap-2">
+                <div className="space-y-1">
+                  <label className="text-xs text-muted-foreground">Fecha de cobro</label>
+                  <Input
+                    type="date"
+                    value={fecha}
+                    onChange={(e) => setFecha(e.target.value)}
+                    className="h-7 text-xs"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs text-muted-foreground">Cuenta destino</label>
+                  <NamedSelect
+                    options={cuentas.map((c) => ({ value: c.id, label: c.nombre }))}
+                    value={cuentaDestinoId ?? ""}
+                    onValueChange={(v) => setCuentaDestinoId(v || null)}
+                    placeholder="Opcional…"
+                    className="h-7 text-xs w-full"
+                  />
+                </div>
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs text-muted-foreground">Observación (opcional)</label>
+                <Input
+                  value={observacion}
+                  onChange={(e) => setObservacion(e.target.value)}
+                  placeholder="Ej. Transferido el lunes"
+                  className="h-7 text-xs"
+                />
+              </div>
+              <div className="flex gap-2 justify-end">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 text-xs"
+                  onClick={() => setCobradoFormId(null)}
+                >
+                  Cancelar
+                </Button>
+                <Button
+                  size="sm"
+                  className="h-7 text-xs"
+                  disabled={submitting || !fecha}
+                  onClick={() => handleMarcarCobrado(p)}
+                >
+                  {submitting ? "Guardando…" : "Confirmar"}
+                </Button>
+              </div>
+            </div>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
+
 // Genera lista de los últimos 12 meses para el filtro
 function getMeses() {
   const meses: { value: string; label: string }[] = [];
@@ -84,6 +264,7 @@ export function MovimientosClient({ movimientos, total, cuentas, tarjetas, categ
 
   const [editorOpen, setEditorOpen] = useState(false);
   const [editing, setEditing] = useState<Movimiento | null>(null);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
 
   // Filtros locales (UI)
   const [busqueda, setBusqueda] = useState("");
@@ -258,135 +439,202 @@ export function MovimientosClient({ movimientos, total, cuentas, tarjetas, categ
                 </tr>
               </thead>
               <tbody>
-                {filtrados.map((m) => (
-                  <tr key={m.id} className="border-b border-border last:border-0 hover:bg-surface/50 transition-colors">
-                    <td className="px-4 py-3 text-muted-foreground whitespace-nowrap">
-                      {formatFecha(m.fecha)}
-                    </td>
-                    <td className="px-4 py-3">
-                      <span className={cn(
-                        "text-xs px-1.5 py-0.5 rounded-full border",
-                        m.ambito === "Profesional"
-                          ? "bg-blue-900/40 text-blue-300 border-blue-800"
-                          : "bg-surface text-muted-foreground border-border"
-                      )}>
-                        {m.ambito}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="font-medium truncate max-w-[200px]">
-                        {m.concepto || m.descripcion || "—"}
-                      </div>
-                      {m.categorias && (
-                        <div className="text-xs text-muted-foreground">{m.categorias.nombre}</div>
-                      )}
-                      {m.ambito === "Profesional" && m.clientes && (
-                        <div className="flex items-center gap-1 mt-0.5 flex-wrap">
-                          <span className="text-xs text-blue-300 bg-blue-900/20 border border-blue-800/40 px-1.5 py-0.5 rounded">
-                            {m.clientes.nombre}
-                          </span>
-                          {m.servicios_cliente && (
-                            <span className="text-xs text-muted-foreground">· {m.servicios_cliente.nombre}</span>
-                          )}
-                        </div>
-                      )}
-                    </td>
-                    <td className="px-4 py-3 text-muted-foreground text-xs">
-                      {m.metodo ?? "—"}
-                      {m.tarjetas && <span className="ml-1">· {m.tarjetas.nombre}</span>}
-                    </td>
-                    <td className={cn(
-                      "px-4 py-3 text-right font-semibold tabular-nums",
-                      m.tipo === "Ingreso" ? "text-green-400" : m.tipo === "Egreso" ? "text-red-400" : "text-muted-foreground"
-                    )}>
-                      {m.tipo === "Ingreso" ? "+" : m.tipo === "Egreso" ? "-" : "↔"}
-                      {formatMonto(m.monto, m.moneda)}
-                    </td>
-                    <td className="px-4 py-3 text-center">
-                      {m.necesidad ? (
+                {filtrados.map((m) => {
+                  const partsTotal = m.gastos_compartidos_participantes?.length ?? 0;
+                  const partsCobrados = m.gastos_compartidos_participantes?.filter((p) => p.estado === "cobrado").length ?? 0;
+                  const isExpanded = expandedId === m.id;
+                  return (
+                    <>
+                    <tr key={m.id} className="border-b border-border last:border-0 hover:bg-surface/50 transition-colors">
+                      <td className="px-4 py-3 text-muted-foreground whitespace-nowrap">
+                        {formatFecha(m.fecha)}
+                      </td>
+                      <td className="px-4 py-3">
                         <span className={cn(
-                          "inline-flex items-center justify-center w-6 h-6 rounded-full border text-xs font-bold",
-                          NECESIDAD_COLORS[m.necesidad]
+                          "text-xs px-1.5 py-0.5 rounded-full border",
+                          m.ambito === "Profesional"
+                            ? "bg-blue-900/40 text-blue-300 border-blue-800"
+                            : "bg-surface text-muted-foreground border-border"
                         )}>
-                          {m.necesidad}
+                          {m.ambito}
                         </span>
-                      ) : <span className="text-muted-foreground/30">—</span>}
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-1 justify-end">
-                        <Button variant="ghost" size="icon-sm" onClick={() => handleEditar(m)} title="Editar">
-                          <Pencil className="h-3.5 w-3.5" />
-                        </Button>
-                        <Button variant="ghost" size="icon-sm" onClick={() => handleDuplicar(m.id)} title="Duplicar">
-                          <Copy className="h-3.5 w-3.5" />
-                        </Button>
-                        <Button variant="ghost" size="icon-sm" onClick={() => handleEliminar(m)} title="Eliminar" className="text-destructive hover:text-destructive">
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </Button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="font-medium truncate max-w-[200px]">
+                          {m.concepto || m.descripcion || "—"}
+                        </div>
+                        {m.categorias && (
+                          <div className="text-xs text-muted-foreground">{m.categorias.nombre}</div>
+                        )}
+                        {m.ambito === "Profesional" && m.clientes && (
+                          <div className="flex items-center gap-1 mt-0.5 flex-wrap">
+                            <span className="text-xs text-blue-300 bg-blue-900/20 border border-blue-800/40 px-1.5 py-0.5 rounded">
+                              {m.clientes.nombre}
+                            </span>
+                            {m.servicios_cliente && (
+                              <span className="text-xs text-muted-foreground">· {m.servicios_cliente.nombre}</span>
+                            )}
+                          </div>
+                        )}
+                        {m.es_compartido && partsTotal > 0 && (
+                          <div className="flex items-center gap-1 mt-0.5 text-xs text-muted-foreground">
+                            <Users className="h-3 w-3" />
+                            <span>Compartido · {partsCobrados}/{partsTotal} cobrado</span>
+                          </div>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 text-muted-foreground text-xs">
+                        {m.metodo ?? "—"}
+                        {m.tarjetas && <span className="ml-1">· {m.tarjetas.nombre}</span>}
+                      </td>
+                      <td className={cn(
+                        "px-4 py-3 text-right font-semibold tabular-nums",
+                        m.tipo === "Ingreso" ? "text-green-400" : m.tipo === "Egreso" ? "text-red-400" : "text-muted-foreground"
+                      )}>
+                        {m.tipo === "Ingreso" ? "+" : m.tipo === "Egreso" ? "-" : "↔"}
+                        {formatMonto(m.monto, m.moneda)}
+                      </td>
+                      <td className="px-4 py-3 text-center">
+                        {m.necesidad ? (
+                          <span className={cn(
+                            "inline-flex items-center justify-center w-6 h-6 rounded-full border text-xs font-bold",
+                            NECESIDAD_COLORS[m.necesidad]
+                          )}>
+                            {m.necesidad}
+                          </span>
+                        ) : <span className="text-muted-foreground/30">—</span>}
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-1 justify-end">
+                          {m.es_compartido && (
+                            <Button
+                              variant="ghost"
+                              size="icon-sm"
+                              title={isExpanded ? "Cerrar" : "Ver cobros"}
+                              onClick={() => setExpandedId(isExpanded ? null : m.id)}
+                            >
+                              <ChevronDown className={cn("h-3.5 w-3.5 transition-transform", isExpanded && "rotate-180")} />
+                            </Button>
+                          )}
+                          <Button variant="ghost" size="icon-sm" onClick={() => handleEditar(m)} title="Editar">
+                            <Pencil className="h-3.5 w-3.5" />
+                          </Button>
+                          <Button variant="ghost" size="icon-sm" onClick={() => handleDuplicar(m.id)} title="Duplicar">
+                            <Copy className="h-3.5 w-3.5" />
+                          </Button>
+                          <Button variant="ghost" size="icon-sm" onClick={() => handleEliminar(m)} title="Eliminar" className="text-destructive hover:text-destructive">
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
+                        </div>
+                      </td>
+                    </tr>
+                    {isExpanded && (
+                      <tr key={`${m.id}-panel`} className="border-b border-border bg-surface/30">
+                        <td colSpan={7} className="px-6 py-2">
+                          <CompartidoPanel
+                            movimientoId={m.id}
+                            concepto={m.concepto}
+                            moneda={m.moneda ?? "ARS"}
+                            cuentas={cuentas}
+                          />
+                        </td>
+                      </tr>
+                    )}
+                    </>
+                  );
+                })}
               </tbody>
             </table>
           </div>
 
           {/* Mobile: cards */}
           <div className="md:hidden flex flex-col gap-2">
-            {filtrados.map((m) => (
-              <div key={m.id} className="border border-border rounded-lg p-3 bg-card">
-                <div className="flex items-start justify-between gap-2">
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <span className={cn(
-                        "font-semibold tabular-nums",
-                        m.tipo === "Ingreso" ? "text-green-400" : m.tipo === "Egreso" ? "text-red-400" : "text-muted-foreground"
-                      )}>
-                        {m.tipo === "Ingreso" ? "+" : m.tipo === "Egreso" ? "-" : "↔"}
-                        {formatMonto(m.monto, m.moneda)}
-                      </span>
-                      {m.necesidad && (
-                        <span className={cn(
-                          "inline-flex items-center justify-center w-5 h-5 rounded-full border text-xs font-bold",
-                          NECESIDAD_COLORS[m.necesidad]
-                        )}>
-                          {m.necesidad}
-                        </span>
-                      )}
-                    </div>
-                    <p className="text-sm font-medium mt-0.5 truncate">
-                      {m.concepto || m.descripcion || "—"}
-                    </p>
-                    <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground">
-                      <span>{formatFecha(m.fecha)}</span>
-                      {m.metodo && <><span>·</span><span>{m.metodo}</span></>}
-                      {m.categorias && <><span>·</span><span>{m.categorias.nombre}</span></>}
-                    </div>
-                    {m.ambito === "Profesional" && m.clientes && (
-                      <div className="flex items-center gap-1 mt-1 flex-wrap">
-                        <span className="text-xs text-blue-300 bg-blue-900/20 border border-blue-800/40 px-1.5 py-0.5 rounded">
-                          {m.clientes.nombre}
-                        </span>
-                        {m.servicios_cliente && (
-                          <span className="text-xs text-muted-foreground">· {m.servicios_cliente.nombre}</span>
+            {filtrados.map((m) => {
+              const partsTotal = m.gastos_compartidos_participantes?.length ?? 0;
+              const partsCobrados = m.gastos_compartidos_participantes?.filter((p) => p.estado === "cobrado").length ?? 0;
+              const isExpanded = expandedId === m.id;
+              return (
+                <div key={m.id} className="border border-border rounded-lg bg-card overflow-hidden">
+                  <div className="p-3">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className={cn(
+                            "font-semibold tabular-nums",
+                            m.tipo === "Ingreso" ? "text-green-400" : m.tipo === "Egreso" ? "text-red-400" : "text-muted-foreground"
+                          )}>
+                            {m.tipo === "Ingreso" ? "+" : m.tipo === "Egreso" ? "-" : "↔"}
+                            {formatMonto(m.monto, m.moneda)}
+                          </span>
+                          {m.necesidad && (
+                            <span className={cn(
+                              "inline-flex items-center justify-center w-5 h-5 rounded-full border text-xs font-bold",
+                              NECESIDAD_COLORS[m.necesidad]
+                            )}>
+                              {m.necesidad}
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-sm font-medium mt-0.5 truncate">
+                          {m.concepto || m.descripcion || "—"}
+                        </p>
+                        <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground">
+                          <span>{formatFecha(m.fecha)}</span>
+                          {m.metodo && <><span>·</span><span>{m.metodo}</span></>}
+                          {m.categorias && <><span>·</span><span>{m.categorias.nombre}</span></>}
+                        </div>
+                        {m.ambito === "Profesional" && m.clientes && (
+                          <div className="flex items-center gap-1 mt-1 flex-wrap">
+                            <span className="text-xs text-blue-300 bg-blue-900/20 border border-blue-800/40 px-1.5 py-0.5 rounded">
+                              {m.clientes.nombre}
+                            </span>
+                            {m.servicios_cliente && (
+                              <span className="text-xs text-muted-foreground">· {m.servicios_cliente.nombre}</span>
+                            )}
+                          </div>
+                        )}
+                        {m.es_compartido && partsTotal > 0 && (
+                          <div className="flex items-center gap-1 mt-1 text-xs text-muted-foreground">
+                            <Users className="h-3 w-3" />
+                            <span>Compartido · {partsCobrados}/{partsTotal} cobrado</span>
+                          </div>
                         )}
                       </div>
-                    )}
+                      <div className="flex gap-1 flex-shrink-0">
+                        {m.es_compartido && (
+                          <Button
+                            variant="ghost"
+                            size="icon-sm"
+                            onClick={() => setExpandedId(isExpanded ? null : m.id)}
+                          >
+                            <ChevronDown className={cn("h-3.5 w-3.5 transition-transform", isExpanded && "rotate-180")} />
+                          </Button>
+                        )}
+                        <Button variant="ghost" size="icon-sm" onClick={() => handleEditar(m)}>
+                          <Pencil className="h-3.5 w-3.5" />
+                        </Button>
+                        <Button variant="ghost" size="icon-sm" onClick={() => handleDuplicar(m.id)}>
+                          <Copy className="h-3.5 w-3.5" />
+                        </Button>
+                        <Button variant="ghost" size="icon-sm" onClick={() => handleEliminar(m)} className="text-destructive hover:text-destructive">
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
+                    </div>
                   </div>
-                  <div className="flex gap-1 flex-shrink-0">
-                    <Button variant="ghost" size="icon-sm" onClick={() => handleEditar(m)}>
-                      <Pencil className="h-3.5 w-3.5" />
-                    </Button>
-                    <Button variant="ghost" size="icon-sm" onClick={() => handleDuplicar(m.id)}>
-                      <Copy className="h-3.5 w-3.5" />
-                    </Button>
-                    <Button variant="ghost" size="icon-sm" onClick={() => handleEliminar(m)} className="text-destructive hover:text-destructive">
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </Button>
-                  </div>
+                  {isExpanded && (
+                    <div className="px-3 pb-3 border-t border-border/50 bg-surface/30">
+                      <CompartidoPanel
+                        movimientoId={m.id}
+                        concepto={m.concepto}
+                        moneda={m.moneda ?? "ARS"}
+                        cuentas={cuentas}
+                      />
+                    </div>
+                  )}
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
 
           {/* Paginación simple */}
