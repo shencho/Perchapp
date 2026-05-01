@@ -2,15 +2,7 @@
 
 import { createClient } from "@/lib/supabase/server";
 import type { GastoCompartidoParticipante } from "@/types/supabase";
-
-export type { GastoCompartidoParticipante };
-
-export interface ParticipanteInput {
-  persona_nombre:    string;
-  persona_id?:       string | null;
-  monto:             number;
-  cuenta_destino_id?: string | null;
-}
+import type { ParticipanteInput, MarcarCobradoInput } from "./gastos-compartidos-types";
 
 // ── Queries ───────────────────────────────────────────────────────────────────
 
@@ -91,16 +83,6 @@ export async function upsertParticipantes(
     );
 
   if (error) throw new Error(error.message);
-}
-
-export interface MarcarCobradoInput {
-  participanteId:   string;
-  fecha:            string;
-  cuentaDestinoId?: string | null;
-  observacion?:     string | null;
-  conceptoGasto:    string; // concepto del movimiento padre para el nombre del ingreso
-  montoGasto:       number; // monto del participante
-  moneda:           string;
 }
 
 /**

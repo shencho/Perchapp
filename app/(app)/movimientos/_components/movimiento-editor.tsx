@@ -21,8 +21,8 @@ import {
 import {
   getParticipantes,
   upsertParticipantes,
-  type ParticipanteInput,
 } from "@/lib/supabase/actions/gastos-compartidos";
+import type { ParticipanteInput } from "@/lib/supabase/actions/gastos-compartidos-types";
 import { createPersona } from "@/lib/supabase/actions/personas";
 import { RegistrarPagoModal } from "./registrar-pago-modal";
 import {
