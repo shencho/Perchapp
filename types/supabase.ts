@@ -58,6 +58,10 @@ export interface Database {
           moneda: string
           orden: number
           archivada: boolean
+          inv_subtipo: "plazo_fijo" | "cripto" | "fci" | "acciones" | "usd_fisico" | "balanz" | "otros" | null
+          inv_fecha_vencimiento: string | null
+          inv_notas: string | null
+          inv_tasa_anual: number | null
           created_at: string
         }
         Insert: {
@@ -69,6 +73,10 @@ export interface Database {
           moneda?: string
           orden?: number
           archivada?: boolean
+          inv_subtipo?: "plazo_fijo" | "cripto" | "fci" | "acciones" | "usd_fisico" | "balanz" | "otros" | null
+          inv_fecha_vencimiento?: string | null
+          inv_notas?: string | null
+          inv_tasa_anual?: number | null
           created_at?: string
         }
         Update: {
@@ -80,6 +88,10 @@ export interface Database {
           moneda?: string
           orden?: number
           archivada?: boolean
+          inv_subtipo?: "plazo_fijo" | "cripto" | "fci" | "acciones" | "usd_fisico" | "balanz" | "otros" | null
+          inv_fecha_vencimiento?: string | null
+          inv_notas?: string | null
+          inv_tasa_anual?: number | null
           created_at?: string
         }
       }

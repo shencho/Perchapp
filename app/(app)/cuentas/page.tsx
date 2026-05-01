@@ -15,6 +15,33 @@ function fmt(n: number, moneda = "ARS") {
   }).format(n);
 }
 
+const SUBTIPO_LABELS: Record<string, string> = {
+  plazo_fijo: "Plazo fijo",
+  cripto: "Cripto",
+  fci: "FCI",
+  acciones: "Acciones",
+  usd_fisico: "USD físico",
+  balanz: "Balanz",
+  otros: "Otros",
+};
+
+const SUBTIPO_COLORS: Record<string, string> = {
+  plazo_fijo: "bg-amber-500/15 text-amber-400 border-amber-500/30",
+  cripto:     "bg-purple-500/15 text-purple-400 border-purple-500/30",
+  fci:        "bg-blue-500/15 text-blue-400 border-blue-500/30",
+  acciones:   "bg-indigo-500/15 text-indigo-400 border-indigo-500/30",
+  usd_fisico: "bg-green-500/15 text-green-400 border-green-500/30",
+  balanz:     "bg-sky-500/15 text-sky-400 border-sky-500/30",
+  otros:      "bg-muted/50 text-muted-foreground border-border",
+};
+
+function calcDiasRestantes(fecha: string | null): number | null {
+  if (!fecha) return null;
+  return Math.ceil(
+    (new Date(fecha + "T12:00:00").getTime() - Date.now()) / (1000 * 60 * 60 * 24)
+  );
+}
+
 export default async function CuentasPage() {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
@@ -38,16 +65,26 @@ export default async function CuentasPage() {
   }));
   const movimientosFull = movRes.data ?? [];
 
-  // Calcular saldo por cuenta
   const saldos = cuentas.map(c => ({
     cuenta: c,
     saldo: calcularSaldoCuenta(c.id, c.saldo ?? 0, movimientos),
   }));
 
+  const saldosLiquidos = saldos.filter(s =>
+    ["Banco", "Billetera virtual", "Efectivo"].includes(s.cuenta.tipo)
+  );
+  const saldosInversion = saldos
+    .filter(s => s.cuenta.tipo === "Inversión")
+    .map(s => ({
+      ...s,
+      diasRestantes: s.cuenta.inv_subtipo === "plazo_fijo"
+        ? calcDiasRestantes(s.cuenta.inv_fecha_vencimiento)
+        : null,
+    }));
+
   const totalARS = saldos.filter(s => s.cuenta.moneda === "ARS").reduce((acc, s) => acc + s.saldo, 0);
   const totalUSD = saldos.filter(s => s.cuenta.moneda === "USD").reduce((acc, s) => acc + s.saldo, 0);
 
-  // Calcular consumo por tarjeta
   const consumos = tarjetas.map(t => {
     const periodo = getPeriodoCierre(t.cierre_dia);
     const consumo = calcularConsumoTarjeta(t.id, movimientosFull, periodo.inicio, periodo.fin);
@@ -62,11 +99,14 @@ export default async function CuentasPage() {
         <p className="text-sm text-muted-foreground mt-1">Saldos calculados al vuelo desde tus movimientos.</p>
       </div>
 
-      {/* Sección A: Cuentas */}
+      {/* Sección A: Cuentas líquidas */}
       <section className="space-y-3">
-        <h2 className="text-base font-semibold">Mis cuentas</h2>
-        {cuentas.length === 0 ? (
-          <p className="text-sm text-muted-foreground">No tenés cuentas cargadas. Agregá una en <Link href="/ajustes" className="underline">Ajustes → Cuentas</Link>.</p>
+        <h2 className="text-base font-semibold">Cuentas</h2>
+        {saldosLiquidos.length === 0 ? (
+          <p className="text-sm text-muted-foreground">
+            No tenés cuentas cargadas. Agregá una en{" "}
+            <Link href="/ajustes" className="underline">Ajustes → Cuentas</Link>.
+          </p>
         ) : (
           <>
             {/* Desktop */}
@@ -81,7 +121,7 @@ export default async function CuentasPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {saldos.map(({ cuenta, saldo }) => (
+                  {saldosLiquidos.map(({ cuenta, saldo }) => (
                     <tr key={cuenta.id} className="border-b border-border last:border-0 hover:bg-surface/50 transition-colors">
                       <td className="px-4 py-3">
                         <Link href={`/cuentas/${cuenta.id}`} className="font-medium hover:text-primary transition-colors">
@@ -98,7 +138,6 @@ export default async function CuentasPage() {
                       </td>
                     </tr>
                   ))}
-                  {/* Totales */}
                   <tr className="border-t border-border bg-surface/50">
                     <td colSpan={3} className="px-4 py-2.5 text-sm font-medium text-muted-foreground">Total</td>
                     <td className="px-4 py-2.5 text-right">
@@ -112,7 +151,7 @@ export default async function CuentasPage() {
 
             {/* Mobile */}
             <div className="md:hidden flex flex-col gap-2">
-              {saldos.map(({ cuenta, saldo }) => (
+              {saldosLiquidos.map(({ cuenta, saldo }) => (
                 <Link key={cuenta.id} href={`/cuentas/${cuenta.id}`} className="block border border-border rounded-lg p-3 bg-card hover:bg-surface/50 transition-colors">
                   <div className="flex items-center justify-between">
                     <div>
@@ -137,9 +176,117 @@ export default async function CuentasPage() {
         )}
       </section>
 
-      {/* Sección B: Tarjetas */}
+      {/* Sección B: Inversiones */}
+      {saldosInversion.length > 0 && (
+        <section className="space-y-3">
+          <h2 className="text-base font-semibold">Inversiones</h2>
+
+          {/* Desktop */}
+          <div className="hidden md:block rounded-lg border border-border overflow-hidden">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-border bg-surface">
+                  <th className="text-left px-4 py-2.5 font-medium text-muted-foreground">Nombre</th>
+                  <th className="text-left px-4 py-2.5 font-medium text-muted-foreground">Tipo</th>
+                  <th className="text-left px-4 py-2.5 font-medium text-muted-foreground">Info</th>
+                  <th className="text-right px-4 py-2.5 font-medium text-muted-foreground">Saldo</th>
+                </tr>
+              </thead>
+              <tbody>
+                {saldosInversion.map(({ cuenta, saldo, diasRestantes }) => {
+                  const subtipo = cuenta.inv_subtipo ?? "otros";
+                  const vencida = diasRestantes !== null && diasRestantes <= 0;
+                  return (
+                    <tr key={cuenta.id} className="border-b border-border last:border-0 hover:bg-surface/50 transition-colors">
+                      <td className="px-4 py-3">
+                        <Link href={`/cuentas/${cuenta.id}`} className="font-medium hover:text-primary transition-colors">
+                          {cuenta.nombre}
+                        </Link>
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className={cn(
+                          "inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border",
+                          SUBTIPO_COLORS[subtipo] ?? SUBTIPO_COLORS.otros
+                        )}>
+                          {SUBTIPO_LABELS[subtipo] ?? subtipo}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-xs text-muted-foreground">
+                        {cuenta.inv_subtipo === "plazo_fijo" && (
+                          <span className="flex items-center gap-2">
+                            {cuenta.inv_tasa_anual != null && (
+                              <span>{cuenta.inv_tasa_anual}% TNA</span>
+                            )}
+                            {diasRestantes !== null && (
+                              vencida ? (
+                                <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-semibold bg-red-500/15 text-red-400 border border-red-500/30">
+                                  Vencido
+                                </span>
+                              ) : (
+                                <span>{diasRestantes}d</span>
+                              )
+                            )}
+                          </span>
+                        )}
+                      </td>
+                      <td className={cn(
+                        "px-4 py-3 text-right font-semibold tabular-nums",
+                        saldo >= 0 ? "text-green-400" : "text-red-400"
+                      )}>
+                        {fmt(saldo, cuenta.moneda)}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Mobile */}
+          <div className="md:hidden flex flex-col gap-2">
+            {saldosInversion.map(({ cuenta, saldo, diasRestantes }) => {
+              const subtipo = cuenta.inv_subtipo ?? "otros";
+              const vencida = diasRestantes !== null && diasRestantes <= 0;
+              return (
+                <Link key={cuenta.id} href={`/cuentas/${cuenta.id}`} className="block border border-border rounded-lg p-3 bg-card hover:bg-surface/50 transition-colors">
+                  <div className="flex items-center justify-between">
+                    <div className="flex flex-col gap-1 min-w-0">
+                      <p className="font-medium truncate">{cuenta.nombre}</p>
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span className={cn(
+                          "inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-medium border",
+                          SUBTIPO_COLORS[subtipo] ?? SUBTIPO_COLORS.otros
+                        )}>
+                          {SUBTIPO_LABELS[subtipo] ?? subtipo}
+                        </span>
+                        {cuenta.inv_subtipo === "plazo_fijo" && diasRestantes !== null && (
+                          vencida ? (
+                            <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-semibold bg-red-500/15 text-red-400 border border-red-500/30">
+                              Vencido
+                            </span>
+                          ) : (
+                            <span className="text-xs text-muted-foreground">{diasRestantes}d restantes</span>
+                          )
+                        )}
+                        {cuenta.inv_tasa_anual != null && cuenta.inv_subtipo === "plazo_fijo" && !vencida && (
+                          <span className="text-xs text-muted-foreground">{cuenta.inv_tasa_anual}% TNA</span>
+                        )}
+                      </div>
+                    </div>
+                    <span className={cn("font-semibold tabular-nums ml-2 shrink-0", saldo >= 0 ? "text-green-400" : "text-red-400")}>
+                      {fmt(saldo, cuenta.moneda)}
+                    </span>
+                  </div>
+                </Link>
+              );
+            })}
+          </div>
+        </section>
+      )}
+
+      {/* Sección C: Tarjetas */}
       <section className="space-y-3">
-        <h2 className="text-base font-semibold">Mis tarjetas</h2>
+        <h2 className="text-base font-semibold">Tarjetas</h2>
         {tarjetas.length === 0 ? (
           <p className="text-sm text-muted-foreground">No tenés tarjetas cargadas. Agregá una en <Link href="/ajustes" className="underline">Ajustes → Tarjetas</Link>.</p>
         ) : (
@@ -157,7 +304,7 @@ export default async function CuentasPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {consumos.map(({ tarjeta, consumo, proximoVto, periodo }) => (
+                  {consumos.map(({ tarjeta, consumo, proximoVto }) => (
                     <tr key={tarjeta.id} className="border-b border-border last:border-0 hover:bg-surface/50 transition-colors">
                       <td className="px-4 py-3">
                         <Link href={`/cuentas/tarjetas/${tarjeta.id}`} className="font-medium hover:text-primary transition-colors">

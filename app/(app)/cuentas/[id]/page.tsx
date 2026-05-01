@@ -4,6 +4,7 @@ import Link from "next/link";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { calcularSaldoCuenta, calcularIngresosDelMes, calcularEgresosDelMes, type MovimientoParaSaldo } from "@/lib/domain/calcularSaldoCuenta";
+import { ActualizarValorModal } from "../_components/actualizar-valor-modal";
 
 function fmt(n: number, moneda = "ARS") {
   return new Intl.NumberFormat("es-AR", {
@@ -17,6 +18,28 @@ function fmt(n: number, moneda = "ARS") {
 function fmtFecha(d: string) {
   return new Date(d + "T12:00:00").toLocaleDateString("es-AR", { day: "2-digit", month: "short" });
 }
+
+const SUBTIPO_LABELS: Record<string, string> = {
+  plazo_fijo: "Plazo fijo",
+  cripto: "Cripto",
+  fci: "FCI",
+  acciones: "Acciones",
+  usd_fisico: "USD físico",
+  balanz: "Balanz",
+  otros: "Otros",
+};
+
+const SUBTIPO_COLORS: Record<string, string> = {
+  plazo_fijo: "bg-amber-500/15 text-amber-400 border-amber-500/30",
+  cripto:     "bg-purple-500/15 text-purple-400 border-purple-500/30",
+  fci:        "bg-blue-500/15 text-blue-400 border-blue-500/30",
+  acciones:   "bg-indigo-500/15 text-indigo-400 border-indigo-500/30",
+  usd_fisico: "bg-green-500/15 text-green-400 border-green-500/30",
+  balanz:     "bg-sky-500/15 text-sky-400 border-sky-500/30",
+  otros:      "bg-muted/50 text-muted-foreground border-border",
+};
+
+const SUBTIPOS_VOLATILES = ["cripto", "fci", "acciones", "balanz"];
 
 interface Props {
   params: Promise<{ id: string }>;
@@ -47,7 +70,6 @@ export default async function CuentaDetallePage({ params, searchParams }: Props)
   const inicio = `${año}-${mesN}-01`;
   const fin = new Date(Number(año), Number(mesN), 0).toISOString().slice(0, 10);
 
-  // Movimientos del mes para esta cuenta (para KPIs y lista)
   const { data: movMes } = await supabase
     .from("movimientos")
     .select("id, tipo, monto, moneda, concepto, descripcion, categoria_id, fecha, cuenta_id, cuenta_destino_id, metodo, necesidad, es_compartido, gc_mi_parte")
@@ -58,7 +80,6 @@ export default async function CuentaDetallePage({ params, searchParams }: Props)
     .order("fecha", { ascending: false })
     .order("created_at", { ascending: false });
 
-  // Todos los movimientos para saldo histórico
   const { data: movAll } = await supabase
     .from("movimientos")
     .select("tipo, monto, cuenta_id, cuenta_destino_id")
@@ -94,6 +115,25 @@ export default async function CuentaDetallePage({ params, searchParams }: Props)
 
   const labelMes = new Date(añoN, mesNN - 1, 1).toLocaleDateString("es-AR", { month: "long", year: "numeric" });
 
+  // Cálculos para inversión
+  const esInversion = cuenta.tipo === "Inversión";
+  const subtipo = cuenta.inv_subtipo ?? "otros";
+  const esVolatil = esInversion && SUBTIPOS_VOLATILES.includes(subtipo);
+
+  const diasRestantes = esInversion && cuenta.inv_subtipo === "plazo_fijo" && cuenta.inv_fecha_vencimiento
+    ? Math.ceil(
+        (new Date(cuenta.inv_fecha_vencimiento + "T12:00:00").getTime() - Date.now())
+        / (1000 * 60 * 60 * 24)
+      )
+    : null;
+
+  const vencida = diasRestantes !== null && diasRestantes <= 0;
+
+  const montoAlVencimiento =
+    cuenta.inv_tasa_anual && diasRestantes !== null && diasRestantes > 0 && saldoActual > 0
+      ? saldoActual * (1 + (cuenta.inv_tasa_anual / 100) * (diasRestantes / 365))
+      : null;
+
   const NECESIDAD_COLORS: Record<number, string> = {
     1: "bg-red-900/50 text-red-300 border-red-800",
     2: "bg-orange-900/50 text-orange-300 border-orange-800",
@@ -117,11 +157,76 @@ export default async function CuentaDetallePage({ params, searchParams }: Props)
           <span className="text-xs px-1.5 py-0.5 rounded-full border border-border text-muted-foreground">{cuenta.tipo}</span>
           <span className="text-xs text-muted-foreground">{cuenta.moneda}</span>
         </div>
-        <div className="mt-2">
+        <div className="mt-2 flex items-baseline gap-3 flex-wrap">
           <span className="text-3xl font-bold tabular-nums">{fmt(saldoActual, cuenta.moneda)}</span>
-          <span className="text-sm text-muted-foreground ml-2">saldo actual</span>
+          <span className="text-sm text-muted-foreground">saldo actual</span>
+          {esVolatil && (
+            <ActualizarValorModal
+              cuentaId={cuenta.id}
+              cuentaNombre={cuenta.nombre}
+              saldoActual={saldoActual}
+              moneda={cuenta.moneda}
+            />
+          )}
         </div>
       </div>
+
+      {/* Bloque info inversión */}
+      {esInversion && (
+        <div className="rounded-lg border border-border p-4 bg-surface/40 space-y-3">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className={cn(
+              "inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border",
+              SUBTIPO_COLORS[subtipo] ?? SUBTIPO_COLORS.otros
+            )}>
+              {SUBTIPO_LABELS[subtipo] ?? subtipo}
+            </span>
+            {vencida && (
+              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-red-500/15 text-red-400 border border-red-500/30">
+                Vencido
+              </span>
+            )}
+          </div>
+
+          {cuenta.inv_subtipo === "plazo_fijo" && (
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+              {cuenta.inv_tasa_anual != null && (
+                <div className="border border-border rounded-lg p-3 bg-card">
+                  <p className="text-xs text-muted-foreground">Tasa anual</p>
+                  <p className="text-base font-semibold mt-0.5 tabular-nums">{cuenta.inv_tasa_anual}%</p>
+                  <p className="text-xs text-muted-foreground">TNA</p>
+                </div>
+              )}
+              {diasRestantes !== null && (
+                <div className="border border-border rounded-lg p-3 bg-card">
+                  <p className="text-xs text-muted-foreground">Vencimiento</p>
+                  {vencida ? (
+                    <p className="text-base font-semibold mt-0.5 text-red-400">Vencido</p>
+                  ) : (
+                    <p className="text-base font-semibold mt-0.5 tabular-nums">{diasRestantes}d</p>
+                  )}
+                  {cuenta.inv_fecha_vencimiento && (
+                    <p className="text-xs text-muted-foreground">
+                      {new Date(cuenta.inv_fecha_vencimiento + "T12:00:00").toLocaleDateString("es-AR", { day: "2-digit", month: "short", year: "2-digit" })}
+                    </p>
+                  )}
+                </div>
+              )}
+              {montoAlVencimiento != null && (
+                <div className="border border-border rounded-lg p-3 bg-card">
+                  <p className="text-xs text-muted-foreground">Estimado al vencer</p>
+                  <p className="text-base font-semibold mt-0.5 tabular-nums text-green-400">{fmt(montoAlVencimiento, cuenta.moneda)}</p>
+                  <p className="text-xs text-muted-foreground">con interés simple</p>
+                </div>
+              )}
+            </div>
+          )}
+
+          {cuenta.inv_notas && (
+            <p className="text-xs text-muted-foreground">{cuenta.inv_notas}</p>
+          )}
+        </div>
+      )}
 
       {/* Navegador de mes */}
       <div className="flex items-center gap-2">
@@ -228,8 +333,10 @@ export default async function CuentaDetallePage({ params, searchParams }: Props)
       </div>
 
       <p className="text-xs text-muted-foreground">
-        Para editar movimientos, usá la sección <Link href="/movimientos" className="underline hover:text-foreground">Movimientos</Link>.
-        Para configurar la cuenta, usá <Link href="/ajustes" className="underline hover:text-foreground">Ajustes → Cuentas</Link>.
+        {esInversion
+          ? <>Los ajustes de valor creados desde esta pantalla aparecen como movimientos en <Link href="/movimientos" className="underline hover:text-foreground">Movimientos</Link>. Para editar los datos de la inversión, usá <Link href="/ajustes" className="underline hover:text-foreground">Ajustes → Cuentas</Link>.</>
+          : <>Para editar movimientos, usá la sección <Link href="/movimientos" className="underline hover:text-foreground">Movimientos</Link>. Para configurar la cuenta, usá <Link href="/ajustes" className="underline hover:text-foreground">Ajustes → Cuentas</Link>.</>
+        }
       </p>
     </div>
   );
