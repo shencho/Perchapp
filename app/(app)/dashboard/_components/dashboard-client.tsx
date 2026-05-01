@@ -45,7 +45,7 @@ export type Alerta = {
 };
 
 export interface DashboardData {
-  perfil: { nombre: string; asistente_nombre: string | null; modo: string };
+  perfil: { nombre: string; asistente_nombre: string | null; email: string; modo: string };
   hero: {
     totalARS: number; totalUSD: number;
     ingresosDelMes: number; egresosDelMes: number;
@@ -171,9 +171,9 @@ function HeroFinanciero({ hero, perfil }: { hero: DashboardData["hero"]; perfil:
       <div className="flex items-center justify-between flex-wrap gap-2">
         <div>
           <h1 className="text-2xl font-semibold">
-            {perfil.asistente_nombre
-              ? `Hola, ${perfil.asistente_nombre}`
-              : perfil.nombre ? `Hola, ${perfil.nombre}` : "Dashboard"}
+            {`Hola, ${perfil.nombre
+              ? perfil.nombre.split(" ")[0]
+              : perfil.email.split("@")[0]}`}
           </h1>
           <p className="text-sm text-muted-foreground mt-0.5">Resumen financiero de hoy</p>
         </div>
@@ -377,7 +377,7 @@ function BloqueCompartidos({ datos }: { datos: DashboardData["compartidos"] }) {
         </div>
       )}
 
-      <Link href="/movimientos" className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors">
+      <Link href="/movimientos?compartido=true" className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors">
         Ver movimientos compartidos <ChevronRight className="h-3 w-3" />
       </Link>
     </div>
@@ -653,6 +653,23 @@ export function DashboardClient({ data }: { data: DashboardData }) {
       {/* Hero — no ocultable */}
       <HeroFinanciero hero={data.hero} perfil={data.perfil} />
 
+      {/* Alertas — fijas arriba, solo si hay (ocultables pero no aparecen en banner) */}
+      {data.alertas.length > 0 && !hiddenBlocks.includes("alertas") && (
+        <section className="space-y-3">
+          <div className="flex items-center justify-between">
+            <h2 className="text-base font-semibold">Alertas</h2>
+            <button
+              onClick={() => toggleBlock("alertas")}
+              className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+            >
+              <X className="h-3 w-3" />
+              Ocultar
+            </button>
+          </div>
+          <BloqueAlertas alertas={data.alertas} />
+        </section>
+      )}
+
       {/* Gráfico evolución */}
       <DashBlock id="grafico" title="Evolución mensual" hiddenBlocks={hiddenBlocks} onToggle={toggleBlock}>
         <GraficoEvolucion
@@ -674,13 +691,6 @@ export function DashboardClient({ data }: { data: DashboardData }) {
         </DashBlock>
       )}
 
-      {/* Compartidos */}
-      {data.compartidos.totalPendiente > 0 && (
-        <DashBlock id="compartidos" title="Gastos compartidos" hiddenBlocks={hiddenBlocks} onToggle={toggleBlock}>
-          <BloqueCompartidos datos={data.compartidos} />
-        </DashBlock>
-      )}
-
       {/* Préstamos */}
       {data.prestamos.length > 0 && (
         <DashBlock id="prestamos" title="Préstamos" hiddenBlocks={hiddenBlocks} onToggle={toggleBlock}>
@@ -695,28 +705,18 @@ export function DashboardClient({ data }: { data: DashboardData }) {
         </DashBlock>
       )}
 
+      {/* Compartidos */}
+      {data.compartidos.totalPendiente > 0 && (
+        <DashBlock id="compartidos" title="Gastos compartidos" hiddenBlocks={hiddenBlocks} onToggle={toggleBlock}>
+          <BloqueCompartidos datos={data.compartidos} />
+        </DashBlock>
+      )}
+
       {/* Análisis */}
       {(data.analisis.topCategorias.length > 0 || data.analisis.porNecesidad.length > 0) && (
         <DashBlock id="analisis" title="Análisis del mes" hiddenBlocks={hiddenBlocks} onToggle={toggleBlock}>
           <BloqueAnalisis analisis={data.analisis} />
         </DashBlock>
-      )}
-
-      {/* Alertas — no aparece en el banner si está "oculto" (es exclusión total) */}
-      {data.alertas.length > 0 && !hiddenBlocks.includes("alertas") && (
-        <section className="space-y-3">
-          <div className="flex items-center justify-between">
-            <h2 className="text-base font-semibold">Alertas</h2>
-            <button
-              onClick={() => toggleBlock("alertas")}
-              className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
-            >
-              <X className="h-3 w-3" />
-              Ocultar
-            </button>
-          </div>
-          <BloqueAlertas alertas={data.alertas} />
-        </section>
       )}
     </div>
   );

@@ -129,24 +129,24 @@ export function CashFlowClient({ saldoInicial, promedios, moneda }: Props) {
         <p className="text-xs font-medium text-muted-foreground mb-3">Saldo proyectado</p>
         <ResponsiveContainer width="100%" height={220}>
           <LineChart data={proyeccion} margin={{ top: 4, right: 4, bottom: 0, left: 0 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
+            <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" vertical={false} />
             <XAxis
               dataKey="label"
-              tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }}
+              tick={{ fill: "#64748b", fontSize: 11 }}
               axisLine={false} tickLine={false}
             />
             <YAxis
               tickFormatter={fmtShort}
-              tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }}
+              tick={{ fill: "#64748b", fontSize: 11 }}
               axisLine={false} tickLine={false}
               width={56}
             />
             <Tooltip content={<CustomTooltip moneda={moneda} />} />
-            <ReferenceLine y={0} stroke="hsl(var(--border))" strokeDasharray="4 4" />
+            <ReferenceLine y={0} stroke="#334155" strokeDasharray="4 4" />
             <Line
               type="monotone" dataKey="saldo" name="Saldo"
-              stroke="hsl(var(--primary))" strokeWidth={2}
-              dot={{ r: 4, fill: "hsl(var(--primary))", strokeWidth: 0 }}
+              stroke="#818cf8" strokeWidth={2}
+              dot={{ r: 4, fill: "#818cf8", strokeWidth: 0 }}
               activeDot={{ r: 6 }}
             />
           </LineChart>

@@ -157,29 +157,42 @@ export function GraficoEvolucion({ movimientos, cuentas, ajusteInversionIds }: P
           onClick={handleChartClick}
           margin={{ top: 4, right: 4, bottom: 0, left: 0 }}
         >
-          <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
+          <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" vertical={false} />
           <XAxis
             dataKey="label"
-            tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }}
+            tick={{ fill: "#64748b", fontSize: 11 }}
             axisLine={false} tickLine={false}
           />
           <YAxis
             tickFormatter={fmtShort}
-            tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }}
+            tick={{ fill: "#64748b", fontSize: 11 }}
             axisLine={false} tickLine={false}
             width={52}
           />
-          <Tooltip content={<CustomTooltip moneda={moneda} />} cursor={{ fill: "hsl(var(--surface))", opacity: 0.6 }} />
+          <Tooltip
+            content={<CustomTooltip moneda={moneda} />}
+            cursor={{ fill: "#1e293b", opacity: 0.8 }}
+          />
           <Legend
             wrapperStyle={{ fontSize: "12px", paddingTop: "8px" }}
-            formatter={(value) => <span style={{ color: "hsl(var(--muted-foreground))" }}>{value}</span>}
+            formatter={(value) => <span style={{ color: "#64748b" }}>{value}</span>}
           />
-          <Bar dataKey="ingresos" name="Ingresos" fill="#22c55e" opacity={0.8} radius={[3, 3, 0, 0]} style={{ cursor: "pointer" }} />
-          <Bar dataKey="egresos" name="Egresos" fill="hsl(var(--destructive))" opacity={0.8} radius={[3, 3, 0, 0]} style={{ cursor: "pointer" }} />
+          <Bar
+            dataKey="ingresos" name="Ingresos" fill="#22c55e" opacity={0.85}
+            radius={[3, 3, 0, 0]} style={{ cursor: "pointer" }}
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            onClick={(data: any) => data?.mes && router.push(`/movimientos?mes=${data.mes}`)}
+          />
+          <Bar
+            dataKey="egresos" name="Egresos" fill="#ef4444" opacity={0.85}
+            radius={[3, 3, 0, 0]} style={{ cursor: "pointer" }}
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            onClick={(data: any) => data?.mes && router.push(`/movimientos?mes=${data.mes}`)}
+          />
           <Line
             type="monotone" dataKey="balance" name="Balance"
-            stroke="hsl(var(--primary))" strokeWidth={2}
-            dot={{ r: 3, fill: "hsl(var(--primary))", strokeWidth: 0 }}
+            stroke="#818cf8" strokeWidth={2}
+            dot={{ r: 3, fill: "#818cf8", strokeWidth: 0 }}
             activeDot={{ r: 5 }}
           />
         </ComposedChart>

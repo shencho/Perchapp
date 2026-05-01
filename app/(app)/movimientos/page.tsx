@@ -5,7 +5,7 @@ import type { GrupoConMiembros } from "@/lib/supabase/actions/grupos-types";
 import type { Persona } from "@/types/supabase";
 
 interface Props {
-  searchParams: Promise<{ mes?: string; pagina?: string }>;
+  searchParams: Promise<{ mes?: string; pagina?: string; compartido?: string }>;
 }
 
 export default async function MovimientosPage({ searchParams }: Props) {
@@ -101,6 +101,7 @@ export default async function MovimientosPage({ searchParams }: Props) {
       personas={(personasRes.data ?? []) as Persona[]}
       grupos={grupos}
       mesActual={mesActual}
+      compartidoInicial={params.compartido === "true"}
     />
   );
 }

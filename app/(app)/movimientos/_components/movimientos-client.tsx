@@ -42,6 +42,7 @@ interface Props {
   personas: Persona[];
   grupos: GrupoConMiembros[];
   mesActual: string;
+  compartidoInicial?: boolean;
 }
 
 // ── Constantes ────────────────────────────────────────────────────────────────
@@ -267,7 +268,7 @@ function getMeses() {
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
-export function MovimientosClient({ movimientos, total, cuentas, tarjetas, categorias, clientes, personas, grupos, mesActual }: Props) {
+export function MovimientosClient({ movimientos, total, cuentas, tarjetas, categorias, clientes, personas, grupos, mesActual, compartidoInicial }: Props) {
   const router = useRouter();
   const [, startTransition] = useTransition();
 
@@ -283,6 +284,7 @@ export function MovimientosClient({ movimientos, total, cuentas, tarjetas, categ
   const [filtroMetodo, setFiltroMetodo] = useState<string>("todos");
   const [filtroCuenta, setFiltroCuenta] = useState<string>("todas");
   const [filtroCategoria, setFiltroCategoria] = useState<string>("todas");
+  const [filtroCompartido, setFiltroCompartido] = useState(compartidoInicial ?? false);
 
   const meses = getMeses();
   const catsPadre = categorias.filter((c) => !c.parent_id);
@@ -298,6 +300,7 @@ export function MovimientosClient({ movimientos, total, cuentas, tarjetas, categ
     if (filtroMetodo !== "todos" && m.metodo !== filtroMetodo) return false;
     if (filtroCuenta !== "todas" && m.cuenta_id !== filtroCuenta) return false;
     if (filtroCategoria !== "todas" && m.categoria_id !== filtroCategoria) return false;
+    if (filtroCompartido && !(m.gastos_compartidos_participantes && m.gastos_compartidos_participantes.length > 0)) return false;
     return true;
   });
 
@@ -429,6 +432,20 @@ export function MovimientosClient({ movimientos, total, cuentas, tarjetas, categ
           placeholder="Categoría"
           className={cn("h-8 text-sm w-40", filtroCategoria !== "todas" && "ring-1 ring-primary/50 border-primary/50")}
         />
+
+        {/* Compartidos */}
+        <button
+          onClick={() => setFiltroCompartido(v => !v)}
+          className={cn(
+            "h-8 flex items-center gap-1.5 px-3 text-sm rounded-md border transition-colors",
+            filtroCompartido
+              ? "border-primary bg-primary/10 text-primary ring-1 ring-primary/50"
+              : "border-border text-muted-foreground hover:text-foreground hover:bg-surface"
+          )}
+        >
+          <Users className="h-3.5 w-3.5" />
+          Compartidos
+        </button>
       </div>
 
       {/* Lista */}

@@ -273,6 +273,7 @@ export default async function DashboardPage() {
     perfil: {
       nombre: perfilData?.nombre ?? "",
       asistente_nombre: perfilData?.asistente_nombre ?? null,
+      email: user.email ?? "",
       modo,
     },
     hero: {
