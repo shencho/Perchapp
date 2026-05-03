@@ -15,7 +15,7 @@ export async function getClientes(incluirArchivados = false): Promise<ClienteCon
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error("No autenticado");
 
-  const [clientesRes, registrosPendientesRes] = await Promise.all([
+  const [clientesRes, registrosRes, pagosRes] = await Promise.all([
     supabase
       .from("clientes")
       .select("*")
@@ -24,18 +24,28 @@ export async function getClientes(incluirArchivados = false): Promise<ClienteCon
     supabase
       .from("registros_trabajo")
       .select("cliente_id, monto")
-      .eq("user_id", user.id)
-      .is("pago_id", null),
+      .eq("user_id", user.id),
+    supabase
+      .from("pagos_cliente")
+      .select("cliente_id, monto")
+      .eq("user_id", user.id),
   ]);
 
   const clientes = clientesRes.data ?? [];
-  const pendientes = registrosPendientesRes.data ?? [];
 
-  // Acumular saldo pendiente por cliente
-  const saldoMap: Record<string, number> = {};
-  for (const r of pendientes) {
+  // facturado total por cliente
+  const facturadoMap: Record<string, number> = {};
+  for (const r of registrosRes.data ?? []) {
     if (r.cliente_id) {
-      saldoMap[r.cliente_id] = (saldoMap[r.cliente_id] ?? 0) + (r.monto ?? 0);
+      facturadoMap[r.cliente_id] = (facturadoMap[r.cliente_id] ?? 0) + (r.monto ?? 0);
+    }
+  }
+
+  // cobrado total por cliente
+  const cobradoMap: Record<string, number> = {};
+  for (const p of pagosRes.data ?? []) {
+    if (p.cliente_id) {
+      cobradoMap[p.cliente_id] = (cobradoMap[p.cliente_id] ?? 0) + p.monto;
     }
   }
 
@@ -47,7 +57,7 @@ export async function getClientes(incluirArchivados = false): Promise<ClienteCon
     .filter((c) => incluirArchivados || !c.archivado)
     .map((c) => ({
       ...c,
-      saldo_pendiente: saldoMap[c.id] ?? 0,
+      saldo_pendiente: Math.max(0, (facturadoMap[c.id] ?? 0) - (cobradoMap[c.id] ?? 0)),
       sub_clientes: hijos.filter((h) => h.parent_cliente_id === c.id),
     }));
 
@@ -59,15 +69,18 @@ export async function getCliente(id: string): Promise<ClienteConSaldo | null> {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error("No autenticado");
 
-  const [clienteRes, subClientesRes, saldoRes] = await Promise.all([
+  const [clienteRes, subClientesRes, registrosRes, pagosRes] = await Promise.all([
     supabase.from("clientes").select("*").eq("id", id).eq("user_id", user.id).single(),
     supabase.from("clientes").select("*").eq("parent_cliente_id", id).eq("user_id", user.id),
-    supabase.from("registros_trabajo").select("monto").eq("cliente_id", id).is("pago_id", null),
+    supabase.from("registros_trabajo").select("monto").eq("cliente_id", id).eq("user_id", user.id),
+    supabase.from("pagos_cliente").select("monto").eq("cliente_id", id).eq("user_id", user.id),
   ]);
 
   if (!clienteRes.data) return null;
 
-  const saldo_pendiente = (saldoRes.data ?? []).reduce((acc, r) => acc + (r.monto ?? 0), 0);
+  const totalFacturado = (registrosRes.data ?? []).reduce((acc, r) => acc + (r.monto ?? 0), 0);
+  const totalCobrado   = (pagosRes.data ?? []).reduce((acc, p) => acc + p.monto, 0);
+  const saldo_pendiente = Math.max(0, totalFacturado - totalCobrado);
 
   return {
     ...clienteRes.data,
