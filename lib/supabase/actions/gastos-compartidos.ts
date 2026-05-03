@@ -2,7 +2,9 @@
 
 import { createClient } from "@/lib/supabase/server";
 import type { GastoCompartidoParticipante } from "@/types/supabase";
-import type { ParticipanteInput, MarcarCobradoInput } from "./gastos-compartidos-types";
+import type { ParticipanteInput, MarcarCobradoInput, PagadorFormInput, GastoGrupalPagadorRow } from "./gastos-compartidos-types";
+import { calcularBalanceGrupal } from "@/lib/domain/calcularBalanceGrupal";
+import type { ResultadoBalanceGrupal, PagadorInput, ParticipanteConsumoInput } from "@/lib/domain/calcularBalanceGrupal";
 
 // ── Queries ───────────────────────────────────────────────────────────────────
 
@@ -140,6 +142,111 @@ export async function marcarCobrado(input: MarcarCobradoInput): Promise<void> {
     .eq("user_id", user.id);
 
   if (updErr) throw new Error(updErr.message);
+}
+
+// ── Splitwise: múltiples pagadores ───────────────────────────────────────────
+
+/**
+ * Devuelve los pagadores registrados para un gasto.
+ * Array vacío = gasto legacy (el usuario pagó todo, retrocompatibilidad).
+ */
+export async function getPagadores(gastoId: string): Promise<GastoGrupalPagadorRow[]> {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error("No autenticado");
+
+  const { data, error } = await supabase
+    .from("gastos_grupales_pagadores")
+    .select("id, persona_id, monto_pagado")
+    .eq("gasto_id", gastoId)
+    .eq("user_id", user.id)
+    .order("created_at");
+
+  if (error) throw new Error(error.message);
+  return data ?? [];
+}
+
+/**
+ * Reemplaza todos los pagadores de un gasto en bulk (DELETE + INSERT).
+ * Pasar array vacío borra los pagadores (vuelve a retrocompatibilidad).
+ */
+export async function upsertPagadores(
+  gastoId: string,
+  pagadores: PagadorFormInput[],
+): Promise<void> {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error("No autenticado");
+
+  // Eliminar todos los pagadores existentes del gasto
+  const { error: delError } = await supabase
+    .from("gastos_grupales_pagadores")
+    .delete()
+    .eq("gasto_id", gastoId)
+    .eq("user_id", user.id);
+
+  if (delError) throw new Error(delError.message);
+  if (pagadores.length === 0) return;
+
+  const { error: insError } = await supabase
+    .from("gastos_grupales_pagadores")
+    .insert(
+      pagadores.map(p => ({
+        user_id:      user.id,
+        gasto_id:     gastoId,
+        persona_id:   p.personaId,
+        monto_pagado: p.montoPagado,
+      })),
+    );
+
+  if (insError) throw new Error(insError.message);
+}
+
+/**
+ * Calcula el balance grupal de un gasto: combina pagadores + participantes
+ * y devuelve balances netos y transferencias mínimas.
+ *
+ * @param gastoId   - ID del movimiento compartido
+ * @param montoGasto - Monto total del gasto (fallback retrocompatibilidad)
+ * @param nombreUsuario - Nombre del usuario para el slot personaId=null
+ */
+export async function getBalanceGasto(
+  gastoId: string,
+  montoGasto: number,
+  nombreUsuario = "Vos",
+): Promise<ResultadoBalanceGrupal> {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error("No autenticado");
+
+  // Cargar pagadores y participantes en paralelo
+  const [pagadoresRows, participantesRows] = await Promise.all([
+    getPagadores(gastoId),
+    getParticipantes(gastoId),
+  ]);
+
+  // Mapear a tipos del dominio
+  // Para los nombres de pagadores, necesitamos las personas
+  // Los nombres ya están disponibles en participantes (persona_nombre)
+  // Para pagadores usamos "Vos" para null y buscamos en participantes para los demás
+  const nombrePorPersonaId = new Map<string, string>()
+  for (const p of participantesRows) {
+    if (p.persona_id) nombrePorPersonaId.set(p.persona_id, p.persona_nombre)
+  }
+
+  const pagadoresInput: PagadorInput[] = pagadoresRows.map(p => ({
+    personaId:   p.persona_id,
+    nombre:      p.persona_id ? (nombrePorPersonaId.get(p.persona_id) ?? "Persona") : nombreUsuario,
+    montoPagado: p.monto_pagado,
+  }))
+
+  const participantesInput: ParticipanteConsumoInput[] = participantesRows.map(p => ({
+    personaId:      p.persona_id,
+    nombre:         p.persona_id === null ? nombreUsuario : p.persona_nombre,
+    montoConsumido: p.monto,
+  }))
+
+  return calcularBalanceGrupal(pagadoresInput, participantesInput, montoGasto, nombreUsuario)
 }
 
 /**

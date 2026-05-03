@@ -1,4 +1,4 @@
-export type { GastoCompartidoParticipante } from "@/types/supabase";
+export type { GastoCompartidoParticipante, GastoGrupalPagador } from "@/types/supabase";
 
 export interface ParticipanteInput {
   persona_nombre:    string;
@@ -16,4 +16,18 @@ export interface MarcarCobradoInput {
   conceptoGasto:    string;
   montoGasto:       number;
   moneda:           string;
+}
+
+// ── Splitwise: múltiples pagadores ───────────────────────────────────────────
+
+export interface PagadorFormInput {
+  personaId:   string | null  // null = el usuario registrador
+  nombre:      string         // display only, no se persiste
+  montoPagado: number
+}
+
+export interface GastoGrupalPagadorRow {
+  id:           string
+  persona_id:   string | null
+  monto_pagado: number
 }

@@ -812,6 +812,32 @@ export interface Database {
           created_at?: string
         }
       }
+      gastos_grupales_pagadores: {
+        Row: {
+          id: string
+          user_id: string
+          gasto_id: string
+          persona_id: string | null
+          monto_pagado: number
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          gasto_id: string
+          persona_id?: string | null
+          monto_pagado: number
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          gasto_id?: string
+          persona_id?: string | null
+          monto_pagado?: number
+          created_at?: string
+        }
+      }
     }
     Views: Record<string, never>
     Functions: Record<string, never>
@@ -840,3 +866,4 @@ export type GrupoMiembro = Database["public"]["Tables"]["grupo_miembros"]["Row"]
 export type GastoCompartidoParticipante = Database["public"]["Tables"]["gastos_compartidos_participantes"]["Row"]
 export type Prestamo = Database["public"]["Tables"]["prestamos"]["Row"]
 export type PrestamoPago = Database["public"]["Tables"]["prestamos_pagos"]["Row"]
+export type GastoGrupalPagador = Database["public"]["Tables"]["gastos_grupales_pagadores"]["Row"]
