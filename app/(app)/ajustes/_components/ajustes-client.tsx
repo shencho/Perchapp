@@ -1,13 +1,14 @@
 "use client";
 
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import type { Profile, Cuenta, Tarjeta, Categoria, Persona } from "@/types/supabase";
+import type { Profile, Cuenta, Tarjeta, Categoria, Persona, PlantillaRecurrente } from "@/types/supabase";
 import type { GrupoConMiembros } from "@/lib/supabase/actions/grupos-types";
 import { PerfilTab } from "./perfil-tab";
 import { CuentasTab } from "./cuentas-tab";
 import { TarjetasTab } from "./tarjetas-tab";
 import { CategoriasTab } from "./categorias-tab";
 import { PersonasGruposTab } from "./personas-grupos-tab";
+import { PlantillasTab } from "./plantillas-tab";
 
 interface Props {
   profile: Profile | null;
@@ -17,6 +18,7 @@ interface Props {
   profesiones: { nombre: string; slug: string }[];
   personas: Persona[];
   grupos: GrupoConMiembros[];
+  plantillas: PlantillaRecurrente[];
 }
 
 export function AjustesClient({
@@ -27,6 +29,7 @@ export function AjustesClient({
   profesiones,
   personas,
   grupos,
+  plantillas,
 }: Props) {
   return (
     <div className="flex flex-col gap-6">
@@ -44,6 +47,7 @@ export function AjustesClient({
           <TabsTrigger value="tarjetas">Tarjetas</TabsTrigger>
           <TabsTrigger value="categorias">Categorías</TabsTrigger>
           <TabsTrigger value="personas">Personas y grupos</TabsTrigger>
+          <TabsTrigger value="plantillas">Recurrentes</TabsTrigger>
         </TabsList>
 
         <TabsContent value="perfil" className="mt-6">
@@ -64,6 +68,15 @@ export function AjustesClient({
 
         <TabsContent value="personas" className="mt-6">
           <PersonasGruposTab personas={personas} grupos={grupos} />
+        </TabsContent>
+
+        <TabsContent value="plantillas" className="mt-6">
+          <PlantillasTab
+            plantillas={plantillas}
+            cuentas={cuentas}
+            tarjetas={tarjetas}
+            categorias={categorias}
+          />
         </TabsContent>
       </Tabs>
     </div>

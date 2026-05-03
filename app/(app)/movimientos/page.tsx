@@ -1,11 +1,13 @@
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import { MovimientosClient } from "./_components/movimientos-client";
+import { getPlantillas } from "@/lib/supabase/actions/plantillas";
+import { getPlantillasPendientesDelMes } from "@/lib/domain/plantillas";
 import type { GrupoConMiembros } from "@/lib/supabase/actions/grupos-types";
 import type { Persona } from "@/types/supabase";
 
 interface Props {
-  searchParams: Promise<{ mes?: string; pagina?: string; compartido?: string }>;
+  searchParams: Promise<{ mes?: string; pagina?: string; compartido?: string; generar?: string }>;
 }
 
 export default async function MovimientosPage({ searchParams }: Props) {
@@ -58,8 +60,8 @@ export default async function MovimientosPage({ searchParams }: Props) {
     .order("created_at", { ascending: false })
     .range(pagina * PAGE_SIZE, (pagina + 1) * PAGE_SIZE - 1);
 
-  // Cargar movimientos + relaciones + datos de filtros en paralelo
-  const [movRes, cuentasRes, tarjetasRes, categoriasRes, clientesRes, personasRes, gruposRes] = await Promise.all([
+  // Cargar movimientos + relaciones + datos de filtros + plantillas en paralelo
+  const [movRes, cuentasRes, tarjetasRes, categoriasRes, clientesRes, personasRes, gruposRes, plantillas] = await Promise.all([
     movQuery,
     supabase
       .from("cuentas")
@@ -96,6 +98,7 @@ export default async function MovimientosPage({ searchParams }: Props) {
       .eq("user_id", user.id)
       .eq("archivado", false)
       .order("nombre"),
+    getPlantillas(),
   ]);
 
   const grupos: GrupoConMiembros[] = (gruposRes.data ?? []).map((g) => ({
@@ -104,6 +107,22 @@ export default async function MovimientosPage({ searchParams }: Props) {
       .map((m) => m.personas)
       .filter((p): p is Persona => p !== null),
   }));
+
+  // Plantillas pendientes del mes actual (check contra movimientos ya cargados)
+  const movsParaCheck = (movRes.data ?? []).map(m => ({
+    plantilla_recurrente_id: m.plantilla_recurrente_id ?? null,
+    fecha: m.fecha,
+  }));
+  // Si el filtro es por mes distinto al actual, igual chequeamos contra todos los movimientos del mes actual
+  const ahora = new Date();
+  const inicioMesActual = `${ahora.getFullYear()}-${String(ahora.getMonth() + 1).padStart(2, "0")}-01`;
+  const finMesActual    = new Date(ahora.getFullYear(), ahora.getMonth() + 1, 0)
+    .toISOString().slice(0, 10);
+  const movsEsteMes = todosLosMeses
+    ? movsParaCheck.filter(m => m.fecha >= inicioMesActual && m.fecha <= finMesActual)
+    : movsParaCheck;
+
+  const plantillasPendientes = getPlantillasPendientesDelMes(plantillas, movsEsteMes, ahora);
 
   return (
     <MovimientosClient
@@ -118,6 +137,8 @@ export default async function MovimientosPage({ searchParams }: Props) {
       mesActual={mesActual}
       compartidoInicial={params.compartido === "true"}
       nombreUsuario={nombreUsuario}
+      plantillasPendientes={plantillasPendientes}
+      generarInicialId={params.generar}
     />
   );
 }

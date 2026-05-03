@@ -4,6 +4,8 @@ import { getPrestamos } from "@/lib/supabase/actions/prestamos";
 import { getClientes } from "@/lib/supabase/actions/clientes";
 import { calcularSaldoCuenta } from "@/lib/domain/calcularSaldoCuenta";
 import { calcularConsumoTarjeta, getPeriodoCierre, getProximoVencimiento, getCicloDelProximoVencimiento } from "@/lib/domain/calcularConsumoTarjeta";
+import { getPlantillas } from "@/lib/supabase/actions/plantillas";
+import { getPlantillasParaAlerta } from "@/lib/domain/plantillas";
 import { calcularSaldoPrestamo } from "@/lib/domain/calcularSaldoPrestamo";
 import { DashboardClient } from "./_components/dashboard-client";
 import type { DashboardData, Alerta, MovGrafico } from "./_components/dashboard-client";
@@ -44,7 +46,7 @@ export default async function DashboardPage() {
   // ── Phase 2: todas las queries principales en paralelo ─────────────────────
   const [
     cuentasRes, tarjetasRes, movimientosRes, categoriasRes,
-    prestamosRaw, gastosRes,
+    prestamosRaw, gastosRes, plantillas,
   ] = await Promise.all([
     supabase.from("cuentas")
       .select("*")
@@ -53,7 +55,7 @@ export default async function DashboardPage() {
       .select("*")
       .eq("user_id", user.id).eq("archivada", false),
     supabase.from("movimientos")
-      .select("tipo, monto, moneda, fecha, cuenta_id, cuenta_destino_id, tarjeta_id, categoria_id, ambito, necesidad")
+      .select("tipo, monto, moneda, fecha, cuenta_id, cuenta_destino_id, tarjeta_id, categoria_id, ambito, necesidad, plantilla_recurrente_id")
       .eq("user_id", user.id)
       .gte("fecha", fechaDesde24m),
     supabase.from("categorias")
@@ -63,6 +65,7 @@ export default async function DashboardPage() {
     supabase.from("gastos_compartidos_participantes")
       .select("persona_nombre, monto")
       .eq("user_id", user.id).eq("estado", "pendiente"),
+    getPlantillas(),
   ]);
 
   const cuentas     = cuentasRes.data ?? [];
@@ -263,6 +266,24 @@ export default async function DashboardPage() {
         href: `/cuentas/${i.id}`,
       });
     });
+
+  // Plantillas pendientes próximas o atrasadas
+  const alertasPlantillas = getPlantillasParaAlerta(plantillas, movimientos, now);
+  alertasPlantillas.forEach(p => {
+    const dias = Math.abs(p.diasRestantes);
+    alertas.push({
+      id:          `plantilla-${p.plantilla.id}`,
+      tipo:        p.atrasada ? "plantilla_atrasada" : "plantilla_pendiente",
+      urgencia:    p.atrasada || p.diasRestantes <= 1 ? "alta" : "media",
+      titulo:      p.atrasada
+        ? `${p.plantilla.nombre} sin generar (hace ${dias}d)`
+        : p.diasRestantes === 0
+          ? `${p.plantilla.nombre} debita hoy`
+          : `${p.plantilla.nombre} debita en ${dias}d`,
+      descripcion: `~${fmtARS(p.plantilla.monto_estimado)} estimado`,
+      href:        `/movimientos?generar=${p.plantilla.id}`,
+    });
+  });
 
   // Clientes en mora (solo modo profesional)
   if (profesional) {

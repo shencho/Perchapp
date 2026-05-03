@@ -18,8 +18,10 @@ import {
 import type { ResultadoBalanceGrupal } from "@/lib/domain/calcularBalanceGrupal";
 import { TIPOS_MOV, METODOS, AMBITOS } from "@/lib/supabase/actions/movimientos-types";
 import { MovimientoEditor } from "./movimiento-editor";
+import { GenerarPendientesModal } from "./generar-pendientes-modal";
 import type { Movimiento, Cuenta, Tarjeta, Categoria, Persona, GastoCompartidoParticipante } from "@/types/supabase";
 import type { GrupoConMiembros } from "@/lib/supabase/actions/grupos-types";
+import type { PlantillaConEstado } from "@/lib/domain/plantillas";
 
 // ── Tipos ─────────────────────────────────────────────────────────────────────
 
@@ -46,6 +48,8 @@ interface Props {
   mesActual: string;
   compartidoInicial?: boolean;
   nombreUsuario?: string;
+  plantillasPendientes?: PlantillaConEstado[];
+  generarInicialId?: string;
 }
 
 // ── Constantes ────────────────────────────────────────────────────────────────
@@ -424,13 +428,14 @@ function getMeses() {
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
-export function MovimientosClient({ movimientos, total, cuentas, tarjetas, categorias, clientes, personas, grupos, mesActual, compartidoInicial, nombreUsuario }: Props) {
+export function MovimientosClient({ movimientos, total, cuentas, tarjetas, categorias, clientes, personas, grupos, mesActual, compartidoInicial, nombreUsuario, plantillasPendientes = [], generarInicialId }: Props) {
   const router = useRouter();
   const [, startTransition] = useTransition();
 
-  const [editorOpen, setEditorOpen] = useState(false);
-  const [editing, setEditing] = useState<Movimiento | null>(null);
-  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [editorOpen, setEditorOpen]     = useState(false);
+  const [editing, setEditing]           = useState<Movimiento | null>(null);
+  const [expandedId, setExpandedId]     = useState<string | null>(null);
+  const [generarOpen, setGenerarOpen]   = useState(!!generarInicialId);
 
   // Filtros locales (UI)
   const [busqueda, setBusqueda] = useState("");
@@ -517,10 +522,17 @@ export function MovimientosClient({ movimientos, total, cuentas, tarjetas, categ
           <h1 className="text-xl font-semibold">Movimientos</h1>
           <p className="text-xs text-muted-foreground mt-0.5">{total} registros</p>
         </div>
-        <Button onClick={handleNuevo} size="sm" className="gap-1.5">
-          <Plus className="h-4 w-4" />
-          Nuevo
-        </Button>
+        <div className="flex items-center gap-2">
+          {plantillasPendientes.length > 0 && (
+            <Button variant="outline" size="sm" onClick={() => setGenerarOpen(true)} className="gap-1.5">
+              Generar pendientes ({plantillasPendientes.length})
+            </Button>
+          )}
+          <Button onClick={handleNuevo} size="sm" className="gap-1.5">
+            <Plus className="h-4 w-4" />
+            Nuevo
+          </Button>
+        </div>
       </div>
 
       {/* Filtros */}
@@ -917,6 +929,14 @@ export function MovimientosClient({ movimientos, total, cuentas, tarjetas, categ
         clientes={clientes}
         personas={personas}
         grupos={grupos}
+      />
+
+      {/* Modal plantillas pendientes */}
+      <GenerarPendientesModal
+        open={generarOpen}
+        onClose={() => setGenerarOpen(false)}
+        plantillasPendientes={plantillasPendientes}
+        initialSelectedId={generarInicialId}
       />
     </div>
   );

@@ -2,24 +2,7 @@
 // toISOString() que puede devolver un día anterior en zonas UTC- (e.g. Argentina).
 // Pendiente fix en PR separado.
 
-// ─── helpers para getCicloDelProximoVencimiento ───────────────────────────────
-
-function clampDay(year: number, month: number, day: number): Date {
-  // JS Date maneja overflow/underflow de mes (month=-1 → dic del año anterior)
-  const lastDay = new Date(year, month + 1, 0).getDate();
-  return new Date(year, month, Math.min(day, lastDay));
-}
-
-function addDays(d: Date, n: number): Date {
-  return new Date(d.getFullYear(), d.getMonth(), d.getDate() + n);
-}
-
-function toLocalISO(d: Date): string {
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${y}-${m}-${day}`;
-}
+import { clampDay, addDays, toLocalISO } from "./_utils/dates";
 
 // ─────────────────────────────────────────────────────────────────────────────
 

@@ -479,6 +479,7 @@ export interface Database {
           gc_mi_parte: number | null
           prestamo_id: string | null
           prestamo_pago_id: string | null
+          plantilla_recurrente_id: string | null
           created_at: string
         }
         Insert: {
@@ -512,6 +513,7 @@ export interface Database {
           gc_mi_parte?: number | null
           prestamo_id?: string | null
           prestamo_pago_id?: string | null
+          plantilla_recurrente_id?: string | null
           created_at?: string
         }
         Update: {
@@ -545,6 +547,7 @@ export interface Database {
           gc_mi_parte?: number | null
           prestamo_id?: string | null
           prestamo_pago_id?: string | null
+          plantilla_recurrente_id?: string | null
           created_at?: string
         }
       }
@@ -812,6 +815,71 @@ export interface Database {
           created_at?: string
         }
       }
+      plantillas_recurrentes: {
+        Row: {
+          id: string
+          user_id: string
+          nombre: string
+          monto_estimado: number
+          moneda: string
+          dia_mes: number
+          metodo: "Efectivo" | "Transferencia" | "Billetera virtual" | "Crédito" | "Débito automático" | "Débito" | null
+          debita_de: "cuenta" | "tarjeta" | null
+          cuenta_id: string | null
+          tarjeta_id: string | null
+          categoria_id: string | null
+          clasificacion: "Fijo" | "Variable" | "Cuotas" | null
+          concepto: string | null
+          activo: boolean
+          fecha_inicio: string
+          fecha_fin: string | null
+          notas: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          nombre: string
+          monto_estimado: number
+          moneda?: string
+          dia_mes: number
+          metodo?: "Efectivo" | "Transferencia" | "Billetera virtual" | "Crédito" | "Débito automático" | "Débito" | null
+          debita_de?: "cuenta" | "tarjeta" | null
+          cuenta_id?: string | null
+          tarjeta_id?: string | null
+          categoria_id?: string | null
+          clasificacion?: "Fijo" | "Variable" | "Cuotas" | null
+          concepto?: string | null
+          activo?: boolean
+          fecha_inicio?: string
+          fecha_fin?: string | null
+          notas?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          nombre?: string
+          monto_estimado?: number
+          moneda?: string
+          dia_mes?: number
+          metodo?: "Efectivo" | "Transferencia" | "Billetera virtual" | "Crédito" | "Débito automático" | "Débito" | null
+          debita_de?: "cuenta" | "tarjeta" | null
+          cuenta_id?: string | null
+          tarjeta_id?: string | null
+          categoria_id?: string | null
+          clasificacion?: "Fijo" | "Variable" | "Cuotas" | null
+          concepto?: string | null
+          activo?: boolean
+          fecha_inicio?: string
+          fecha_fin?: string | null
+          notas?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+      }
       gastos_grupales_pagadores: {
         Row: {
           id: string
@@ -867,3 +935,4 @@ export type GastoCompartidoParticipante = Database["public"]["Tables"]["gastos_c
 export type Prestamo = Database["public"]["Tables"]["prestamos"]["Row"]
 export type PrestamoPago = Database["public"]["Tables"]["prestamos_pagos"]["Row"]
 export type GastoGrupalPagador = Database["public"]["Tables"]["gastos_grupales_pagadores"]["Row"]
+export type PlantillaRecurrente = Database["public"]["Tables"]["plantillas_recurrentes"]["Row"]

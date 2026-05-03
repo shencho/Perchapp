@@ -40,7 +40,7 @@ export type PrestamoResumen = {
 
 export type Alerta = {
   id: string;
-  tipo: "tarjeta_vence" | "mora_cliente" | "plazo_fijo_vencido";
+  tipo: "tarjeta_vence" | "mora_cliente" | "plazo_fijo_vencido" | "plantilla_pendiente" | "plantilla_atrasada";
   urgencia: "alta" | "media";
   titulo: string; descripcion: string; href: string;
 };

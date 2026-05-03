@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { AjustesClient } from "./_components/ajustes-client";
+import { getPlantillas } from "@/lib/supabase/actions/plantillas";
 import type { GrupoConMiembros } from "@/lib/supabase/actions/grupos-types";
 import type { Persona } from "@/types/supabase";
 
@@ -19,6 +20,7 @@ export default async function AjustesPage() {
     { data: profesiones },
     { data: personasRaw },
     { data: gruposRaw },
+    plantillas,
   ] = await Promise.all([
     supabase.from("profiles").select("*").eq("id", user.id).single(),
     supabase.from("cuentas").select("*").eq("user_id", user.id).eq("archivada", false).order("orden"),
@@ -32,6 +34,7 @@ export default async function AjustesPage() {
       .eq("user_id", user.id)
       .eq("archivado", false)
       .order("nombre"),
+    getPlantillas(),
   ]);
 
   const grupos: GrupoConMiembros[] = (gruposRaw ?? []).map((g) => ({
@@ -50,6 +53,7 @@ export default async function AjustesPage() {
       profesiones={profesiones ?? []}
       personas={personasRaw ?? []}
       grupos={grupos}
+      plantillas={plantillas}
     />
   );
 }
