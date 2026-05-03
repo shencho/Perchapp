@@ -219,10 +219,11 @@ export async function getBalanceGasto(
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error("No autenticado");
 
-  // Cargar pagadores y participantes en paralelo
-  const [pagadoresRows, participantesRows] = await Promise.all([
+  // Cargar pagadores, participantes y gc_mi_parte (retrocompat) en paralelo
+  const [pagadoresRows, participantesRows, movRow] = await Promise.all([
     getPagadores(gastoId),
     getParticipantes(gastoId),
+    supabase.from("movimientos").select("gc_mi_parte").eq("id", gastoId).eq("user_id", user.id).single(),
   ]);
 
   // Mapear a tipos del dominio
@@ -245,6 +246,17 @@ export async function getBalanceGasto(
     nombre:         p.persona_id === null ? nombreUsuario : p.persona_nombre,
     montoConsumido: p.monto,
   }))
+
+  // Retrocompat: gastos viejos guardan consumo del usuario en gc_mi_parte, no en participantes
+  const hasUserParticipant = participantesRows.some(p => p.persona_id === null)
+  const gcMiParteVal = movRow.data?.gc_mi_parte ?? null
+  if (!hasUserParticipant && gcMiParteVal && gcMiParteVal > 0) {
+    participantesInput.push({
+      personaId:      null,
+      nombre:         nombreUsuario,
+      montoConsumido: gcMiParteVal,
+    })
+  }
 
   return calcularBalanceGrupal(pagadoresInput, participantesInput, montoGasto, nombreUsuario)
 }

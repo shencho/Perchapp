@@ -21,8 +21,10 @@ import {
 import {
   getParticipantes,
   upsertParticipantes,
+  getPagadores,
+  upsertPagadores,
 } from "@/lib/supabase/actions/gastos-compartidos";
-import type { ParticipanteInput } from "@/lib/supabase/actions/gastos-compartidos-types";
+import type { ParticipanteInput, PagadorFormInput } from "@/lib/supabase/actions/gastos-compartidos-types";
 import { createPersona } from "@/lib/supabase/actions/personas";
 import { RegistrarPagoModal } from "./registrar-pago-modal";
 import {
@@ -153,6 +155,14 @@ export function MovimientoEditor({ open, onClose, editing, cuentas, tarjetas, ca
   const [nuevaPersonaId, setNuevaPersonaId] = useState<string | null>(null);
   const [nuevaGuardarEnAgenda, setNuevaGuardarEnAgenda] = useState(false);
 
+  // Pagadores (Splitwise)
+  const [pagadores, setPagadores] = useState<PagadorFormInput[]>([]);
+  const [pagadoresAutoSync, setPagadoresAutoSync] = useState(true);
+  const [showAddPagador, setShowAddPagador] = useState(false);
+  const [nuevoPagadorNombre, setNuevoPagadorNombre] = useState("");
+  const [nuevoPagadorPersonaId, setNuevoPagadorPersonaId] = useState<string | null>(null);
+  const [nuevoPagadorMonto, setNuevoPagadorMonto] = useState<number>(0);
+
   const {
     register,
     handleSubmit,
@@ -239,6 +249,18 @@ export function MovimientoEditor({ open, onClose, editing, cuentas, tarjetas, ca
     setNuevaNombre("");
     setNuevaPersonaId(null);
     setNuevaGuardarEnAgenda(false);
+    // Pagadores — init sync, override async from DB
+    setShowAddPagador(false);
+    setNuevoPagadorNombre("");
+    setNuevoPagadorPersonaId(null);
+    setNuevoPagadorMonto(0);
+    if (editing?.es_compartido) {
+      setPagadores([{ personaId: null, nombre: "Vos", montoPagado: editing.monto }]);
+      setPagadoresAutoSync(true);
+    } else {
+      setPagadores([]);
+      setPagadoresAutoSync(true);
+    }
 
     if (editing?.es_compartido && editing.id) {
       getParticipantes(editing.id)
@@ -254,6 +276,21 @@ export function MovimientoEditor({ open, onClose, editing, cuentas, tarjetas, ca
           guardarEnAgenda: false,
         }))))
         .catch(() => setParticipantes([]));
+      getPagadores(editing.id)
+        .then((rows) => {
+          if (rows.length > 0) {
+            setPagadoresAutoSync(false);
+            setPagadores(rows.map((r) => ({
+              personaId:   r.persona_id,
+              nombre:      r.persona_id
+                ? (personas.find((p) => p.id === r.persona_id)?.nombre ?? "Persona")
+                : "Vos",
+              montoPagado: r.monto_pagado,
+            })));
+          }
+          // else: keep sync default (user paid all)
+        })
+        .catch(() => {/* keep default */});
     } else {
       setParticipantes([]);
     }
@@ -292,9 +329,19 @@ export function MovimientoEditor({ open, onClose, editing, cuentas, tarjetas, ca
     if (tipo !== "Egreso") {
       setEsCompartido(false);
       setParticipantes([]);
+      setPagadores([]);
+      setPagadoresAutoSync(true);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tipo]);
+
+  // Auto-sync monto del usuario en pagadores (solo cuando es el único pagador y no fue editado)
+  useEffect(() => {
+    if (esCompartido && pagadoresAutoSync && monto > 0 && !isNaN(monto)) {
+      setPagadores([{ personaId: null, nombre: "Vos", montoPagado: monto }]);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [monto, esCompartido, pagadoresAutoSync]);
 
   // Limpiar cliente/servicio cuando se cambia a Personal
   useEffect(() => {
@@ -340,6 +387,7 @@ export function MovimientoEditor({ open, onClose, editing, cuentas, tarjetas, ca
   const total    = cantidad && monto ? cantidad * monto : monto;
 
   const datalistId = useId();
+  const pagadoresDatalistId = useId();
 
   function agregarParticipante() {
     if (!nuevaNombre.trim()) return;
@@ -388,6 +436,29 @@ export function MovimientoEditor({ open, onClose, editing, cuentas, tarjetas, ca
     );
   }
 
+  function agregarPagador() {
+    if (!nuevoPagadorNombre.trim() || nuevoPagadorMonto <= 0) return;
+    setPagadoresAutoSync(false);
+    setPagadores((prev) => [
+      ...prev,
+      { personaId: nuevoPagadorPersonaId, nombre: nuevoPagadorNombre.trim(), montoPagado: nuevoPagadorMonto },
+    ]);
+    setNuevoPagadorNombre("");
+    setNuevoPagadorPersonaId(null);
+    setNuevoPagadorMonto(0);
+    setShowAddPagador(false);
+  }
+
+  function eliminarPagador(idx: number) {
+    setPagadoresAutoSync(false);
+    setPagadores((prev) => prev.filter((_, i) => i !== idx));
+  }
+
+  function updatePagadorMonto(idx: number, valor: number) {
+    setPagadoresAutoSync(false);
+    setPagadores((prev) => prev.map((p, i) => i === idx ? { ...p, montoPagado: valor } : p));
+  }
+
   // ── Submit ─────────────────────────────────────────────────────────────────
 
   async function onSubmit(values: FormData) {
@@ -426,6 +497,15 @@ export function MovimientoEditor({ open, onClose, editing, cuentas, tarjetas, ca
       // Preparar participantes para upsert: resolver "guardar en agenda" primero
       const participantesInput: ParticipanteInput[] = [];
       if (esCompartido) {
+        // Consumo propio del usuario (persona_id = null) — para balance grupal
+        if (gcMiParte > 0) {
+          participantesInput.push({
+            persona_nombre: "Vos",
+            persona_id:     null,
+            monto:          gcMiParte,
+            modo:           gcMiParteModo,
+          });
+        }
         const pendientes = participantes.filter((p) => p.estado === "pendiente");
         for (const p of pendientes) {
           let personaId = p.persona_id;
@@ -458,11 +538,19 @@ export function MovimientoEditor({ open, onClose, editing, cuentas, tarjetas, ca
           }
         }
         await updateMovimiento(editing.id, payload);
-        if (esCompartido) await upsertParticipantes(editing.id, participantesInput);
+        if (esCompartido) {
+          await Promise.all([
+            upsertParticipantes(editing.id, participantesInput),
+            upsertPagadores(editing.id, pagadores),
+          ]);
+        }
       } else {
         const { id: nuevoId } = await createMovimiento(payload);
-        if (esCompartido && participantesInput.length > 0) {
-          await upsertParticipantes(nuevoId, participantesInput);
+        if (esCompartido) {
+          await Promise.all([
+            upsertParticipantes(nuevoId, participantesInput),
+            upsertPagadores(nuevoId, pagadores),
+          ]);
         }
       }
 
@@ -951,9 +1039,14 @@ export function MovimientoEditor({ open, onClose, editing, cuentas, tarjetas, ca
                     checked={esCompartido}
                     onChange={(e) => {
                       setEsCompartido(e.target.checked);
-                      if (e.target.checked && monto > 0) {
-                        setGcMiParte(monto);
+                      if (e.target.checked) {
+                        setGcMiParte(monto > 0 ? monto : 0);
                         setGcMiParteEditada(false);
+                        setPagadores([{ personaId: null, nombre: "Vos", montoPagado: monto > 0 ? monto : 0 }]);
+                        setPagadoresAutoSync(true);
+                      } else {
+                        setPagadores([]);
+                        setPagadoresAutoSync(true);
                       }
                     }}
                   />
@@ -965,6 +1058,115 @@ export function MovimientoEditor({ open, onClose, editing, cuentas, tarjetas, ca
 
                 {esCompartido && (
                   <div className="space-y-4 pl-4 border-l-2 border-border/50">
+
+                    {/* ¿Quién(es) pagó(aron)? */}
+                    <div className="space-y-2">
+                      <Label className="text-xs text-muted-foreground">¿Quién(es) pagó(aron)?</Label>
+                      <div className="space-y-1.5">
+                        {pagadores.map((p, idx) => (
+                          <div key={idx} className="flex items-center gap-2 rounded-md px-3 py-2 border bg-surface border-border text-sm">
+                            <span className="flex-1 truncate">{p.nombre}</span>
+                            <Input
+                              type="number"
+                              step="0.01"
+                              className="w-28 h-7 text-sm"
+                              value={p.montoPagado || ""}
+                              onChange={(e) => updatePagadorMonto(idx, parseFloat(e.target.value) || 0)}
+                            />
+                            {p.personaId !== null && (
+                              <button
+                                type="button"
+                                className="text-muted-foreground hover:text-destructive transition-colors"
+                                onClick={() => eliminarPagador(idx)}
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </button>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+
+                      {/* Warning suma pagadores ≠ monto */}
+                      {(() => {
+                        const sumPag = pagadores.reduce((acc, p) => acc + p.montoPagado, 0);
+                        const delta = sumPag - monto;
+                        if (Math.abs(delta) > 0.01 && monto > 0) {
+                          return (
+                            <div className="flex items-start gap-2 rounded-md border border-amber-800/40 bg-amber-950/20 px-3 py-2 text-xs text-amber-300">
+                              <AlertTriangle className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+                              <span>
+                                Suma de pagadores ({formatMonto(sumPag, moneda)}) ≠ total ({formatMonto(monto, moneda)}). Delta: {delta > 0 ? "+" : ""}{formatMonto(delta, moneda)}.
+                              </span>
+                            </div>
+                          );
+                        }
+                        return null;
+                      })()}
+
+                      {/* Agregar otro pagador */}
+                      {!showAddPagador ? (
+                        <button
+                          type="button"
+                          onClick={() => setShowAddPagador(true)}
+                          className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
+                        >
+                          <Plus className="h-3.5 w-3.5" />
+                          Otro pagador
+                        </button>
+                      ) : (
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <input
+                            type="text"
+                            list={pagadoresDatalistId}
+                            placeholder="Nombre del pagador…"
+                            className="flex h-8 flex-1 min-w-32 rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                            value={nuevoPagadorNombre}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              setNuevoPagadorNombre(val);
+                              const match = personas.find((p) => p.nombre.toLowerCase() === val.toLowerCase());
+                              setNuevoPagadorPersonaId(match?.id ?? null);
+                            }}
+                            onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); agregarPagador(); } }}
+                          />
+                          <datalist id={pagadoresDatalistId}>
+                            {personas.map((p) => <option key={p.id} value={p.nombre} />)}
+                          </datalist>
+                          <Input
+                            type="number"
+                            step="0.01"
+                            placeholder="Monto…"
+                            className="w-28 h-8 text-sm"
+                            value={nuevoPagadorMonto || ""}
+                            onChange={(e) => setNuevoPagadorMonto(parseFloat(e.target.value) || 0)}
+                          />
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            className="h-8 px-2"
+                            disabled={!nuevoPagadorNombre.trim() || nuevoPagadorMonto <= 0}
+                            onClick={agregarPagador}
+                          >
+                            <Plus className="h-3.5 w-3.5" />
+                          </Button>
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="ghost"
+                            className="h-8 px-2"
+                            onClick={() => {
+                              setShowAddPagador(false);
+                              setNuevoPagadorNombre("");
+                              setNuevoPagadorPersonaId(null);
+                              setNuevoPagadorMonto(0);
+                            }}
+                          >
+                            <X className="h-3.5 w-3.5" />
+                          </Button>
+                        </div>
+                      )}
+                    </div>
 
                     {/* Mi parte + modo toggle */}
                     <div className="space-y-1.5">

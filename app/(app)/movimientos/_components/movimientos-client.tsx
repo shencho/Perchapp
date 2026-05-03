@@ -221,10 +221,10 @@ function CompartidoPanel({
       {/* Tab: Cobros */}
       {activeTab === "cobros" && (
         <div className="space-y-2 pt-1">
-          {!hasParticipantes ? (
+          {participantes.filter(p => p.persona_id !== null).length === 0 ? (
             <p className="text-xs text-muted-foreground py-2">Sin participantes registrados.</p>
           ) : (
-            participantes.map((p) => (
+            participantes.filter(p => p.persona_id !== null).map((p) => (
               <div key={p.id} className="space-y-2">
                 <div className="flex items-center gap-2">
                   <span className="flex-1 text-sm">{p.persona_nombre}</span>
