@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useTransition, Fragment } from "react";
 import { useRouter } from "next/navigation";
-import { Plus, Pencil, Copy, Trash2, Search, ChevronDown, Users, Landmark } from "lucide-react";
+import { Plus, Pencil, Copy, Trash2, Search, ChevronDown, Users, Landmark, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
@@ -13,7 +13,9 @@ import {
   getParticipantes,
   marcarCobrado,
   marcarPendiente,
+  getBalanceGasto,
 } from "@/lib/supabase/actions/gastos-compartidos";
+import type { ResultadoBalanceGrupal } from "@/lib/domain/calcularBalanceGrupal";
 import { TIPOS_MOV, METODOS, AMBITOS } from "@/lib/supabase/actions/movimientos-types";
 import { MovimientoEditor } from "./movimiento-editor";
 import type { Movimiento, Cuenta, Tarjeta, Categoria, Persona, GastoCompartidoParticipante } from "@/types/supabase";
@@ -43,6 +45,7 @@ interface Props {
   grupos: GrupoConMiembros[];
   mesActual: string;
   compartidoInicial?: boolean;
+  nombreUsuario?: string;
 }
 
 // ── Constantes ────────────────────────────────────────────────────────────────
@@ -89,16 +92,22 @@ function CompartidoPanel({
   movimientoId,
   concepto,
   moneda,
+  montoGasto,
   cuentas,
+  nombreUsuario = "Vos",
 }: {
   movimientoId: string;
   concepto: string | null;
   moneda: string;
+  montoGasto: number;
   cuentas: Cuenta[];
+  nombreUsuario?: string;
 }) {
   const router = useRouter();
   const [, startTransition] = useTransition();
   const [participantes, setParticipantes] = useState<GastoCompartidoParticipante[] | null>(null);
+  const [balance, setBalance] = useState<ResultadoBalanceGrupal | null>(null);
+  const [activeTab, setActiveTab] = useState<"cobros" | "balance">("cobros");
   const [cobradoFormId, setCobradoFormId] = useState<string | null>(null);
   const [fecha, setFecha] = useState(todayStr());
   const [cuentaDestinoId, setCuentaDestinoId] = useState<string | null>(null);
@@ -106,14 +115,25 @@ function CompartidoPanel({
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
-    getParticipantes(movimientoId)
-      .then(setParticipantes)
-      .catch(() => setParticipantes([]));
-  }, [movimientoId]);
+    Promise.all([
+      getParticipantes(movimientoId),
+      getBalanceGasto(movimientoId, montoGasto, nombreUsuario),
+    ]).then(([parts, bal]) => {
+      setParticipantes(parts);
+      setBalance(bal);
+    }).catch(() => {
+      setParticipantes([]);
+      setBalance(null);
+    });
+  }, [movimientoId, montoGasto, nombreUsuario]);
 
   async function reload() {
-    const updated = await getParticipantes(movimientoId);
+    const [updated, bal] = await Promise.all([
+      getParticipantes(movimientoId),
+      getBalanceGasto(movimientoId, montoGasto, nombreUsuario),
+    ]);
     setParticipantes(updated);
+    setBalance(bal);
     startTransition(() => router.refresh());
   }
 
@@ -148,107 +168,241 @@ function CompartidoPanel({
     }
   }
 
-  if (!participantes) {
+  function handleSaldar(deudorPersonaId: string | null) {
+    const part = participantes?.find(p => p.persona_id === deudorPersonaId && p.estado === "pendiente");
+    if (part) {
+      setActiveTab("cobros");
+      setCobradoFormId(part.id);
+      setFecha(todayStr());
+      setCuentaDestinoId(null);
+      setObservacion("");
+    }
+  }
+
+  if (!participantes || !balance) {
     return <p className="text-xs text-muted-foreground py-2">Cargando…</p>;
   }
-  if (participantes.length === 0) {
+
+  const hasParticipantes = participantes.length > 0;
+  const hasBalance = balance.personas.length > 0;
+
+  if (!hasParticipantes && !hasBalance) {
     return <p className="text-xs text-muted-foreground py-2">Sin participantes registrados.</p>;
   }
 
   return (
     <div className="space-y-2 py-1">
-      {participantes.map((p) => (
-        <div key={p.id} className="space-y-2">
-          <div className="flex items-center gap-2">
-            <span className="flex-1 text-sm">{p.persona_nombre}</span>
-            <span className="text-sm tabular-nums text-muted-foreground">
-              {formatMonto(p.monto, moneda)}
-            </span>
-            {p.estado === "cobrado" ? (
-              <div className="flex items-center gap-1.5">
-                <span className="text-xs px-1.5 py-0.5 rounded-full bg-emerald-900/40 text-emerald-400 border border-emerald-800/40">
-                  Cobrado
-                </span>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-6 text-xs px-2"
-                  onClick={() => handleMarcarPendiente(p)}
-                >
-                  Desmarcar
-                </Button>
-              </div>
-            ) : (
-              <Button
-                variant="outline"
-                size="sm"
-                className="h-6 text-xs px-2"
-                onClick={() => {
-                  setCobradoFormId(cobradoFormId === p.id ? null : p.id);
-                  setFecha(todayStr());
-                  setCuentaDestinoId(null);
-                  setObservacion("");
-                }}
-              >
-                Marcar cobrado
-              </Button>
-            )}
-          </div>
+      {/* Tabs */}
+      <div className="flex gap-0 border-b border-border/50">
+        <button
+          onClick={() => setActiveTab("cobros")}
+          className={cn(
+            "px-3 py-1.5 text-xs font-medium border-b-2 -mb-px transition-colors",
+            activeTab === "cobros"
+              ? "border-primary text-foreground"
+              : "border-transparent text-muted-foreground hover:text-foreground"
+          )}
+        >
+          Cobros
+        </button>
+        <button
+          onClick={() => setActiveTab("balance")}
+          className={cn(
+            "px-3 py-1.5 text-xs font-medium border-b-2 -mb-px transition-colors",
+            activeTab === "balance"
+              ? "border-primary text-foreground"
+              : "border-transparent text-muted-foreground hover:text-foreground"
+          )}
+        >
+          Balance grupal
+        </button>
+      </div>
 
-          {cobradoFormId === p.id && (
-            <div className="ml-4 p-3 rounded-md border border-border bg-surface/60 space-y-2">
-              <div className="grid grid-cols-2 gap-2">
-                <div className="space-y-1">
-                  <label className="text-xs text-muted-foreground">Fecha de cobro</label>
-                  <Input
-                    type="date"
-                    value={fecha}
-                    onChange={(e) => setFecha(e.target.value)}
-                    className="h-7 text-xs"
-                  />
+      {/* Tab: Cobros */}
+      {activeTab === "cobros" && (
+        <div className="space-y-2 pt-1">
+          {!hasParticipantes ? (
+            <p className="text-xs text-muted-foreground py-2">Sin participantes registrados.</p>
+          ) : (
+            participantes.map((p) => (
+              <div key={p.id} className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <span className="flex-1 text-sm">{p.persona_nombre}</span>
+                  <span className="text-sm tabular-nums text-muted-foreground">
+                    {formatMonto(p.monto, moneda)}
+                  </span>
+                  {p.estado === "cobrado" ? (
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-xs px-1.5 py-0.5 rounded-full bg-emerald-900/40 text-emerald-400 border border-emerald-800/40">
+                        Cobrado
+                      </span>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-6 text-xs px-2"
+                        onClick={() => handleMarcarPendiente(p)}
+                      >
+                        Desmarcar
+                      </Button>
+                    </div>
+                  ) : (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-6 text-xs px-2"
+                      onClick={() => {
+                        setCobradoFormId(cobradoFormId === p.id ? null : p.id);
+                        setFecha(todayStr());
+                        setCuentaDestinoId(null);
+                        setObservacion("");
+                      }}
+                    >
+                      Marcar cobrado
+                    </Button>
+                  )}
                 </div>
-                <div className="space-y-1">
-                  <label className="text-xs text-muted-foreground">Cuenta destino</label>
-                  <NamedSelect
-                    options={cuentas.map((c) => ({ value: c.id, label: c.nombre }))}
-                    value={cuentaDestinoId ?? ""}
-                    onValueChange={(v) => setCuentaDestinoId(v || null)}
-                    placeholder="Opcional…"
-                    className="h-7 text-xs w-full"
-                  />
-                </div>
+
+                {cobradoFormId === p.id && (
+                  <div className="ml-4 p-3 rounded-md border border-border bg-surface/60 space-y-2">
+                    <div className="grid grid-cols-2 gap-2">
+                      <div className="space-y-1">
+                        <label className="text-xs text-muted-foreground">Fecha de cobro</label>
+                        <Input
+                          type="date"
+                          value={fecha}
+                          onChange={(e) => setFecha(e.target.value)}
+                          className="h-7 text-xs"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-xs text-muted-foreground">Cuenta destino</label>
+                        <NamedSelect
+                          options={cuentas.map((c) => ({ value: c.id, label: c.nombre }))}
+                          value={cuentaDestinoId ?? ""}
+                          onValueChange={(v) => setCuentaDestinoId(v || null)}
+                          placeholder="Opcional…"
+                          className="h-7 text-xs w-full"
+                        />
+                      </div>
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-xs text-muted-foreground">Observación (opcional)</label>
+                      <Input
+                        value={observacion}
+                        onChange={(e) => setObservacion(e.target.value)}
+                        placeholder="Ej. Transferido el lunes"
+                        className="h-7 text-xs"
+                      />
+                    </div>
+                    <div className="flex gap-2 justify-end">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 text-xs"
+                        onClick={() => setCobradoFormId(null)}
+                      >
+                        Cancelar
+                      </Button>
+                      <Button
+                        size="sm"
+                        className="h-7 text-xs"
+                        disabled={submitting || !fecha}
+                        onClick={() => handleMarcarCobrado(p)}
+                      >
+                        {submitting ? "Guardando…" : "Confirmar"}
+                      </Button>
+                    </div>
+                  </div>
+                )}
               </div>
-              <div className="space-y-1">
-                <label className="text-xs text-muted-foreground">Observación (opcional)</label>
-                <Input
-                  value={observacion}
-                  onChange={(e) => setObservacion(e.target.value)}
-                  placeholder="Ej. Transferido el lunes"
-                  className="h-7 text-xs"
-                />
-              </div>
-              <div className="flex gap-2 justify-end">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-7 text-xs"
-                  onClick={() => setCobradoFormId(null)}
-                >
-                  Cancelar
-                </Button>
-                <Button
-                  size="sm"
-                  className="h-7 text-xs"
-                  disabled={submitting || !fecha}
-                  onClick={() => handleMarcarCobrado(p)}
-                >
-                  {submitting ? "Guardando…" : "Confirmar"}
-                </Button>
-              </div>
-            </div>
+            ))
           )}
         </div>
-      ))}
+      )}
+
+      {/* Tab: Balance grupal */}
+      {activeTab === "balance" && (
+        <div className="space-y-3 pt-1">
+          {!hasBalance ? (
+            <p className="text-xs text-muted-foreground py-2">No hay datos de balance disponibles.</p>
+          ) : (
+            <>
+              {/* Tabla de personas */}
+              <div className="rounded-md border border-border overflow-hidden">
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr className="border-b border-border bg-surface/50">
+                      <th className="text-left px-3 py-2 font-medium text-muted-foreground">Persona</th>
+                      <th className="text-right px-3 py-2 font-medium text-muted-foreground">Pagó</th>
+                      <th className="text-right px-3 py-2 font-medium text-muted-foreground">Consumió</th>
+                      <th className="text-right px-3 py-2 font-medium text-muted-foreground">Saldo</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {balance.personas.map((p) => (
+                      <tr key={p.personaId ?? "__usuario__"} className="border-b border-border/50 last:border-0">
+                        <td className="px-3 py-2 font-medium">
+                          {p.nombre}
+                          {p.personaId === null && (
+                            <span className="ml-1 text-muted-foreground font-normal">(vos)</span>
+                          )}
+                        </td>
+                        <td className="px-3 py-2 text-right tabular-nums text-muted-foreground">
+                          {p.pagado > 0 ? formatMonto(p.pagado, moneda) : "—"}
+                        </td>
+                        <td className="px-3 py-2 text-right tabular-nums text-muted-foreground">
+                          {p.consumido > 0 ? formatMonto(p.consumido, moneda) : "—"}
+                        </td>
+                        <td className={cn(
+                          "px-3 py-2 text-right tabular-nums font-semibold",
+                          p.neto > 0 ? "text-green-400" : p.neto < 0 ? "text-red-400" : "text-muted-foreground"
+                        )}>
+                          {p.neto > 0 ? "+" : ""}{formatMonto(p.neto, moneda)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Transferencias para saldar */}
+              {balance.transferencias.length > 0 && (
+                <div className="space-y-1.5">
+                  <p className="text-xs text-muted-foreground font-medium">Transferencias para saldar</p>
+                  {balance.transferencias.map((t, idx) => (
+                    <div key={idx} className="flex items-center justify-between gap-2 rounded-md px-3 py-2 bg-surface/50 border border-border/50">
+                      <div className="flex items-center gap-1.5 text-xs min-w-0">
+                        <span className="font-medium truncate">{t.deudorNombre}</span>
+                        <ArrowRight className="h-3 w-3 shrink-0 text-muted-foreground" />
+                        <span className="truncate">{t.acreedorNombre}</span>
+                        <span className="tabular-nums text-muted-foreground ml-1 shrink-0">
+                          {formatMonto(t.monto, moneda)}
+                        </span>
+                      </div>
+                      {t.acreedorId === null && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="h-6 text-xs px-2 shrink-0"
+                          onClick={() => handleSaldar(t.deudorId)}
+                        >
+                          Saldar
+                        </Button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {balance.hayDesbalance && (
+                <p className="text-xs text-amber-400 bg-amber-900/20 border border-amber-800/40 rounded px-2 py-1">
+                  ⚠ Total pagado ≠ total consumido. Puede haber pagadores fuera de este gasto.
+                </p>
+              )}
+            </>
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -268,7 +422,7 @@ function getMeses() {
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
-export function MovimientosClient({ movimientos, total, cuentas, tarjetas, categorias, clientes, personas, grupos, mesActual, compartidoInicial }: Props) {
+export function MovimientosClient({ movimientos, total, cuentas, tarjetas, categorias, clientes, personas, grupos, mesActual, compartidoInicial, nombreUsuario }: Props) {
   const router = useRouter();
   const [, startTransition] = useTransition();
 
@@ -597,7 +751,9 @@ export function MovimientosClient({ movimientos, total, cuentas, tarjetas, categ
                             movimientoId={m.id}
                             concepto={m.concepto}
                             moneda={m.moneda ?? "ARS"}
+                            montoGasto={m.monto}
                             cuentas={cuentas}
+                            nombreUsuario={nombreUsuario}
                           />
                         </td>
                       </tr>
@@ -718,7 +874,9 @@ export function MovimientosClient({ movimientos, total, cuentas, tarjetas, categ
                         movimientoId={m.id}
                         concepto={m.concepto}
                         moneda={m.moneda ?? "ARS"}
+                        montoGasto={m.monto}
                         cuentas={cuentas}
+                        nombreUsuario={nombreUsuario}
                       />
                     </div>
                   )}

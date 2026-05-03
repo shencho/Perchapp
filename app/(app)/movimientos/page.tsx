@@ -25,6 +25,14 @@ export default async function MovimientosPage({ searchParams }: Props) {
   const inicio = `${anio}-${mes}-01`;
   const fin = new Date(Number(anio), Number(mes), 0).toISOString().slice(0, 10);
 
+  // Nombre del usuario (para resolver "Vos" en balance grupal)
+  const { data: perfil } = await supabase
+    .from("profiles")
+    .select("nombre")
+    .eq("id", user.id)
+    .single();
+  const nombreUsuario = perfil?.nombre?.split(" ")[0] ?? "Vos";
+
   // Cargar movimientos + relaciones + datos de filtros en paralelo
   const [movRes, cuentasRes, tarjetasRes, categoriasRes, clientesRes, personasRes, gruposRes] = await Promise.all([
     supabase
@@ -102,6 +110,7 @@ export default async function MovimientosPage({ searchParams }: Props) {
       grupos={grupos}
       mesActual={mesActual}
       compartidoInicial={params.compartido === "true"}
+      nombreUsuario={nombreUsuario}
     />
   );
 }
