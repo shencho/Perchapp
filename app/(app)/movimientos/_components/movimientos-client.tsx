@@ -409,7 +409,9 @@ function CompartidoPanel({
 
 // Genera lista de los últimos 12 meses para el filtro
 function getMeses() {
-  const meses: { value: string; label: string }[] = [];
+  const meses: { value: string; label: string }[] = [
+    { value: "todos", label: "Todos los movimientos" },
+  ];
   const now = new Date();
   for (let i = 0; i < 12; i++) {
     const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
@@ -498,9 +500,9 @@ export function MovimientosClient({ movimientos, total, cuentas, tarjetas, categ
   function handleMesChange(mes: string | null) {
     if (!mes) return;
     setFiltroMes(mes);
-    // Recargar página con nuevo mes (server-side)
     const url = new URL(window.location.href);
     url.searchParams.set("mes", mes);
+    url.searchParams.delete("pagina");
     router.push(url.toString());
   }
 
@@ -539,7 +541,7 @@ export function MovimientosClient({ movimientos, total, cuentas, tarjetas, categ
           options={meses}
           value={filtroMes}
           onValueChange={(v) => v && handleMesChange(v)}
-          className="h-8 text-sm w-40"
+          className={cn("h-8 text-sm", filtroMes === "todos" ? "w-52" : "w-40")}
         />
 
         {/* Tipo — muestra "Tipo" (muted) cuando no hay filtro */}

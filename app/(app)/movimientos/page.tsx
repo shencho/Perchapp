@@ -15,15 +15,12 @@ export default async function MovimientosPage({ searchParams }: Props) {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  // Mes por defecto: actual
+  // Mes por defecto: actual. "todos" desactiva el filtro de fecha.
   const now = new Date();
   const mesActual = params.mes ?? `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
   const pagina = parseInt(params.pagina ?? "0");
   const PAGE_SIZE = 25;
-
-  const [anio, mes] = mesActual.split("-");
-  const inicio = `${anio}-${mes}-01`;
-  const fin = new Date(Number(anio), Number(mes), 0).toISOString().slice(0, 10);
+  const todosLosMeses = mesActual === "todos";
 
   // Nombre del usuario (para resolver "Vos" en balance grupal)
   const { data: perfil } = await supabase
@@ -33,27 +30,37 @@ export default async function MovimientosPage({ searchParams }: Props) {
     .single();
   const nombreUsuario = perfil?.nombre?.split(" ")[0] ?? "Vos";
 
+  // Construir query de movimientos con filtro de fecha opcional
+  let movQuery = supabase
+    .from("movimientos")
+    .select(`
+      *,
+      categorias ( id, nombre, tipo, parent_id ),
+      cuentas:cuenta_id ( id, nombre, tipo ),
+      cuenta_destino:cuenta_destino_id ( id, nombre ),
+      tarjetas:tarjeta_id ( id, nombre ),
+      clientes:cliente_id ( id, nombre ),
+      servicios_cliente:servicio_id ( id, nombre ),
+      gastos_compartidos_participantes!movimiento_id ( id, estado, monto ),
+      prestamos:prestamo_id ( id, tipo, institucion_nombre, persona_id, personas ( nombre ) )
+    `, { count: "exact" })
+    .eq("user_id", user.id);
+
+  if (!todosLosMeses) {
+    const [anio, mes] = mesActual.split("-");
+    const inicio = `${anio}-${mes}-01`;
+    const fin = new Date(Number(anio), Number(mes), 0).toISOString().slice(0, 10);
+    movQuery = movQuery.gte("fecha", inicio).lte("fecha", fin);
+  }
+
+  movQuery = movQuery
+    .order("fecha", { ascending: false })
+    .order("created_at", { ascending: false })
+    .range(pagina * PAGE_SIZE, (pagina + 1) * PAGE_SIZE - 1);
+
   // Cargar movimientos + relaciones + datos de filtros en paralelo
   const [movRes, cuentasRes, tarjetasRes, categoriasRes, clientesRes, personasRes, gruposRes] = await Promise.all([
-    supabase
-      .from("movimientos")
-      .select(`
-        *,
-        categorias ( id, nombre, tipo, parent_id ),
-        cuentas:cuenta_id ( id, nombre, tipo ),
-        cuenta_destino:cuenta_destino_id ( id, nombre ),
-        tarjetas:tarjeta_id ( id, nombre ),
-        clientes:cliente_id ( id, nombre ),
-        servicios_cliente:servicio_id ( id, nombre ),
-        gastos_compartidos_participantes!movimiento_id ( id, estado, monto ),
-        prestamos:prestamo_id ( id, tipo, institucion_nombre, persona_id, personas ( nombre ) )
-      `, { count: "exact" })
-      .eq("user_id", user.id)
-      .gte("fecha", inicio)
-      .lte("fecha", fin)
-      .order("fecha", { ascending: false })
-      .order("created_at", { ascending: false })
-      .range(pagina * PAGE_SIZE, (pagina + 1) * PAGE_SIZE - 1),
+    movQuery,
     supabase
       .from("cuentas")
       .select("*")
