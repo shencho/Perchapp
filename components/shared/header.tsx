@@ -18,6 +18,7 @@ const NAV_BASE = [
   { href: "/movimientos", label: "Movimientos" },
   { href: "/captura",     label: "Captura" },
   { href: "/cuentas",     label: "Cuentas" },
+  { href: "/balances",    label: "Balances" },
   { href: "/prestamos",   label: "Préstamos" },
 ];
 

@@ -262,6 +262,90 @@ export async function getBalanceGasto(
 }
 
 /**
+ * Salda toda la deuda pendiente de una persona en una moneda dada:
+ * crea 1 movimiento Ingreso por el total y marca todos sus participantes pendientes como cobrados.
+ */
+export async function saldarTodoPersona(input: {
+  personaId: string;
+  moneda: string;
+  cuentaDestinoId: string | null;
+  fecha: string;
+  observacion: string | null;
+}): Promise<void> {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error("No autenticado");
+
+  // Obtener IDs de gastos compartidos del usuario en la moneda indicada
+  const { data: gastosRows } = await supabase
+    .from("movimientos")
+    .select("id, concepto")
+    .eq("user_id", user.id)
+    .eq("es_compartido", true)
+    .eq("moneda", input.moneda);
+
+  const gastoIds = (gastosRows ?? []).map((g) => g.id);
+  if (gastoIds.length === 0) return;
+
+  // Participantes pendientes de esta persona en esos gastos
+  const { data: pendientes } = await supabase
+    .from("gastos_compartidos_participantes")
+    .select("id, monto")
+    .eq("persona_id", input.personaId)
+    .eq("user_id", user.id)
+    .eq("estado", "pendiente")
+    .in("movimiento_id", gastoIds);
+
+  if (!pendientes || pendientes.length === 0) return;
+
+  const totalMonto = pendientes.reduce((acc, p) => acc + p.monto, 0);
+
+  // Nombre de la persona para el concepto
+  const { data: personaData } = await supabase
+    .from("personas")
+    .select("nombre")
+    .eq("id", input.personaId)
+    .single();
+  const nombrePersona = personaData?.nombre ?? "Persona";
+
+  // Crear movimiento Ingreso
+  const { data: mov, error: movErr } = await supabase
+    .from("movimientos")
+    .insert({
+      user_id:       user.id,
+      tipo:          "Ingreso",
+      ambito:        "Personal",
+      monto:         totalMonto,
+      moneda:        input.moneda,
+      concepto:      `Saldo consolidado con ${nombrePersona}`,
+      fecha:         input.fecha,
+      cuenta_id:     input.cuentaDestinoId ?? null,
+      observaciones: input.observacion ?? null,
+      clasificacion: "Variable",
+      cuotas:        1,
+      frecuencia:    "Corriente",
+      cantidad:      1,
+    })
+    .select("id")
+    .single();
+
+  if (movErr || !mov) throw new Error(movErr?.message ?? "Error al crear movimiento");
+
+  // Marcar todos los participantes como cobrados
+  const { error: updErr } = await supabase
+    .from("gastos_compartidos_participantes")
+    .update({
+      estado:                "cobrado",
+      movimiento_ingreso_id: mov.id,
+      cuenta_destino_id:     input.cuentaDestinoId ?? null,
+    })
+    .in("id", pendientes.map((p) => p.id))
+    .eq("user_id", user.id);
+
+  if (updErr) throw new Error(updErr.message);
+}
+
+/**
  * Destilda cobrado: elimina el movimiento Ingreso vinculado y resetea el participante.
  */
 export async function marcarPendiente(participanteId: string): Promise<void> {
