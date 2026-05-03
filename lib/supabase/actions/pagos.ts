@@ -64,43 +64,29 @@ export async function getDataPagoModal(clienteId: string): Promise<{
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error("No autenticado");
 
-  const { data: registros, error: regError } = await supabase
+  // Registros pendientes = pago_id IS NULL (modelo one-to-one, sin tabla pivot)
+  const { data: registros, error } = await supabase
     .from("registros_trabajo")
     .select("id, fecha, monto, notas")
     .eq("cliente_id", clienteId)
     .eq("user_id", user.id)
+    .is("pago_id", null)
     .order("fecha");
 
-  if (regError) throw new Error(regError.message);
-  if (!registros || registros.length === 0) return { registrosPendientes: [], saldoPendiente: 0 };
+  if (error) throw new Error(error.message);
 
-  const registroIds = registros.map((r) => r.id);
-  const { data: pivot, error: pivotError } = await supabase
-    .from("registros_pagos")
-    .select("registro_id, monto_asignado")
-    .in("registro_id", registroIds)
-    .eq("user_id", user.id);
+  const registrosPendientes: RegistroConMontoPendiente[] = (registros ?? []).map((r) => ({
+    id:              r.id,
+    fecha:           r.fecha,
+    monto:           r.monto ?? 0,
+    monto_pendiente: r.monto ?? 0,
+    notas:           r.notas,
+  }));
 
-  if (pivotError) throw new Error(pivotError.message);
-
-  const montoCubierto = new Map<string, number>();
-  for (const p of pivot ?? []) {
-    montoCubierto.set(p.registro_id, (montoCubierto.get(p.registro_id) ?? 0) + p.monto_asignado);
-  }
-
-  const registrosPendientes: RegistroConMontoPendiente[] = [];
-  let saldoPendiente = 0;
-
-  for (const r of registros) {
-    const cubierto = montoCubierto.get(r.id) ?? 0;
-    const monto_pendiente = Math.max(0, (r.monto ?? 0) - cubierto);
-    if (monto_pendiente > 0) {
-      registrosPendientes.push({ id: r.id, fecha: r.fecha, monto: r.monto ?? 0, monto_pendiente, notas: r.notas });
-      saldoPendiente += monto_pendiente;
-    }
-  }
-
-  return { registrosPendientes, saldoPendiente };
+  return {
+    registrosPendientes,
+    saldoPendiente: registrosPendientes.reduce((acc, r) => acc + r.monto_pendiente, 0),
+  };
 }
 
 export async function getPagoByMovimientoId(
@@ -192,7 +178,7 @@ export async function createPago(data: CreatePagoInput): Promise<ResultadoPago> 
       .eq("id", pago.id);
   }
 
-  // (d) Asignación FIFO usando registros_pagos como fuente de monto_pendiente
+  // (d) Asignación FIFO
   const { registrosPendientes } = await getDataPagoModal(data.cliente_id);
   const { asignaciones, saldoRestante } = asignarPagoFIFO(registrosPendientes, data.monto);
 
@@ -203,15 +189,6 @@ export async function createPago(data: CreatePagoInput): Promise<ResultadoPago> 
       .update({ pago_id: pago.id, facturado: true })
       .in("id", ids)
       .eq("user_id", user.id);
-
-    await supabase.from("registros_pagos").insert(
-      asignaciones.map((a) => ({
-        user_id:        user.id,
-        registro_id:    a.registro_id,
-        pago_id:        pago.id,
-        monto_asignado: a.monto_asignado,
-      })),
-    );
   }
 
   return { pago_id: pago.id, asignaciones, saldo_restante: saldoRestante };
@@ -336,14 +313,6 @@ export async function createPagoFromMovimiento(data: CreatePagoFromMovimientoInp
       .in("id", ids)
       .eq("user_id", user.id);
 
-    await supabase.from("registros_pagos").insert(
-      todosAsignados.map((a) => ({
-        user_id:        user.id,
-        registro_id:    a.registro_id,
-        pago_id:        pago.id,
-        monto_asignado: a.monto_asignado,
-      })),
-    );
   }
 }
 
@@ -355,8 +324,7 @@ export async function reasignarPago(
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error("No autenticado");
 
-  // 1. Limpiar pivot + pago_id previos
-  await supabase.from("registros_pagos").delete().eq("pago_id", pagoId).eq("user_id", user.id);
+  // 1. Limpiar pago_id previos
   await supabase
     .from("registros_trabajo")
     .update({ pago_id: null, facturado: false })
@@ -377,21 +345,17 @@ export async function reasignarPago(
 
   if (!pago) throw new Error("Pago no encontrado");
 
-  // 3. Obtener montos de los registros + cobertura de otros pagos
-  const [{ data: registros }, { data: cubiertos }] = await Promise.all([
-    supabase.from("registros_trabajo").select("id, fecha, monto").in("id", ids).eq("user_id", user.id),
-    supabase.from("registros_pagos").select("registro_id, monto_asignado").in("registro_id", ids).eq("user_id", user.id),
-  ]);
-
-  const montoCubierto = new Map<string, number>();
-  for (const c of cubiertos ?? []) {
-    montoCubierto.set(c.registro_id, (montoCubierto.get(c.registro_id) ?? 0) + c.monto_asignado);
-  }
+  // 3. Obtener montos de los registros (one-to-one: monto_pendiente = monto total)
+  const { data: registros } = await supabase
+    .from("registros_trabajo")
+    .select("id, fecha, monto")
+    .in("id", ids)
+    .eq("user_id", user.id);
 
   const registrosParaFIFO = (registros ?? []).map((r) => ({
     id:              r.id,
     fecha:           r.fecha,
-    monto_pendiente: Math.max(0, (r.monto ?? 0) - (montoCubierto.get(r.id) ?? 0)),
+    monto_pendiente: r.monto ?? 0,
   }));
 
   // 4. FIFO + persistir
@@ -404,15 +368,6 @@ export async function reasignarPago(
       .update({ pago_id: pagoId, facturado: true })
       .in("id", asignadosIds)
       .eq("user_id", user.id);
-
-    await supabase.from("registros_pagos").insert(
-      asignaciones.map((a) => ({
-        user_id:        user.id,
-        registro_id:    a.registro_id,
-        pago_id:        pagoId,
-        monto_asignado: a.monto_asignado,
-      })),
-    );
   }
 }
 
