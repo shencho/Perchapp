@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { calcularSaldoCuenta, type MovimientoParaSaldo } from "@/lib/domain/calcularSaldoCuenta";
-import { calcularConsumoTarjeta, getPeriodoCierre, getProximoVencimiento } from "@/lib/domain/calcularConsumoTarjeta";
+import { calcularConsumoTarjeta, getPeriodoCierre, getProximoVencimiento, getCicloDelProximoVencimiento } from "@/lib/domain/calcularConsumoTarjeta";
 import type { Cuenta, Tarjeta } from "@/types/supabase";
 
 function fmt(n: number, moneda = "ARS") {
@@ -86,10 +86,20 @@ export default async function CuentasPage() {
   const totalUSD = saldos.filter(s => s.cuenta.moneda === "USD").reduce((acc, s) => acc + s.saldo, 0);
 
   const consumos = tarjetas.map(t => {
-    const periodo = getPeriodoCierre(t.cierre_dia);
-    const consumo = calcularConsumoTarjeta(t.id, movimientosFull, periodo.inicio, periodo.fin);
-    const proximoVto = getProximoVencimiento(t.vencimiento_dia);
-    return { tarjeta: t, consumo, proximoVto, periodo };
+    if (!t.cierre_dia || !t.vencimiento_dia) {
+      const periodo = getPeriodoCierre(t.cierre_dia);
+      return {
+        tarjeta: t,
+        consumo: calcularConsumoTarjeta(t.id, movimientosFull, periodo.inicio, periodo.fin),
+        proximoVto: getProximoVencimiento(t.vencimiento_dia),
+      };
+    }
+    const ciclo = getCicloDelProximoVencimiento(t.cierre_dia, t.vencimiento_dia);
+    return {
+      tarjeta: t,
+      consumo: calcularConsumoTarjeta(t.id, movimientosFull, ciclo.inicio, ciclo.fin),
+      proximoVto: ciclo.fechaVencimiento,
+    };
   });
 
   return (

@@ -3,7 +3,7 @@ import { redirect, notFound } from "next/navigation";
 import Link from "next/link";
 import { ChevronLeft } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { calcularConsumoTarjeta, getPeriodoCierre, getProximoVencimiento } from "@/lib/domain/calcularConsumoTarjeta";
+import { calcularConsumoTarjeta, getPeriodoCierre, getProximoVencimiento, getCicloDelProximoVencimiento } from "@/lib/domain/calcularConsumoTarjeta";
 
 function fmt(n: number, moneda = "ARS") {
   return new Intl.NumberFormat("es-AR", {
@@ -38,8 +38,18 @@ export default async function TarjetaDetallePage({ params }: Props) {
 
   if (!tarjeta) notFound();
 
-  const periodo = getPeriodoCierre(tarjeta.cierre_dia);
-  const proximoVto = getProximoVencimiento(tarjeta.vencimiento_dia);
+  let inicio: string, fin: string, proximoVto: string | null;
+  if (tarjeta.cierre_dia != null && tarjeta.vencimiento_dia != null) {
+    const ciclo = getCicloDelProximoVencimiento(tarjeta.cierre_dia, tarjeta.vencimiento_dia);
+    inicio = ciclo.inicio;
+    fin = ciclo.fin;
+    proximoVto = ciclo.fechaVencimiento;
+  } else {
+    const periodo = getPeriodoCierre(tarjeta.cierre_dia);
+    inicio = periodo.inicio;
+    fin = periodo.fin;
+    proximoVto = getProximoVencimiento(tarjeta.vencimiento_dia);
+  }
 
   // Movimientos del período actual con esta tarjeta
   const { data: movPeriodo } = await supabase
@@ -47,8 +57,8 @@ export default async function TarjetaDetallePage({ params }: Props) {
     .select("id, tipo, monto, moneda, concepto, descripcion, fecha, metodo, clasificacion, cuotas, fecha_vencimiento")
     .eq("user_id", user.id)
     .eq("tarjeta_id", id)
-    .gte("fecha", periodo.inicio)
-    .lte("fecha", periodo.fin)
+    .gte("fecha", inicio)
+    .lte("fecha", fin)
     .order("fecha", { ascending: false });
 
   // Cuotas pendientes (fuera del período actual, clasificacion=Cuotas)
@@ -65,7 +75,7 @@ export default async function TarjetaDetallePage({ params }: Props) {
 
   const consumoTotal = calcularConsumoTarjeta(id, (movPeriodo ?? []).map(m => ({
     monto: m.monto, tarjeta_id: id, fecha: m.fecha,
-  })), periodo.inicio, periodo.fin);
+  })), inicio, fin);
 
   return (
     <div className="flex flex-col gap-6">
@@ -90,7 +100,7 @@ export default async function TarjetaDetallePage({ params }: Props) {
         <div className="border border-border rounded-lg p-3 bg-card">
           <p className="text-xs text-muted-foreground">Consumo del período</p>
           <p className="text-xl font-bold tabular-nums text-red-400 mt-0.5">{fmt(consumoTotal)}</p>
-          <p className="text-xs text-muted-foreground mt-1">{fmtFecha(periodo.inicio)} — {fmtFecha(periodo.fin)}</p>
+          <p className="text-xs text-muted-foreground mt-1">{fmtFecha(inicio)} — {fmtFecha(fin)}</p>
         </div>
         <div className="border border-border rounded-lg p-3 bg-card">
           <p className="text-xs text-muted-foreground">Próximo vencimiento</p>

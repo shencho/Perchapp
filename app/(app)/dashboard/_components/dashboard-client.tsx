@@ -30,6 +30,7 @@ export type CuentaConSaldo = {
 export type TarjetaResumen = {
   id: string; nombre: string; tipo: string | null;
   banco_emisor: string | null; consumo: number; proximoVto: string | null;
+  cicloAbierto?: boolean;
 };
 
 export type PrestamoResumen = {

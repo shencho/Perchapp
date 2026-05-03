@@ -3,7 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getPrestamos } from "@/lib/supabase/actions/prestamos";
 import { getClientes } from "@/lib/supabase/actions/clientes";
 import { calcularSaldoCuenta } from "@/lib/domain/calcularSaldoCuenta";
-import { calcularConsumoTarjeta, getPeriodoCierre, getProximoVencimiento } from "@/lib/domain/calcularConsumoTarjeta";
+import { calcularConsumoTarjeta, getPeriodoCierre, getProximoVencimiento, getCicloDelProximoVencimiento } from "@/lib/domain/calcularConsumoTarjeta";
 import { calcularSaldoPrestamo } from "@/lib/domain/calcularSaldoPrestamo";
 import { DashboardClient } from "./_components/dashboard-client";
 import type { DashboardData, Alerta, MovGrafico } from "./_components/dashboard-client";
@@ -143,11 +143,21 @@ export default async function DashboardPage() {
 
   // ── Tarjetas con consumo ───────────────────────────────────────────────────
   const tarjetasResumen = tarjetas.map(t => {
-    const periodo = getPeriodoCierre(t.cierre_dia);
+    if (!t.cierre_dia || !t.vencimiento_dia) {
+      const periodo = getPeriodoCierre(t.cierre_dia);
+      return {
+        id: t.id, nombre: t.nombre, tipo: t.tipo, banco_emisor: t.banco_emisor,
+        consumo: calcularConsumoTarjeta(t.id, movimientos, periodo.inicio, periodo.fin),
+        proximoVto: getProximoVencimiento(t.vencimiento_dia),
+        cicloAbierto: false,
+      };
+    }
+    const ciclo = getCicloDelProximoVencimiento(t.cierre_dia, t.vencimiento_dia);
     return {
       id: t.id, nombre: t.nombre, tipo: t.tipo, banco_emisor: t.banco_emisor,
-      consumo: calcularConsumoTarjeta(t.id, movimientos, periodo.inicio, periodo.fin),
-      proximoVto: getProximoVencimiento(t.vencimiento_dia),
+      consumo: calcularConsumoTarjeta(t.id, movimientos, ciclo.inicio, ciclo.fin),
+      proximoVto: ciclo.fechaVencimiento,
+      cicloAbierto: ciclo.cicloAbierto,
     };
   });
 
@@ -234,7 +244,7 @@ export default async function DashboardPage() {
         tipo: "tarjeta_vence",
         urgencia: dias <= 3 ? "alta" : "media",
         titulo: `Tarjeta ${t.nombre} vence ${dias === 0 ? "hoy" : `en ${dias}d`}`,
-        descripcion: `${fmtARS(t.consumo)} de consumo pendiente`,
+        descripcion: `${fmtARS(t.consumo)} de consumo pendiente${t.cicloAbierto ? " (ciclo en curso)" : ""}`,
         href: `/cuentas/tarjetas/${t.id}`,
       });
     }
