@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getPrestamos } from "@/lib/supabase/actions/prestamos";
 import { getClientes } from "@/lib/supabase/actions/clientes";
 import { calcularSaldoCuenta } from "@/lib/domain/calcularSaldoCuenta";
+import { montoPropio } from "@/lib/domain/_utils/movimiento";
 import { calcularConsumoTarjeta, getPeriodoCierre, getProximoVencimiento, getCicloDelProximoVencimiento } from "@/lib/domain/calcularConsumoTarjeta";
 import { getPlantillas } from "@/lib/supabase/actions/plantillas";
 import { getPlantillasParaAlerta } from "@/lib/domain/plantillas";
@@ -55,7 +56,7 @@ export default async function DashboardPage() {
       .select("*")
       .eq("user_id", user.id).eq("archivada", false),
     supabase.from("movimientos")
-      .select("tipo, monto, moneda, fecha, cuenta_id, cuenta_destino_id, tarjeta_id, categoria_id, ambito, necesidad, plantilla_recurrente_id")
+      .select("tipo, monto, moneda, fecha, cuenta_id, cuenta_destino_id, tarjeta_id, categoria_id, ambito, necesidad, plantilla_recurrente_id, es_compartido, gc_mi_parte")
       .eq("user_id", user.id)
       .gte("fecha", fechaDesde24m),
     supabase.from("categorias")
@@ -133,7 +134,7 @@ export default async function DashboardPage() {
     !ajusteInversionIds.includes(m.categoria_id ?? "__")
   );
   const ingresosDelMes = movMesActual.filter(m => m.tipo === "Ingreso").reduce((acc, m) => acc + m.monto, 0);
-  const egresosDelMes  = movMesActual.filter(m => m.tipo === "Egreso").reduce((acc, m) => acc + m.monto, 0);
+  const egresosDelMes  = movMesActual.filter(m => m.tipo === "Egreso").reduce((acc, m) => acc + montoPropio(m), 0);
   const balanceDelMes  = ingresosDelMes - egresosDelMes;
 
   const movMesAnt = movimientos.filter(m =>
@@ -142,7 +143,7 @@ export default async function DashboardPage() {
   );
   const balanceMesAnterior =
     movMesAnt.filter(m => m.tipo === "Ingreso").reduce((acc, m) => acc + m.monto, 0) -
-    movMesAnt.filter(m => m.tipo === "Egreso").reduce((acc, m) => acc + m.monto, 0);
+    movMesAnt.filter(m => m.tipo === "Egreso").reduce((acc, m) => acc + montoPropio(m), 0);
 
   // ── Tarjetas con consumo ───────────────────────────────────────────────────
   const tarjetasResumen = tarjetas.map(t => {
@@ -193,11 +194,11 @@ export default async function DashboardPage() {
   // ── Análisis del mes ───────────────────────────────────────────────────────
   const categoriaMap = Object.fromEntries(categorias.map(c => [c.id, c.nombre]));
   const movEgresoMes = movMesActual.filter(m => m.tipo === "Egreso");
-  const totalEgMes = movEgresoMes.reduce((acc, m) => acc + m.monto, 0);
+  const totalEgMes = movEgresoMes.reduce((acc, m) => acc + montoPropio(m), 0);
 
   const byCat = movEgresoMes.reduce((acc, m) => {
     const k = m.categoria_id ?? "__sin__";
-    return { ...acc, [k]: (acc[k] ?? 0) + m.monto };
+    return { ...acc, [k]: (acc[k] ?? 0) + montoPropio(m) };
   }, {} as Record<string, number>);
 
   const topCategorias = Object.entries(byCat)
@@ -211,12 +212,12 @@ export default async function DashboardPage() {
   const porNecesidad = [1, 2, 3, 4, 5]
     .map(nivel => ({
       nivel,
-      monto: movEgresoMes.filter(m => m.necesidad === nivel).reduce((acc, m) => acc + m.monto, 0),
+      monto: movEgresoMes.filter(m => m.necesidad === nivel).reduce((acc, m) => acc + montoPropio(m), 0),
     }))
     .filter(n => n.monto > 0);
 
-  const totalPersonal     = movEgresoMes.filter(m => m.ambito === "Personal").reduce((acc, m) => acc + m.monto, 0);
-  const totalProfesional  = movEgresoMes.filter(m => m.ambito === "Profesional").reduce((acc, m) => acc + m.monto, 0);
+  const totalPersonal     = movEgresoMes.filter(m => m.ambito === "Personal").reduce((acc, m) => acc + montoPropio(m), 0);
+  const totalProfesional  = movEgresoMes.filter(m => m.ambito === "Profesional").reduce((acc, m) => acc + montoPropio(m), 0);
 
   // ── Profesional ────────────────────────────────────────────────────────────
   let profesional: DashboardData["profesional"] = null;
@@ -317,7 +318,7 @@ export default async function DashboardPage() {
     tarjetas: tarjetasResumen,
     movimientosGrafico: movimientos.map(m => ({
       tipo: m.tipo as MovGrafico["tipo"],
-      monto: m.monto, moneda: m.moneda, fecha: m.fecha,
+      monto: m.tipo === "Egreso" ? montoPropio(m) : m.monto, moneda: m.moneda, fecha: m.fecha,
       cuenta_id: m.cuenta_id, cuenta_destino_id: m.cuenta_destino_id,
       categoria_id: m.categoria_id,
       ambito: m.ambito ?? "Personal",
