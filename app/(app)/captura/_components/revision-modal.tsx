@@ -167,7 +167,9 @@ export function RevisionModal({
     try {
       await createMovimiento({
         tipo:              parsed.tipo,
-        ambito:            "Personal",
+        ambito:            parsed.ambito ?? "Personal",
+        cliente_id:        parsed.cliente_id ?? null,
+        servicio_id:       parsed.servicio_id ?? null,
         monto:             parsed.final,
         moneda:            parsed.moneda,
         tipo_cambio:       parsed.tipoCambio ?? null,
@@ -232,7 +234,8 @@ export function RevisionModal({
             {/* Resumen completo */}
             <div className="bg-surface rounded-lg p-4 space-y-2 text-sm">
               <Row label="Tipo"          value={parsed.tipo}       accent={parsed.tipo === "Ingreso" ? "green" : "red"} />
-              <Row label="Ámbito"        value="Personal" />
+              <Row label="Ámbito"        value={parsed.ambito ?? "Personal"} />
+              {parsed.cliente_id && <Row label="Cliente" value={clientes.find((c) => c.id === parsed.cliente_id)?.nombre ?? parsed.cliente_id} />}
               <Row label="Concepto"      value={parsed.concepto} />
               {parsed.descripcion && <Row label="Descripción" value={parsed.descripcion} />}
 
