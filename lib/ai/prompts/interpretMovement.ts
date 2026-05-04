@@ -1,4 +1,5 @@
 // Prompt del intérprete de movimientos en lenguaje natural.
+import { CATALOGO_PERSONAL_EGRESOS } from "./catalogoCategorias";
 
 export interface PromptParams {
   userText: string;
@@ -18,7 +19,8 @@ export interface ParsedMovimiento {
   ambito:            "Personal" | "Profesional";
   cliente_id:        string | null;
   servicio_id:       string | null;
-  categoria:         string;
+  categoria:         string | null;
+  subcategoria:      string | null;
   categoria_id:      string | null;
   subcategoria_id:   string | null;
   concepto:          string;
@@ -166,6 +168,28 @@ Reglas para decidir el ámbito:
 2. Si usa palabras como "cobré", "me pagó", "facturé", "sesión con", "consulta de", "honorarios", "cliente" → probablemente "Profesional".
 3. Si es ambiguo o no hay señales profesionales → ambito="Personal", cliente_id=null, servicio_id=null.
 
+CATÁLOGO DEL USUARIO PARA EGRESOS PERSONALES:
+
+Cuando interpretes un egreso de ámbito Personal, PREFERÍ usar las categorías y subcategorías de este catálogo.
+
+REGLAS:
+1. Si encontrás match claro → usar el nombre EXACTO del catálogo en "categoria" y "subcategoria".
+2. Si la frase es ambigua o no matchea con confianza → devolver categoria=null, subcategoria=null, categoria_id=null. El usuario completará manualmente.
+3. NO inventes categorías que no estén en el catálogo. Es preferible devolver null que sugerir una categoría que no existe.
+4. Para Ingresos o egresos Profesionales, ignorá este catálogo y usá tu criterio (no tenemos catálogo para esos casos todavía).
+5. Si encontrás match en el catálogo Y la categoría/subcategoría existe en la lista de CATEGORÍAS DEL USUARIO (arriba) con el mismo nombre, devolvé también el categoria_id / subcategoria_id correspondiente. Si está en el catálogo pero NO en la lista DB → devolvé los nombres como string pero IDs en null (el usuario deberá crearla).
+
+EJEMPLOS:
+- 'pagué la luz' → Hogar / Servicios (concepto: Electricidad) + buscar IDs en lista DB
+- 'compré pescado en el super' → Alimentos / Supermercado (concepto: Pescadería) + buscar IDs
+- 'me corté el pelo' → Cuidado personal / Peluquería + buscar IDs
+- 'pagué Netflix' → Suscripciones / Películas + buscar IDs
+- 'compré una pelota' → Deporte, subcategoria=null (no hay match claro de subcategoría)
+- 'compré algo' → todo null, el usuario completará
+
+CATÁLOGO:
+${CATALOGO_PERSONAL_EGRESOS}
+
 CLIENTES ACTIVOS DEL USUARIO (si la frase menciona uno, vinculalo en cliente_id):
 ${clientesStr}
 
@@ -217,9 +241,10 @@ Devolvé SOLO este JSON (sin backticks, sin texto extra):
   "ambito": "Personal" o "Profesional",
   "cliente_id": "uuid del cliente si matchea en la lista, sino null",
   "servicio_id": "uuid del servicio si matchea en la lista y hay cliente, sino null",
-  "categoria": "nombre de la categoría padre (para mostrar)",
-  "categoria_id": "id exacto de la categoría padre si existe en la lista, sino null",
-  "subcategoria_id": "id exacto de la subcategoría si existe en la lista, sino null",
+  "categoria": "nombre de la categoría padre del catálogo si matchea, sino null",
+  "subcategoria": "nombre de la subcategoría del catálogo si matchea, sino null",
+  "categoria_id": "id exacto de la categoría padre si existe en la lista DB, sino null",
+  "subcategoria_id": "id exacto de la subcategoría si existe en la lista DB, sino null",
   "concepto": "concepto corto (subcategoría o nombre del comercio)",
   "descripcion": "detalle adicional (o vacío)",
   "clasificacion": "Fijo" o "Variable" o "Cuotas",
