@@ -56,7 +56,7 @@ export default async function DashboardPage() {
       .select("*")
       .eq("user_id", user.id).eq("archivada", false),
     supabase.from("movimientos")
-      .select("tipo, monto, moneda, fecha, cuenta_id, cuenta_destino_id, tarjeta_id, categoria_id, ambito, necesidad, plantilla_recurrente_id, es_compartido, gc_mi_parte")
+      .select("tipo, monto, moneda, fecha, cuenta_id, cuenta_destino_id, tarjeta_id, categoria_id, ambito, necesidad, plantilla_recurrente_id, es_compartido, gc_mi_parte, es_reembolso")
       .eq("user_id", user.id)
       .gte("fecha", fechaDesde24m),
     supabase.from("categorias")
@@ -133,7 +133,7 @@ export default async function DashboardPage() {
     m.fecha >= inicioMesActual && m.fecha <= finMesActual &&
     !ajusteInversionIds.includes(m.categoria_id ?? "__")
   );
-  const ingresosDelMes = movMesActual.filter(m => m.tipo === "Ingreso").reduce((acc, m) => acc + m.monto, 0);
+  const ingresosDelMes = movMesActual.filter(m => m.tipo === "Ingreso" && !m.es_reembolso).reduce((acc, m) => acc + m.monto, 0);
   const egresosDelMes  = movMesActual.filter(m => m.tipo === "Egreso").reduce((acc, m) => acc + montoPropio(m), 0);
   const balanceDelMes  = ingresosDelMes - egresosDelMes;
 
@@ -142,7 +142,7 @@ export default async function DashboardPage() {
     !ajusteInversionIds.includes(m.categoria_id ?? "__")
   );
   const balanceMesAnterior =
-    movMesAnt.filter(m => m.tipo === "Ingreso").reduce((acc, m) => acc + m.monto, 0) -
+    movMesAnt.filter(m => m.tipo === "Ingreso" && !m.es_reembolso).reduce((acc, m) => acc + m.monto, 0) -
     movMesAnt.filter(m => m.tipo === "Egreso").reduce((acc, m) => acc + montoPropio(m), 0);
 
   // ── Tarjetas con consumo ───────────────────────────────────────────────────
@@ -316,7 +316,7 @@ export default async function DashboardPage() {
     cuentasLiquidas,
     inversiones,
     tarjetas: tarjetasResumen,
-    movimientosGrafico: movimientos.map(m => ({
+    movimientosGrafico: movimientos.filter(m => m.tipo !== "Ingreso" || !m.es_reembolso).map(m => ({
       tipo: m.tipo as MovGrafico["tipo"],
       monto: m.tipo === "Egreso" ? montoPropio(m) : m.monto, moneda: m.moneda, fecha: m.fecha,
       cuenta_id: m.cuenta_id, cuenta_destino_id: m.cuenta_destino_id,

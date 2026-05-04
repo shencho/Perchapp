@@ -124,6 +124,7 @@ export async function marcarCobrado(input: MarcarCobradoInput): Promise<void> {
       cuotas:        1,
       frecuencia:    "Corriente",
       cantidad:      1,
+      es_reembolso:  true,
     })
     .select("id")
     .single();
@@ -325,6 +326,7 @@ export async function saldarTodoPersona(input: {
       cuotas:        1,
       frecuencia:    "Corriente",
       cantidad:      1,
+      es_reembolso:  true,
     })
     .select("id")
     .single();
