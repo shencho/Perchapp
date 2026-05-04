@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import { Mic, MicOff, Send, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -50,6 +51,7 @@ interface Props {
 }
 
 export function CapturaClient({ asistente_nombre, cuentas, tarjetas, categorias }: Props) {
+  const router = useRouter();
   const [texto, setTexto] = useState("");
   const [estado, setEstado] = useState<"idle" | "loading" | "error">("idle");
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -175,6 +177,7 @@ export function CapturaClient({ asistente_nombre, cuentas, tarjetas, categorias 
   function handleConfirmed() {
     setTexto("");
     setParsed(null);
+    router.push("/movimientos");
   }
 
   // ── Render ─────────────────────────────────────────────────────────────────

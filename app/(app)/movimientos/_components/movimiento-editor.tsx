@@ -92,6 +92,7 @@ type FormData = z.infer<typeof schema>;
 interface Props {
   open: boolean;
   onClose: () => void;
+  onSaved?: () => void;
   editing?: Movimiento | null;
   cuentas: Cuenta[];
   tarjetas: Tarjeta[];
@@ -133,7 +134,7 @@ function todayStr() {
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
-export function MovimientoEditor({ open, onClose, editing, cuentas, tarjetas, categorias, clientes = [], defaultValues, suggestCategoria, personas = [], grupos = [] }: Props) {
+export function MovimientoEditor({ open, onClose, onSaved, editing, cuentas, tarjetas, categorias, clientes = [], defaultValues, suggestCategoria, personas = [], grupos = [] }: Props) {
   const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -555,6 +556,7 @@ export function MovimientoEditor({ open, onClose, editing, cuentas, tarjetas, ca
       }
 
       router.refresh();
+      onSaved?.();
       onClose();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Error al guardar");
@@ -576,6 +578,7 @@ export function MovimientoEditor({ open, onClose, editing, cuentas, tarjetas, ca
           setPagoModalOpen(false);
           setPendingPayload(null);
           router.refresh();
+          onSaved?.();
           onClose();
         }}
         cliente={{

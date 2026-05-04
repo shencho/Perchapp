@@ -303,6 +303,10 @@ export function RevisionModal({
         <MovimientoEditor
           open={editorOpen}
           onClose={() => setEditorOpen(false)}
+          onSaved={() => {
+            setEditorOpen(false);
+            onConfirmed();
+          }}
           editing={null}
           cuentas={cuentas}
           tarjetas={tarjetas}
