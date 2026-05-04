@@ -23,7 +23,7 @@ export async function POST(req: NextRequest) {
     }
 
     // 3. Cargar contexto del usuario en paralelo
-    const [profileRes, cuentasRes, tarjetasRes, categoriasRes] = await Promise.all([
+    const [profileRes, cuentasRes, tarjetasRes, categoriasRes, clientesRes, serviciosRes] = await Promise.all([
       supabase
         .from("profiles")
         .select("vto_day_default, asistente_nombre, profesion")
@@ -44,6 +44,18 @@ export async function POST(req: NextRequest) {
         .select("id, nombre, tipo, parent_id")
         .eq("user_id", user.id)
         .eq("archivada", false),
+      supabase
+        .from("clientes")
+        .select("id, nombre")
+        .eq("user_id", user.id)
+        .eq("archivado", false)
+        .order("nombre"),
+      supabase
+        .from("servicios_cliente")
+        .select("id, cliente_id, nombre, modalidad")
+        .eq("user_id", user.id)
+        .eq("archivado", false)
+        .order("nombre"),
     ]);
 
     const profile    = profileRes.data;
@@ -51,6 +63,10 @@ export async function POST(req: NextRequest) {
     const tarjetas   = tarjetasRes.data   ?? [];
     const categorias = (categoriasRes.data ?? []) as {
       id: string; nombre: string; tipo: string; parent_id: string | null;
+    }[];
+    const clientes   = (clientesRes.data  ?? []) as { id: string; nombre: string }[];
+    const servicios  = (serviciosRes.data ?? []) as {
+      id: string; cliente_id: string; nombre: string; modalidad: string;
     }[];
 
     // 4. Construir prompt
@@ -60,6 +76,8 @@ export async function POST(req: NextRequest) {
       cuentas,
       tarjetas,
       categorias,
+      clientes,
+      servicios,
       asistente_nombre:  profile?.asistente_nombre ?? "Perchita",
       profesion:         profile?.profesion ?? "",
     });

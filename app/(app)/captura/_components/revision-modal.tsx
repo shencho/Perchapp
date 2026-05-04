@@ -91,7 +91,9 @@ function parsedToEditorDefaults(
 
   return {
     tipo:              p.tipo,
-    ambito:            "Personal",
+    ambito:            p.ambito ?? "Personal",
+    cliente_id:        p.cliente_id ?? null,
+    servicio_id:       p.servicio_id ?? null,
     moneda:            p.moneda,
     tipo_cambio:       p.tipoCambio ?? undefined,
     monto:             p.final,
