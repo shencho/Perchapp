@@ -8,7 +8,8 @@ import { cn } from "@/lib/utils";
 import { createMovimiento } from "@/lib/supabase/actions/movimientos";
 import { MovimientoEditor } from "@/app/(app)/movimientos/_components/movimiento-editor";
 import type { ParsedMovimiento } from "@/lib/ai/prompts/interpretMovement";
-import type { Cuenta, Tarjeta, Categoria } from "@/types/supabase";
+import type { Cuenta, Tarjeta, Categoria, Persona } from "@/types/supabase";
+import type { GrupoConMiembros } from "@/lib/supabase/actions/grupos-types";
 
 interface Props {
   open: boolean;
@@ -17,6 +18,9 @@ interface Props {
   cuentas: Cuenta[];
   tarjetas: Tarjeta[];
   categorias: Categoria[];
+  clientes: { id: string; nombre: string }[];
+  personas: Persona[];
+  grupos: GrupoConMiembros[];
   onConfirmed: () => void;
 }
 
@@ -117,6 +121,9 @@ export function RevisionModal({
   cuentas,
   tarjetas,
   categorias,
+  clientes,
+  personas,
+  grupos,
   onConfirmed,
 }: Props) {
   const router = useRouter();
@@ -311,6 +318,9 @@ export function RevisionModal({
           cuentas={cuentas}
           tarjetas={tarjetas}
           categorias={categorias}
+          clientes={clientes}
+          personas={personas}
+          grupos={grupos}
           defaultValues={
             parsedToEditorDefaults(parsed, categorias, cuentas, tarjetas) as
               Parameters<typeof MovimientoEditor>[0]["defaultValues"]

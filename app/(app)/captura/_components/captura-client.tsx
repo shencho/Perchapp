@@ -7,7 +7,8 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { RevisionModal } from "./revision-modal";
 import type { ParsedMovimiento } from "@/lib/ai/prompts/interpretMovement";
-import type { Cuenta, Tarjeta, Categoria } from "@/types/supabase";
+import type { Cuenta, Tarjeta, Categoria, Persona } from "@/types/supabase";
+import type { GrupoConMiembros } from "@/lib/supabase/actions/grupos-types";
 
 // ── Web Speech API types ──────────────────────────────────────────────────────
 
@@ -48,9 +49,12 @@ interface Props {
   cuentas: Cuenta[];
   tarjetas: Tarjeta[];
   categorias: Categoria[];
+  clientes: { id: string; nombre: string }[];
+  personas: Persona[];
+  grupos: GrupoConMiembros[];
 }
 
-export function CapturaClient({ asistente_nombre, cuentas, tarjetas, categorias }: Props) {
+export function CapturaClient({ asistente_nombre, cuentas, tarjetas, categorias, clientes, personas, grupos }: Props) {
   const router = useRouter();
   const [texto, setTexto] = useState("");
   const [estado, setEstado] = useState<"idle" | "loading" | "error">("idle");
@@ -300,6 +304,9 @@ export function CapturaClient({ asistente_nombre, cuentas, tarjetas, categorias 
         cuentas={cuentas}
         tarjetas={tarjetas}
         categorias={categorias}
+        clientes={clientes}
+        personas={personas}
+        grupos={grupos}
         onConfirmed={handleConfirmed}
       />
     </div>
