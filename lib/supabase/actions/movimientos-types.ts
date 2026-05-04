@@ -39,8 +39,9 @@ export const movimientoSchema = z.object({
   cliente_id:         z.string().uuid().nullable().optional(),
   servicio_id:        z.string().uuid().nullable().optional(),
   fecha:              z.string().optional(),
-  es_compartido:      z.boolean().optional(),
-  gc_mi_parte:        z.number().positive().nullable().optional(),
+  es_compartido:           z.boolean().optional(),
+  gc_mi_parte:             z.number().positive().nullable().optional(),
+  plantilla_recurrente_id: z.string().uuid().nullable().optional(),
 });
 
 export type MovimientoInput = z.infer<typeof movimientoSchema>;

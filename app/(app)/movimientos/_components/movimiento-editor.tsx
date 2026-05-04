@@ -5,13 +5,14 @@ import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useRouter } from "next/navigation";
-import { X, Plus, Trash2, Users, AlertTriangle, Lock, Unlock } from "lucide-react";
+import { X, Plus, Trash2, Users, AlertTriangle, Lock, Unlock, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { NamedSelect } from "@/components/ui/named-select";
 import { cn } from "@/lib/utils";
 import { createMovimiento, updateMovimiento } from "@/lib/supabase/actions/movimientos";
+import { createPlantilla, buscarPlantillaParecida } from "@/lib/supabase/actions/plantillas";
 import { getServicios } from "@/lib/supabase/actions/servicios";
 import {
   getPagoByMovimientoId,
@@ -35,7 +36,7 @@ import {
   FRECUENCIAS,
   type MovimientoInput,
 } from "@/lib/supabase/actions/movimientos-types";
-import type { Movimiento, Cuenta, Tarjeta, Categoria, Persona } from "@/types/supabase";
+import type { Movimiento, Cuenta, Tarjeta, Categoria, Persona, PlantillaRecurrente } from "@/types/supabase";
 import type { GrupoConMiembros } from "@/lib/supabase/actions/grupos-types";
 import { CreatableSelect, type CatOption } from "./creatable-select";
 
@@ -79,9 +80,20 @@ const schema = z.object({
   fecha:             z.string().optional(),
   cliente_id:        z.string().nullable().optional(),
   servicio_id:       z.string().nullable().optional(),
+  crear_recurrente:   z.boolean().optional(),
+  nombre_plantilla:   z.string().optional(),
+  dia_mes_recurrente: z.number().int().min(1).max(31).optional(),
 }).superRefine((data, ctx) => {
   if (data.ambito === "Profesional" && data.tipo !== "Transferencia" && !data.cliente_id) {
     ctx.addIssue({ code: z.ZodIssueCode.custom, message: "El cliente es requerido", path: ["cliente_id"] });
+  }
+  if (data.crear_recurrente === true) {
+    if (!data.nombre_plantilla || data.nombre_plantilla.trim().length < 2) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Nombre requerido (mínimo 2 caracteres)", path: ["nombre_plantilla"] });
+    }
+    if (!data.dia_mes_recurrente || data.dia_mes_recurrente < 1 || data.dia_mes_recurrente > 31) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: "El día debe ser entre 1 y 31", path: ["dia_mes_recurrente"] });
+    }
   }
 });
 
@@ -171,6 +183,7 @@ export function MovimientoEditor({ open, onClose, onSaved, editing, cuentas, tar
     watch,
     reset,
     setValue,
+    getValues,
     formState: { errors },
   } = useForm<FormData>({
     resolver: zodResolver(schema),
@@ -180,11 +193,12 @@ export function MovimientoEditor({ open, onClose, onSaved, editing, cuentas, tar
       moneda:        "ARS",
       clasificacion: "Variable",
       cuotas:        1,
-      frecuencia:    "Corriente",
-      cantidad:      1,
-      fecha:         todayStr(),
-      cliente_id:    null,
-      servicio_id:   null,
+      frecuencia:       "Corriente",
+      cantidad:         1,
+      fecha:            todayStr(),
+      cliente_id:       null,
+      servicio_id:      null,
+      crear_recurrente: false,
       ...defaultValues,
     },
   });
@@ -318,7 +332,16 @@ export function MovimientoEditor({ open, onClose, onSaved, editing, cuentas, tar
   const cuotas       = watch("cuotas");
   const monto        = watch("monto");
   const cantidad     = watch("cantidad");
-  const clienteId    = watch("cliente_id");
+  const clienteId        = watch("cliente_id");
+  const crearRecurrente  = watch("crear_recurrente");
+
+  // Pre-llenar nombre_plantilla con concepto cuando el usuario activa el checkbox
+  useEffect(() => {
+    if (crearRecurrente && !getValues("nombre_plantilla")) {
+      setValue("nombre_plantilla", getValues("concepto") ?? "");
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [crearRecurrente, getValues, setValue]);
 
   // REGLA 1: detectar si el pago vinculado se desvinculará al guardar
   const pagoSeDesvinculara =
@@ -546,12 +569,59 @@ export function MovimientoEditor({ open, onClose, onSaved, editing, cuentas, tar
           ]);
         }
       } else {
+        // ── Detección de duplicado antes de crear ──────────
+        let hacerRecurrente = values.crear_recurrente === true && values.tipo === "Egreso";
+
+        if (hacerRecurrente) {
+          const match = await buscarPlantillaParecida({
+            concepto:    payload.concepto    ?? null,
+            categoria_id: payload.categoria_id ?? null,
+            cuenta_id:   payload.cuenta_id   ?? null,
+            tarjeta_id:  payload.tarjeta_id  ?? null,
+          });
+          if (match) {
+            const confirmar = window.confirm(
+              `Ya tenés una plantilla parecida: "${match.nombre}".\n¿Querés crear otra igual de todos modos?`
+            );
+            if (!confirmar) hacerRecurrente = false;
+          }
+        }
+
+        // ── Crear movimiento ───────────────────────────────
         const { id: nuevoId } = await createMovimiento(payload);
+
         if (esCompartido) {
           await Promise.all([
             upsertParticipantes(nuevoId, participantesInput),
             upsertPagadores(nuevoId, pagadores),
           ]);
+        }
+
+        // ── Crear plantilla y vincular ─────────────────────
+        if (hacerRecurrente) {
+          try {
+            const montoPlantilla = esCompartido && gcMiParte && gcMiParte > 0 ? gcMiParte : values.monto;
+            const plantilla = await createPlantilla({
+              nombre:         values.nombre_plantilla!,
+              monto_estimado: montoPlantilla,
+              moneda:         values.moneda,
+              dia_mes:        values.dia_mes_recurrente!,
+              metodo:         values.metodo ?? undefined,
+              debita_de:      values.debita_de ?? null,
+              cuenta_id:      values.cuenta_id ?? null,
+              tarjeta_id:     values.tarjeta_id ?? null,
+              categoria_id:   payload.categoria_id ?? null,
+              concepto:       payload.concepto ?? null,
+              clasificacion:  values.clasificacion as PlantillaRecurrente["clasificacion"],
+            });
+            await updateMovimiento(nuevoId, { plantilla_recurrente_id: plantilla.id });
+          } catch (plantillaErr) {
+            console.error("Error creando plantilla:", plantillaErr);
+            window.alert(
+              "El movimiento se creó correctamente, pero no se pudo crear la plantilla recurrente.\n" +
+              "Podés crearla manualmente desde Ajustes > Recurrentes."
+            );
+          }
         }
       }
 
@@ -1439,6 +1509,58 @@ export function MovimientoEditor({ open, onClose, onSaved, editing, cuentas, tar
                       }
                       return null;
                     })()}
+                  </div>
+                )}
+              </>
+            )}
+
+            {/* ── HACER RECURRENTE ──────────────────────────────── */}
+            {tipo === "Egreso" && !editing && (
+              <>
+                <hr className="border-border" />
+
+                <div className="flex items-center gap-2.5">
+                  <input
+                    id="crear-recurrente"
+                    type="checkbox"
+                    className="h-4 w-4 rounded border-border accent-primary cursor-pointer"
+                    {...register("crear_recurrente")}
+                  />
+                  <Label htmlFor="crear-recurrente" className="font-normal cursor-pointer flex items-center gap-1.5">
+                    <RefreshCw className="h-3.5 w-3.5 text-muted-foreground" />
+                    Hacer este movimiento recurrente (mensual)
+                  </Label>
+                </div>
+
+                {crearRecurrente && (
+                  <div className="space-y-3 pl-6 border-l-2 border-border/50">
+                    <div className="space-y-1.5">
+                      <Label>Nombre de la plantilla</Label>
+                      <Input
+                        placeholder="ej. Luz Edenor"
+                        {...register("nombre_plantilla")}
+                      />
+                      {errors.nombre_plantilla && (
+                        <p className="text-xs text-destructive">{errors.nombre_plantilla.message}</p>
+                      )}
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label>Día del mes que se debita</Label>
+                      <Input
+                        type="number"
+                        min={1}
+                        max={31}
+                        className="w-24"
+                        {...register("dia_mes_recurrente", { valueAsNumber: true })}
+                      />
+                      {errors.dia_mes_recurrente && (
+                        <p className="text-xs text-destructive">{errors.dia_mes_recurrente.message}</p>
+                      )}
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Los próximos meses vas a poder generar este movimiento desde
+                      &ldquo;Generar pendientes&rdquo; en /movimientos.
+                    </p>
                   </div>
                 )}
               </>

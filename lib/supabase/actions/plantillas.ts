@@ -94,6 +94,42 @@ export async function deletePlantilla(id: string): Promise<void> {
   if (error) throw new Error(error.message);
 }
 
+export async function buscarPlantillaParecida(input: {
+  concepto:    string | null;
+  categoria_id: string | null;
+  cuenta_id:   string | null;
+  tarjeta_id:  string | null;
+}): Promise<{ id: string; nombre: string } | null> {
+  if (!input.concepto) return null;
+  if (!input.cuenta_id && !input.tarjeta_id) return null;
+
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return null;
+
+  let query = supabase
+    .from("plantillas_recurrentes")
+    .select("id, nombre")
+    .eq("user_id", user.id)
+    .eq("activo", true)
+    .ilike("concepto", input.concepto)
+    .limit(1);
+
+  if (input.categoria_id) {
+    query = query.eq("categoria_id", input.categoria_id);
+  } else {
+    query = query.is("categoria_id", null);
+  }
+
+  const orParts: string[] = [];
+  if (input.cuenta_id)  orParts.push(`cuenta_id.eq.${input.cuenta_id}`);
+  if (input.tarjeta_id) orParts.push(`tarjeta_id.eq.${input.tarjeta_id}`);
+  query = query.or(orParts.join(","));
+
+  const { data } = await query.maybeSingle();
+  return data ?? null;
+}
+
 export interface GenerarMovimientoItem {
   plantillaId: string;
   monto: number;
