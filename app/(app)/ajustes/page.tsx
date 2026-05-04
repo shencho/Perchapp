@@ -20,6 +20,8 @@ export default async function AjustesPage() {
     { data: profesiones },
     { data: personasRaw },
     { data: gruposRaw },
+    { data: clientesRaw },
+    { data: serviciosRaw },
     plantillas,
   ] = await Promise.all([
     supabase.from("profiles").select("*").eq("id", user.id).single(),
@@ -34,6 +36,8 @@ export default async function AjustesPage() {
       .eq("user_id", user.id)
       .eq("archivado", false)
       .order("nombre"),
+    supabase.from("clientes").select("id, nombre").eq("user_id", user.id).eq("archivado", false).order("nombre"),
+    supabase.from("servicios_cliente").select("id, cliente_id, nombre").eq("user_id", user.id).eq("archivado", false).order("nombre"),
     getPlantillas(),
   ]);
 
@@ -53,6 +57,8 @@ export default async function AjustesPage() {
       profesiones={profesiones ?? []}
       personas={personasRaw ?? []}
       grupos={grupos}
+      clientes={clientesRaw ?? []}
+      servicios={serviciosRaw ?? []}
       plantillas={plantillas}
     />
   );

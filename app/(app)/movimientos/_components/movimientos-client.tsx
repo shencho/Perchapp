@@ -525,7 +525,13 @@ export function MovimientosClient({ movimientos, total, cuentas, tarjetas, categ
         <div className="flex items-center gap-2">
           {plantillasPendientes.length > 0 && (
             <Button variant="outline" size="sm" onClick={() => setGenerarOpen(true)} className="gap-1.5">
-              Generar pendientes ({plantillasPendientes.length})
+              {(() => {
+                const e = plantillasPendientes.filter(p => p.plantilla.tipo !== "Ingreso").length;
+                const i = plantillasPendientes.filter(p => p.plantilla.tipo === "Ingreso").length;
+                if (e > 0 && i > 0) return `Generar pendientes (${e} egresos + ${i} ingresos)`;
+                if (i > 0) return `Generar pendientes (${i} ingreso${i !== 1 ? "s" : ""})`;
+                return `Generar pendientes (${e} egreso${e !== 1 ? "s" : ""})`;
+              })()}
             </Button>
           )}
           <Button onClick={handleNuevo} size="sm" className="gap-1.5">
@@ -936,6 +942,7 @@ export function MovimientosClient({ movimientos, total, cuentas, tarjetas, categ
         open={generarOpen}
         onClose={() => setGenerarOpen(false)}
         plantillasPendientes={plantillasPendientes}
+        clientes={clientes}
         initialSelectedId={generarInicialId}
       />
     </div>

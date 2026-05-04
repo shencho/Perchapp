@@ -9,6 +9,10 @@ export interface CreatePlantillaInput {
   monto_estimado: number;
   moneda: string;
   dia_mes: number;
+  tipo?: "Egreso" | "Ingreso";
+  ambito?: "Personal" | "Profesional";
+  cliente_id?: string | null;
+  servicio_id?: string | null;
   metodo?: PlantillaRecurrente["metodo"];
   debita_de?: "cuenta" | "tarjeta" | null;
   cuenta_id?: string | null;
@@ -95,6 +99,7 @@ export async function deletePlantilla(id: string): Promise<void> {
 }
 
 export async function buscarPlantillaParecida(input: {
+  tipo:        "Egreso" | "Ingreso";
   concepto:    string | null;
   categoria_id: string | null;
   cuenta_id:   string | null;
@@ -112,6 +117,7 @@ export async function buscarPlantillaParecida(input: {
     .select("id, nombre")
     .eq("user_id", user.id)
     .eq("activo", true)
+    .eq("tipo", input.tipo)
     .ilike("concepto", input.concepto)
     .limit(1);
 
@@ -167,7 +173,7 @@ export async function generarMovimientosDePlantillas(
 
     return {
       user_id:                 user.id,
-      tipo:                    "Egreso" as const,
+      tipo:                    (p.tipo ?? "Egreso") as "Ingreso" | "Egreso",
       fecha,
       monto:                   item.monto,
       descripcion:             item.descripcion || null,
@@ -179,7 +185,9 @@ export async function generarMovimientosDePlantillas(
       categoria_id:            p.categoria_id,
       clasificacion:           p.clasificacion ?? "Fijo",
       concepto:                p.concepto ?? null,
-      ambito:                  "Personal" as const,
+      ambito:                  (p.ambito ?? "Personal") as "Personal" | "Profesional",
+      cliente_id:              p.cliente_id ?? null,
+      servicio_id:             p.servicio_id ?? null,
       frecuencia:              "Corriente" as const,
       plantilla_recurrente_id: p.id,
     };

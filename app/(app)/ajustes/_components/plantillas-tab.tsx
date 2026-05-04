@@ -16,7 +16,6 @@ import { cn } from "@/lib/utils";
 import {
   createPlantilla,
   updatePlantilla,
-  deactivatePlantilla,
   deletePlantilla,
 } from "@/lib/supabase/actions/plantillas";
 import type { PlantillaRecurrente, Cuenta, Tarjeta, Categoria } from "@/types/supabase";
@@ -29,6 +28,8 @@ const METODOS = [
 const CLASIFICACIONES = ["Fijo", "Variable", "Cuotas"] as const;
 
 const schema = z.object({
+  tipo:          z.enum(["Egreso", "Ingreso"]),
+  ambito:        z.enum(["Personal", "Profesional"]),
   nombre:        z.string().min(1, "Requerido"),
   monto_estimado: z.number().nonnegative("Debe ser ≥ 0"),
   moneda:        z.enum(["ARS", "USD"]),
@@ -37,6 +38,8 @@ const schema = z.object({
   debita_de:     z.enum(["cuenta", "tarjeta"]).nullable().optional(),
   cuenta_id:     z.string().nullable().optional(),
   tarjeta_id:    z.string().nullable().optional(),
+  cliente_id:    z.string().nullable().optional(),
+  servicio_id:   z.string().nullable().optional(),
   clasificacion: z.enum(CLASIFICACIONES).nullable().optional(),
   concepto:      z.string().nullable().optional(),
   fecha_inicio:  z.string().optional(),
@@ -53,8 +56,10 @@ const schema = z.object({
 type FormData = z.infer<typeof schema>;
 
 const EMPTY: FormData = {
+  tipo: "Egreso", ambito: "Personal",
   nombre: "", monto_estimado: 0, moneda: "ARS", dia_mes: 1,
   metodo: null, debita_de: null, cuenta_id: null, tarjeta_id: null,
+  cliente_id: null, servicio_id: null,
   clasificacion: "Fijo", concepto: null, fecha_inicio: "", notas: null,
 };
 
@@ -63,6 +68,8 @@ interface Props {
   cuentas: Cuenta[];
   tarjetas: Tarjeta[];
   categorias: Categoria[];
+  clientes: { id: string; nombre: string }[];
+  servicios: { id: string; cliente_id: string; nombre: string }[];
 }
 
 function fmtMonto(n: number, moneda: string) {
@@ -72,7 +79,7 @@ function fmtMonto(n: number, moneda: string) {
   }).format(n);
 }
 
-export function PlantillasTab({ plantillas, cuentas, tarjetas, categorias }: Props) {
+export function PlantillasTab({ plantillas, cuentas, tarjetas, categorias, clientes, servicios }: Props) {
   const router = useRouter();
   const [dialogOpen, setDialogOpen]       = useState(false);
   const [deleteOpen, setDeleteOpen]       = useState(false);
@@ -82,19 +89,28 @@ export function PlantillasTab({ plantillas, cuentas, tarjetas, categorias }: Pro
   const [isDeleting, setIsDeleting]       = useState(false);
   const [actionError, setActionError]     = useState<string | null>(null);
 
-  // Categoría/subcategoría — estado local fuera de RHF (igual que movimiento-editor)
   const [padreId, setPadreId] = useState<string | null>(null);
   const [subcatId, setSubcatId] = useState<string | null>(null);
 
-  const { register, handleSubmit, control, watch, reset, formState: { errors } } =
+  const { register, handleSubmit, control, watch, reset, setValue, formState: { errors } } =
     useForm<FormData>({ resolver: zodResolver(schema), defaultValues: EMPTY });
 
-  const debita_de = watch("debita_de");
+  const tipo       = watch("tipo");
+  const ambito     = watch("ambito");
+  const debita_de  = watch("debita_de");
+  const clienteId  = watch("cliente_id");
 
-  const catsPadre = categorias.filter(c => !c.parent_id && (c.tipo === "Egreso" || c.tipo === "Ambos"));
+  const catsPadre = categorias.filter(c => !c.parent_id && (
+    tipo === "Ingreso"
+      ? (c.tipo === "Ingreso" || c.tipo === "Ambos")
+      : (c.tipo === "Egreso" || c.tipo === "Ambos")
+  ));
   const catsHijas = padreId ? categorias.filter(c => c.parent_id === padreId) : [];
+  const serviciosFiltrados = servicios.filter(s => s.cliente_id === clienteId);
 
   useEffect(() => { setSubcatId(null); }, [padreId]);
+  useEffect(() => { setPadreId(null); setSubcatId(null); }, [tipo]);
+  useEffect(() => { setValue("servicio_id", null); }, [clienteId, setValue]);
 
   function resolveCatId(catId: string | null | undefined) {
     if (!catId) { setPadreId(null); setSubcatId(null); return; }
@@ -116,6 +132,8 @@ export function PlantillasTab({ plantillas, cuentas, tarjetas, categorias }: Pro
     setEditing(p);
     resolveCatId(p.categoria_id);
     reset({
+      tipo:           (p.tipo ?? "Egreso") as "Egreso" | "Ingreso",
+      ambito:         (p.ambito ?? "Personal") as "Personal" | "Profesional",
       nombre:         p.nombre,
       monto_estimado: p.monto_estimado,
       moneda:         p.moneda as "ARS" | "USD",
@@ -124,6 +142,8 @@ export function PlantillasTab({ plantillas, cuentas, tarjetas, categorias }: Pro
       debita_de:      p.debita_de ?? null,
       cuenta_id:      p.cuenta_id ?? null,
       tarjeta_id:     p.tarjeta_id ?? null,
+      cliente_id:     p.cliente_id ?? null,
+      servicio_id:    p.servicio_id ?? null,
       clasificacion:  p.clasificacion ?? null,
       concepto:       p.concepto ?? null,
       fecha_inicio:   p.fecha_inicio ?? "",
@@ -141,6 +161,8 @@ export function PlantillasTab({ plantillas, cuentas, tarjetas, categorias }: Pro
         ...data,
         categoria_id: subcatId ?? padreId ?? null,
         fecha_inicio: data.fecha_inicio || new Date().toISOString().slice(0, 10),
+        cliente_id:  (data.ambito === "Profesional" && data.tipo === "Ingreso") ? (data.cliente_id ?? null) : null,
+        servicio_id: (data.ambito === "Profesional" && data.tipo === "Ingreso") ? (data.servicio_id ?? null) : null,
       };
       if (editing) await updatePlantilla(editing.id, payload);
       else         await createPlantilla(payload);
@@ -197,12 +219,23 @@ export function PlantillasTab({ plantillas, cuentas, tarjetas, categorias }: Pro
             const cuenta  = cuentas.find(c => c.id === p.cuenta_id);
             const tarjeta = tarjetas.find(t => t.id === p.tarjeta_id);
             const instrumento = cuenta?.nombre ?? tarjeta?.nombre ?? null;
+            const tipoPlantilla = p.tipo ?? "Egreso";
             return (
               <div key={p.id} className="flex items-center justify-between px-4 py-3 gap-3">
                 <div className="flex flex-col gap-0.5 min-w-0">
-                  <span className={cn("text-sm font-medium", !p.activo && "text-muted-foreground line-through")}>
-                    {p.nombre}
-                  </span>
+                  <div className="flex items-center gap-1.5">
+                    <span className={cn("text-sm font-medium", !p.activo && "text-muted-foreground line-through")}>
+                      {p.nombre}
+                    </span>
+                    <span className={cn(
+                      "text-xs px-1.5 py-0.5 rounded border font-medium shrink-0",
+                      tipoPlantilla === "Ingreso"
+                        ? "bg-green-900/30 text-green-400 border-green-800/40"
+                        : "bg-red-900/30 text-red-400 border-red-800/40",
+                    )}>
+                      {tipoPlantilla}
+                    </span>
+                  </div>
                   <span className="text-xs text-muted-foreground">
                     Día {p.dia_mes} · {fmtMonto(p.monto_estimado, p.moneda)}
                     {instrumento && ` · ${instrumento}`}
@@ -245,9 +278,41 @@ export function PlantillasTab({ plantillas, cuentas, tarjetas, categorias }: Pro
       >
         <div className="flex flex-col gap-3">
 
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <Label>Tipo</Label>
+              <Controller
+                name="tipo"
+                control={control}
+                render={({ field }) => (
+                  <NamedSelect
+                    options={[{ value: "Egreso", label: "Egreso" }, { value: "Ingreso", label: "Ingreso" }]}
+                    value={field.value}
+                    onValueChange={v => field.onChange(v ?? "Egreso")}
+                  />
+                )}
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <Label>Ámbito</Label>
+              <Controller
+                name="ambito"
+                control={control}
+                render={({ field }) => (
+                  <NamedSelect
+                    options={[{ value: "Personal", label: "Personal" }, { value: "Profesional", label: "Profesional" }]}
+                    value={field.value}
+                    onValueChange={v => field.onChange(v ?? "Personal")}
+                  />
+                )}
+              />
+            </div>
+          </div>
+
           <div className="space-y-1.5">
             <Label>Nombre <span className="text-muted-foreground text-xs">(identificador interno)</span></Label>
-            <Input {...register("nombre")} placeholder="Ej. Luz Edenor" />
+            <Input {...register("nombre")} placeholder={tipo === "Ingreso" ? "Ej. Sueldo, Honorario cliente X" : "Ej. Luz Edenor"} />
             {errors.nombre && <p className="text-xs text-destructive">{errors.nombre.message}</p>}
           </div>
 
@@ -285,7 +350,7 @@ export function PlantillasTab({ plantillas, cuentas, tarjetas, categorias }: Pro
           </div>
 
           <div className="space-y-1.5">
-            <Label>Día del mes</Label>
+            <Label>{tipo === "Ingreso" ? "Día del mes esperado" : "Día del mes"}</Label>
             <Controller
               name="dia_mes"
               control={control}
@@ -300,79 +365,6 @@ export function PlantillasTab({ plantillas, cuentas, tarjetas, categorias }: Pro
             />
             {errors.dia_mes && <p className="text-xs text-destructive">{errors.dia_mes.message}</p>}
           </div>
-
-          <div className="space-y-1.5">
-            <Label>Método de pago</Label>
-            <Controller
-              name="metodo"
-              control={control}
-              render={({ field }) => (
-                <NamedSelect
-                  options={METODOS.map(m => ({ value: m, label: m }))}
-                  value={field.value ?? null}
-                  onValueChange={v => field.onChange(v)}
-                  placeholder="Sin especificar"
-                />
-              )}
-            />
-          </div>
-
-          <div className="space-y-1.5">
-            <Label>Se debita de</Label>
-            <Controller
-              name="debita_de"
-              control={control}
-              render={({ field }) => (
-                <NamedSelect
-                  options={[
-                    { value: "cuenta", label: "Cuenta bancaria" },
-                    { value: "tarjeta", label: "Tarjeta de crédito" },
-                  ]}
-                  value={field.value ?? null}
-                  onValueChange={v => { field.onChange(v); }}
-                  placeholder="Sin especificar"
-                />
-              )}
-            />
-          </div>
-
-          {debita_de === "cuenta" && (
-            <div className="space-y-1.5">
-              <Label>Cuenta</Label>
-              <Controller
-                name="cuenta_id"
-                control={control}
-                render={({ field }) => (
-                  <NamedSelect
-                    options={cuentas.map(c => ({ value: c.id, label: c.nombre }))}
-                    value={field.value ?? null}
-                    onValueChange={v => field.onChange(v)}
-                    placeholder="Seleccioná una cuenta"
-                  />
-                )}
-              />
-              {errors.cuenta_id && <p className="text-xs text-destructive">{errors.cuenta_id.message}</p>}
-            </div>
-          )}
-
-          {debita_de === "tarjeta" && (
-            <div className="space-y-1.5">
-              <Label>Tarjeta</Label>
-              <Controller
-                name="tarjeta_id"
-                control={control}
-                render={({ field }) => (
-                  <NamedSelect
-                    options={tarjetas.map(t => ({ value: t.id, label: t.nombre }))}
-                    value={field.value ?? null}
-                    onValueChange={v => field.onChange(v)}
-                    placeholder="Seleccioná una tarjeta"
-                  />
-                )}
-              />
-              {errors.tarjeta_id && <p className="text-xs text-destructive">{errors.tarjeta_id.message}</p>}
-            </div>
-          )}
 
           <div className="space-y-1.5">
             <Label>Categoría</Label>
@@ -396,9 +388,124 @@ export function PlantillasTab({ plantillas, cuentas, tarjetas, categorias }: Pro
             </div>
           )}
 
+          {ambito === "Profesional" && tipo === "Ingreso" && (
+            <>
+              <div className="space-y-1.5">
+                <Label>Cliente</Label>
+                <Controller
+                  name="cliente_id"
+                  control={control}
+                  render={({ field }) => (
+                    <NamedSelect
+                      options={clientes.map(c => ({ value: c.id, label: c.nombre }))}
+                      value={field.value ?? null}
+                      onValueChange={v => field.onChange(v)}
+                      placeholder="Sin cliente"
+                    />
+                  )}
+                />
+              </div>
+
+              {serviciosFiltrados.length > 0 && (
+                <div className="space-y-1.5">
+                  <Label>Servicio</Label>
+                  <Controller
+                    name="servicio_id"
+                    control={control}
+                    render={({ field }) => (
+                      <NamedSelect
+                        options={serviciosFiltrados.map(s => ({ value: s.id, label: s.nombre }))}
+                        value={field.value ?? null}
+                        onValueChange={v => field.onChange(v)}
+                        placeholder="Sin servicio"
+                      />
+                    )}
+                  />
+                </div>
+              )}
+            </>
+          )}
+
+          {tipo === "Egreso" && (
+            <>
+              <div className="space-y-1.5">
+                <Label>Método de pago</Label>
+                <Controller
+                  name="metodo"
+                  control={control}
+                  render={({ field }) => (
+                    <NamedSelect
+                      options={METODOS.map(m => ({ value: m, label: m }))}
+                      value={field.value ?? null}
+                      onValueChange={v => field.onChange(v)}
+                      placeholder="Sin especificar"
+                    />
+                  )}
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <Label>Se debita de</Label>
+                <Controller
+                  name="debita_de"
+                  control={control}
+                  render={({ field }) => (
+                    <NamedSelect
+                      options={[
+                        { value: "cuenta", label: "Cuenta bancaria" },
+                        { value: "tarjeta", label: "Tarjeta de crédito" },
+                      ]}
+                      value={field.value ?? null}
+                      onValueChange={v => { field.onChange(v); }}
+                      placeholder="Sin especificar"
+                    />
+                  )}
+                />
+              </div>
+
+              {debita_de === "cuenta" && (
+                <div className="space-y-1.5">
+                  <Label>Cuenta</Label>
+                  <Controller
+                    name="cuenta_id"
+                    control={control}
+                    render={({ field }) => (
+                      <NamedSelect
+                        options={cuentas.map(c => ({ value: c.id, label: c.nombre }))}
+                        value={field.value ?? null}
+                        onValueChange={v => field.onChange(v)}
+                        placeholder="Seleccioná una cuenta"
+                      />
+                    )}
+                  />
+                  {errors.cuenta_id && <p className="text-xs text-destructive">{errors.cuenta_id.message}</p>}
+                </div>
+              )}
+
+              {debita_de === "tarjeta" && (
+                <div className="space-y-1.5">
+                  <Label>Tarjeta</Label>
+                  <Controller
+                    name="tarjeta_id"
+                    control={control}
+                    render={({ field }) => (
+                      <NamedSelect
+                        options={tarjetas.map(t => ({ value: t.id, label: t.nombre }))}
+                        value={field.value ?? null}
+                        onValueChange={v => field.onChange(v)}
+                        placeholder="Seleccioná una tarjeta"
+                      />
+                    )}
+                  />
+                  {errors.tarjeta_id && <p className="text-xs text-destructive">{errors.tarjeta_id.message}</p>}
+                </div>
+              )}
+            </>
+          )}
+
           <div className="space-y-1.5">
             <Label>Concepto <span className="text-muted-foreground text-xs">(opcional)</span></Label>
-            <Input {...register("concepto")} placeholder="Ej. Servicio eléctrico" />
+            <Input {...register("concepto")} placeholder={tipo === "Ingreso" ? "Ej. Honorario mensual" : "Ej. Servicio eléctrico"} />
           </div>
 
           <div className="space-y-1.5">

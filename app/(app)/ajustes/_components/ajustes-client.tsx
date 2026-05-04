@@ -18,6 +18,8 @@ interface Props {
   profesiones: { nombre: string; slug: string }[];
   personas: Persona[];
   grupos: GrupoConMiembros[];
+  clientes: { id: string; nombre: string }[];
+  servicios: { id: string; cliente_id: string; nombre: string }[];
   plantillas: PlantillaRecurrente[];
 }
 
@@ -29,6 +31,8 @@ export function AjustesClient({
   profesiones,
   personas,
   grupos,
+  clientes,
+  servicios,
   plantillas,
 }: Props) {
   return (
@@ -76,6 +80,8 @@ export function AjustesClient({
             cuentas={cuentas}
             tarjetas={tarjetas}
             categorias={categorias}
+            clientes={clientes}
+            servicios={servicios}
           />
         </TabsContent>
       </Tabs>

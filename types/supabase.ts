@@ -826,6 +826,10 @@ export interface Database {
           monto_estimado: number
           moneda: string
           dia_mes: number
+          tipo: "Egreso" | "Ingreso"
+          ambito: "Personal" | "Profesional"
+          cliente_id: string | null
+          servicio_id: string | null
           metodo: "Efectivo" | "Transferencia" | "Billetera virtual" | "Crédito" | "Débito automático" | "Débito" | null
           debita_de: "cuenta" | "tarjeta" | null
           cuenta_id: string | null
@@ -847,6 +851,10 @@ export interface Database {
           monto_estimado: number
           moneda?: string
           dia_mes: number
+          tipo?: "Egreso" | "Ingreso"
+          ambito?: "Personal" | "Profesional"
+          cliente_id?: string | null
+          servicio_id?: string | null
           metodo?: "Efectivo" | "Transferencia" | "Billetera virtual" | "Crédito" | "Débito automático" | "Débito" | null
           debita_de?: "cuenta" | "tarjeta" | null
           cuenta_id?: string | null
@@ -868,6 +876,10 @@ export interface Database {
           monto_estimado?: number
           moneda?: string
           dia_mes?: number
+          tipo?: "Egreso" | "Ingreso"
+          ambito?: "Personal" | "Profesional"
+          cliente_id?: string | null
+          servicio_id?: string | null
           metodo?: "Efectivo" | "Transferencia" | "Billetera virtual" | "Crédito" | "Débito automático" | "Débito" | null
           debita_de?: "cuenta" | "tarjeta" | null
           cuenta_id?: string | null

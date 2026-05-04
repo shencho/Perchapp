@@ -570,10 +570,11 @@ export function MovimientoEditor({ open, onClose, onSaved, editing, cuentas, tar
         }
       } else {
         // ── Detección de duplicado antes de crear ──────────
-        let hacerRecurrente = values.crear_recurrente === true && values.tipo === "Egreso";
+        let hacerRecurrente = values.crear_recurrente === true && values.tipo !== "Transferencia";
 
         if (hacerRecurrente) {
           const match = await buscarPlantillaParecida({
+            tipo:        values.tipo as "Egreso" | "Ingreso",
             concepto:    payload.concepto    ?? null,
             categoria_id: payload.categoria_id ?? null,
             cuenta_id:   payload.cuenta_id   ?? null,
@@ -606,6 +607,10 @@ export function MovimientoEditor({ open, onClose, onSaved, editing, cuentas, tar
               monto_estimado: montoPlantilla,
               moneda:         values.moneda,
               dia_mes:        values.dia_mes_recurrente!,
+              tipo:           values.tipo as "Egreso" | "Ingreso",
+              ambito:         values.ambito,
+              cliente_id:     values.ambito === "Profesional" ? (values.cliente_id ?? null) : null,
+              servicio_id:    values.ambito === "Profesional" ? (values.servicio_id ?? null) : null,
               metodo:         values.metodo ?? undefined,
               debita_de:      values.debita_de ?? null,
               cuenta_id:      values.cuenta_id ?? null,
@@ -1515,7 +1520,7 @@ export function MovimientoEditor({ open, onClose, onSaved, editing, cuentas, tar
             )}
 
             {/* ── HACER RECURRENTE ──────────────────────────────── */}
-            {tipo === "Egreso" && !editing && (
+            {tipo !== "Transferencia" && !editing && (
               <>
                 <hr className="border-border" />
 
@@ -1528,7 +1533,9 @@ export function MovimientoEditor({ open, onClose, onSaved, editing, cuentas, tar
                   />
                   <Label htmlFor="crear-recurrente" className="font-normal cursor-pointer flex items-center gap-1.5">
                     <RefreshCw className="h-3.5 w-3.5 text-muted-foreground" />
-                    Hacer este movimiento recurrente (mensual)
+                    {tipo === "Ingreso"
+                      ? "Hacer este movimiento recurrente (mensual) — registrar como cobro recurrente"
+                      : "Hacer este movimiento recurrente (mensual)"}
                   </Label>
                 </div>
 
@@ -1545,7 +1552,7 @@ export function MovimientoEditor({ open, onClose, onSaved, editing, cuentas, tar
                       )}
                     </div>
                     <div className="space-y-1.5">
-                      <Label>Día del mes que se debita</Label>
+                      <Label>{tipo === "Ingreso" ? "Día del mes que cobrás" : "Día del mes que se debita"}</Label>
                       <Input
                         type="number"
                         min={1}
@@ -1558,8 +1565,9 @@ export function MovimientoEditor({ open, onClose, onSaved, editing, cuentas, tar
                       )}
                     </div>
                     <p className="text-xs text-muted-foreground">
-                      Los próximos meses vas a poder generar este movimiento desde
-                      &ldquo;Generar pendientes&rdquo; en /movimientos.
+                      {tipo === "Ingreso"
+                        ? <>Los próximos meses vas a poder registrar este cobro desde &ldquo;Generar pendientes&rdquo; en /movimientos.</>
+                        : <>Los próximos meses vas a poder generar este pago desde &ldquo;Generar pendientes&rdquo; en /movimientos.</>}
                     </p>
                   </div>
                 )}

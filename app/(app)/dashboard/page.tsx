@@ -279,8 +279,12 @@ export default async function DashboardPage() {
       titulo:      p.atrasada
         ? `${p.plantilla.nombre} sin generar (hace ${dias}d)`
         : p.diasRestantes === 0
-          ? `${p.plantilla.nombre} debita hoy`
-          : `${p.plantilla.nombre} debita en ${dias}d`,
+          ? p.plantilla.tipo === "Ingreso"
+            ? `${p.plantilla.nombre} — esperás cobrar hoy`
+            : `${p.plantilla.nombre} debita hoy`
+          : p.plantilla.tipo === "Ingreso"
+            ? `${p.plantilla.nombre} — esperás cobrar en ${dias}d`
+            : `${p.plantilla.nombre} debita en ${dias}d`,
       descripcion: `~${fmtARS(p.plantilla.monto_estimado)} estimado`,
       href:        `/movimientos?generar=${p.plantilla.id}`,
     });

@@ -16,6 +16,7 @@ interface Props {
   open: boolean;
   onClose: () => void;
   plantillasPendientes: PlantillaConEstado[];
+  clientes?: { id: string; nombre: string }[];
   initialSelectedId?: string;
 }
 
@@ -26,7 +27,7 @@ function fmtFecha(iso: string) {
 }
 
 export function GenerarPendientesModal({
-  open, onClose, plantillasPendientes, initialSelectedId,
+  open, onClose, plantillasPendientes, clientes = [], initialSelectedId,
 }: Props) {
   const router = useRouter();
   const [montos, setMontos]           = useState<Record<string, number>>({});
@@ -117,7 +118,22 @@ export function GenerarPendientesModal({
                       />
                     </td>
                     <td className="py-2.5 pr-3">
-                      <div className="font-medium leading-tight">{p.nombre}</div>
+                      <div className="flex items-center gap-1.5 leading-tight">
+                        <span className="font-medium">{p.nombre}</span>
+                        <span className={cn(
+                          "text-xs px-1.5 py-0.5 rounded border font-medium shrink-0",
+                          p.tipo === "Ingreso"
+                            ? "bg-green-900/30 text-green-400 border-green-800/40"
+                            : "bg-red-900/30 text-red-400 border-red-800/40"
+                        )}>
+                          {p.tipo ?? "Egreso"}
+                        </span>
+                      </div>
+                      {p.ambito === "Profesional" && p.cliente_id && (
+                        <div className="text-xs text-muted-foreground mt-0.5">
+                          {clientes.find(c => c.id === p.cliente_id)?.nombre ?? "Cliente"}
+                        </div>
+                      )}
                       {atrasada ? (
                         <div className="flex items-center gap-1 text-xs text-orange-400 mt-0.5">
                           <AlertTriangle className="h-3 w-3" />
