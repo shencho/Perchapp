@@ -895,6 +895,32 @@ export interface Database {
           updated_at?: string
         }
       }
+      alertas_silenciadas: {
+        Row: {
+          id: string
+          user_id: string
+          alerta_tipo: "plantilla_pendiente" | "plantilla_atrasada"
+          alerta_referencia: string
+          silenciada_hasta: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          alerta_tipo: "plantilla_pendiente" | "plantilla_atrasada"
+          alerta_referencia: string
+          silenciada_hasta: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          alerta_tipo?: "plantilla_pendiente" | "plantilla_atrasada"
+          alerta_referencia?: string
+          silenciada_hasta?: string
+          created_at?: string
+        }
+      }
       gastos_grupales_pagadores: {
         Row: {
           id: string
@@ -951,3 +977,4 @@ export type Prestamo = Database["public"]["Tables"]["prestamos"]["Row"]
 export type PrestamoPago = Database["public"]["Tables"]["prestamos_pagos"]["Row"]
 export type GastoGrupalPagador = Database["public"]["Tables"]["gastos_grupales_pagadores"]["Row"]
 export type PlantillaRecurrente = Database["public"]["Tables"]["plantillas_recurrentes"]["Row"]
+export type AlertaSilenciada = Database["public"]["Tables"]["alertas_silenciadas"]["Row"]

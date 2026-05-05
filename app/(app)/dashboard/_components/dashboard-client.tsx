@@ -11,6 +11,7 @@ import {
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from "recharts";
 import { cn } from "@/lib/utils";
 import { GraficoEvolucion } from "./grafico-evolucion";
+import { silenciarAlerta } from "@/lib/supabase/actions/alertas";
 
 // ── Tipos exportados (usados por page.tsx) ────────────────────────────────────
 
@@ -43,6 +44,7 @@ export type Alerta = {
   tipo: "tarjeta_vence" | "mora_cliente" | "plazo_fijo_vencido" | "plantilla_pendiente" | "plantilla_atrasada";
   urgencia: "alta" | "media";
   titulo: string; descripcion: string; href: string;
+  referencia_id?: string;
 };
 
 export interface DashboardData {
@@ -589,28 +591,49 @@ function BloqueAnalisis({ analisis }: { analisis: DashboardData["analisis"] }) {
 
 // ── Bloque Alertas ────────────────────────────────────────────────────────────
 
-function BloqueAlertas({ alertas }: { alertas: Alerta[] }) {
+function BloqueAlertas({
+  alertas,
+  onSilenciar,
+}: {
+  alertas: Alerta[];
+  onSilenciar: (alerta: Alerta) => void;
+}) {
   return (
     <div className="flex flex-col gap-2">
-      {alertas.map(a => (
-        <Link key={a.id} href={a.href}
-          className={cn(
-            "flex items-start gap-3 p-3 rounded-lg border transition-colors hover:bg-surface/50",
+      {alertas.map(a => {
+        const puedeSilenciar =
+          (a.tipo === "plantilla_pendiente" || a.tipo === "plantilla_atrasada") &&
+          !!a.referencia_id;
+        return (
+          <div key={a.id} className={cn(
+            "flex items-center rounded-lg border",
             a.urgencia === "alta"
               ? "border-red-500/30 bg-red-500/5"
-              : "border-amber-500/30 bg-amber-500/5"
+              : "border-amber-500/30 bg-amber-500/5",
           )}>
-          <AlertTriangle className={cn(
-            "h-4 w-4 mt-0.5 shrink-0",
-            a.urgencia === "alta" ? "text-red-400" : "text-amber-400"
-          )} />
-          <div className="min-w-0">
-            <p className="text-sm font-medium">{a.titulo}</p>
-            <p className="text-xs text-muted-foreground mt-0.5">{a.descripcion}</p>
+            <Link href={a.href} className="flex flex-1 items-start gap-3 p-3 transition-colors hover:bg-surface/50 min-w-0">
+              <AlertTriangle className={cn(
+                "h-4 w-4 mt-0.5 shrink-0",
+                a.urgencia === "alta" ? "text-red-400" : "text-amber-400",
+              )} />
+              <div className="min-w-0">
+                <p className="text-sm font-medium">{a.titulo}</p>
+                <p className="text-xs text-muted-foreground mt-0.5">{a.descripcion}</p>
+              </div>
+              {!puedeSilenciar && <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0 mt-0.5" />}
+            </Link>
+            {puedeSilenciar && (
+              <button
+                className="px-3 py-3 text-muted-foreground hover:text-foreground transition-colors shrink-0"
+                title="Silenciar esta alerta"
+                onClick={() => onSilenciar(a)}
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            )}
           </div>
-          <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0 mt-0.5" />
-        </Link>
-      ))}
+        );
+      })}
     </div>
   );
 }
@@ -622,6 +645,19 @@ export function DashboardClient({ data }: { data: DashboardData }) {
   const router = useRouter();
 
   const esProf = data.perfil.modo !== "personal";
+
+  async function handleSilenciar(alerta: Alerta) {
+    if (!alerta.referencia_id) return;
+    const now = new Date();
+    const last = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+    const silenciada_hasta = `${last.getFullYear()}-${String(last.getMonth() + 1).padStart(2, "0")}-${String(last.getDate()).padStart(2, "0")}`;
+    await silenciarAlerta({
+      alerta_tipo: alerta.tipo as "plantilla_pendiente" | "plantilla_atrasada",
+      alerta_referencia: alerta.referencia_id,
+      silenciada_hasta,
+    });
+    router.refresh();
+  }
 
   // Determinar qué IDs de bloques son ocultables y están disponibles
   const bloquesDisponibles = [
@@ -667,7 +703,7 @@ export function DashboardClient({ data }: { data: DashboardData }) {
               Ocultar
             </button>
           </div>
-          <BloqueAlertas alertas={data.alertas} />
+          <BloqueAlertas alertas={data.alertas} onSilenciar={handleSilenciar} />
         </section>
       )}
 
