@@ -162,6 +162,6 @@ export async function createProfile(data: OnboardingData) {
 
   if (flagsError) throw new Error(flagsError.message);
 
-  // 6. Redirigir al dashboard
-  redirect("/dashboard");
+  // 6. Redirigir a categorías sugeridas
+  redirect("/onboarding/categorias-sugeridas");
 }

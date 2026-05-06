@@ -119,3 +119,148 @@ export async function archiveCategoria(id: string) {
   if (error) throw new Error(error.message);
   revalidatePath("/ajustes");
 }
+
+export async function aplicarTemplate(input: {
+  items: Array<{
+    categoria_nombre: string;
+    tipo: "Egreso" | "Ingreso";
+    subcategoria_nombre?: string;
+    nombre_personalizado?: string;
+    estrategia_conflicto: "saltar" | "reemplazar" | "crear_duplicado";
+  }>;
+}): Promise<{ creadas: number; saltadas: number; reemplazadas: number; errores: string[] }> {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error("No autenticado");
+
+  const userId = user.id;
+  let creadas = 0, saltadas = 0, reemplazadas = 0;
+  const errores: string[] = [];
+  const parentCache = new Map<string, string>(); // nombre_lower → padre_id
+
+  async function resolveParent(nombre: string, tipo: "Egreso" | "Ingreso"): Promise<string | null> {
+    const cacheKey = nombre.toLowerCase();
+    if (parentCache.has(cacheKey)) return parentCache.get(cacheKey)!;
+
+    const { data: existing } = await supabase
+      .from("categorias")
+      .select("id")
+      .eq("user_id", userId)
+      .ilike("nombre", nombre)
+      .is("parent_id", null)
+      .eq("archivada", false)
+      .maybeSingle();
+
+    if (existing) {
+      parentCache.set(cacheKey, existing.id);
+      return existing.id;
+    }
+
+    const { data: nuevo, error } = await supabase
+      .from("categorias")
+      .insert({ user_id: userId, nombre, tipo })
+      .select("id")
+      .single();
+
+    if (error || !nuevo) return null;
+    parentCache.set(cacheKey, nuevo.id);
+    return nuevo.id;
+  }
+
+  // Paso 1: items de categoría padre (sin subcategoria_nombre)
+  for (const item of input.items.filter(i => !i.subcategoria_nombre)) {
+    const cacheKey = item.categoria_nombre.toLowerCase();
+    try {
+      const { data: existing } = await supabase
+        .from("categorias")
+        .select("id")
+        .eq("user_id", userId)
+        .ilike("nombre", item.categoria_nombre)
+        .is("parent_id", null)
+        .eq("archivada", false)
+        .maybeSingle();
+
+      if (existing) {
+        if (item.estrategia_conflicto === "crear_duplicado") {
+          const dupNombre = `${item.categoria_nombre} (2)`;
+          const { data: dup, error } = await supabase
+            .from("categorias")
+            .insert({ user_id: userId, nombre: dupNombre, tipo: item.tipo })
+            .select("id")
+            .single();
+          if (error) throw new Error(error.message);
+          parentCache.set(cacheKey, dup!.id);
+          creadas++;
+        } else {
+          // saltar (reemplazar no aplica a padres)
+          parentCache.set(cacheKey, existing.id);
+          saltadas++;
+        }
+      } else {
+        const { data: nuevo, error } = await supabase
+          .from("categorias")
+          .insert({ user_id: userId, nombre: item.categoria_nombre, tipo: item.tipo })
+          .select("id")
+          .single();
+        if (error) throw new Error(error.message);
+        parentCache.set(cacheKey, nuevo!.id);
+        creadas++;
+      }
+    } catch (e) {
+      errores.push(`${item.categoria_nombre}: ${e instanceof Error ? e.message : "Error"}`);
+    }
+  }
+
+  // Paso 2: items de subcategoría
+  for (const item of input.items.filter(i => !!i.subcategoria_nombre)) {
+    try {
+      const padreId = await resolveParent(item.categoria_nombre, item.tipo);
+      if (!padreId) {
+        errores.push(`No se pudo crear la categoría padre "${item.categoria_nombre}"`);
+        continue;
+      }
+
+      const nombreFinal = item.nombre_personalizado?.trim() || item.subcategoria_nombre!;
+
+      const { data: existingSub } = await supabase
+        .from("categorias")
+        .select("id")
+        .eq("user_id", userId)
+        .ilike("nombre", nombreFinal)
+        .eq("parent_id", padreId)
+        .eq("archivada", false)
+        .maybeSingle();
+
+      if (existingSub) {
+        if (item.estrategia_conflicto === "saltar") {
+          saltadas++;
+        } else if (item.estrategia_conflicto === "reemplazar") {
+          const { error } = await supabase
+            .from("categorias")
+            .update({ nombre: nombreFinal })
+            .eq("id", existingSub.id)
+            .eq("user_id", userId);
+          if (error) throw new Error(error.message);
+          reemplazadas++;
+        } else {
+          const { error } = await supabase
+            .from("categorias")
+            .insert({ user_id: userId, nombre: `${nombreFinal} (2)`, tipo: item.tipo, parent_id: padreId });
+          if (error) throw new Error(error.message);
+          creadas++;
+        }
+      } else {
+        const { error } = await supabase
+          .from("categorias")
+          .insert({ user_id: userId, nombre: nombreFinal, tipo: item.tipo, parent_id: padreId });
+        if (error) throw new Error(error.message);
+        creadas++;
+      }
+    } catch (e) {
+      errores.push(`${item.categoria_nombre} > ${item.subcategoria_nombre}: ${e instanceof Error ? e.message : "Error"}`);
+    }
+  }
+
+  revalidatePath("/ajustes");
+  return { creadas, saltadas, reemplazadas, errores };
+}

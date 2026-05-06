@@ -1,5 +1,4 @@
 // Prompt del intérprete de movimientos en lenguaje natural.
-import { CATALOGO_PERSONAL_EGRESOS } from "./catalogoCategorias";
 
 export interface PromptParams {
   userText: string;
@@ -11,6 +10,7 @@ export interface PromptParams {
   servicios: { id: string; cliente_id: string; nombre: string; modalidad: string }[];
   asistente_nombre: string;
   profesion: string;
+  catalogoDinamico: string;
   combosHistoricos?: string;
 }
 
@@ -110,6 +110,7 @@ export function buildInterpretPrompt(params: PromptParams): { sys: string; promp
     servicios,
     asistente_nombre,
     profesion,
+    catalogoDinamico,
     combosHistoricos = "",
   } = params;
 
@@ -188,7 +189,7 @@ EJEMPLOS:
 - 'compré algo' → todo null, el usuario completará
 
 CATÁLOGO:
-${CATALOGO_PERSONAL_EGRESOS}
+${catalogoDinamico}
 
 CLIENTES ACTIVOS DEL USUARIO (si la frase menciona uno, vinculalo en cliente_id):
 ${clientesStr}

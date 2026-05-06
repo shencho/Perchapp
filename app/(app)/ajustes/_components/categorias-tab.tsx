@@ -5,7 +5,7 @@ import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useRouter } from "next/navigation";
-import { Plus, Pencil, Archive } from "lucide-react";
+import { Plus, Pencil, Archive, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -23,6 +23,7 @@ import {
   updateCategoria,
   archiveCategoria,
 } from "@/lib/supabase/actions/categorias";
+import { ImportarTemplateModal } from "./importar-template-modal";
 import type { Categoria } from "@/types/supabase";
 
 const TIPOS = ["Ingreso", "Egreso", "Ambos"] as const;
@@ -54,6 +55,7 @@ export function CategoriasTab({ categorias }: Props) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isArchiving, setIsArchiving] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [importModalOpen, setImportModalOpen] = useState(false);
 
   const {
     register,
@@ -139,10 +141,16 @@ export function CategoriasTab({ categorias }: Props) {
             ? "Todavía no tenés categorías."
             : `${categorias.length} categoría${categorias.length !== 1 ? "s" : ""}`}
         </p>
-        <Button size="sm" onClick={openCreate}>
-          <Plus className="h-4 w-4 mr-1" />
-          Nueva categoría
-        </Button>
+        <div className="flex gap-2">
+          <Button size="sm" variant="outline" onClick={() => setImportModalOpen(true)}>
+            <Sparkles className="h-4 w-4 mr-1" />
+            Importar sugeridas
+          </Button>
+          <Button size="sm" onClick={openCreate}>
+            <Plus className="h-4 w-4 mr-1" />
+            Nueva categoría
+          </Button>
+        </div>
       </div>
 
       {ordenadas.length > 0 && (
@@ -261,6 +269,13 @@ export function CategoriasTab({ categorias }: Props) {
           )}
         </div>
       </FormDialog>
+
+      <ImportarTemplateModal
+        open={importModalOpen}
+        onOpenChange={setImportModalOpen}
+        categorias={categorias}
+        onDone={() => router.refresh()}
+      />
 
       <DeleteConfirm
         open={deleteOpen}

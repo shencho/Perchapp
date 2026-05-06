@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { createClient } from "@/lib/supabase/server";
 import { buildInterpretPrompt, extractJsonFromResponse } from "@/lib/ai/prompts/interpretMovement";
+import { buildCatalogoDinamico } from "@/lib/ai/prompts/catalogoDinamico";
 import { ANTHROPIC_MODEL } from "@/lib/ai/config";
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
@@ -23,7 +24,8 @@ export async function POST(req: NextRequest) {
     }
 
     // 3. Cargar contexto del usuario en paralelo
-    const [profileRes, cuentasRes, tarjetasRes, categoriasRes, clientesRes, serviciosRes] = await Promise.all([
+    const fecha90d = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+    const [profileRes, cuentasRes, tarjetasRes, categoriasRes, clientesRes, serviciosRes, movimientosRes] = await Promise.all([
       supabase
         .from("profiles")
         .select("vto_day_default, asistente_nombre, profesion")
@@ -56,6 +58,13 @@ export async function POST(req: NextRequest) {
         .eq("user_id", user.id)
         .eq("archivado", false)
         .order("nombre"),
+      supabase
+        .from("movimientos")
+        .select("concepto, categoria_id")
+        .eq("user_id", user.id)
+        .gte("fecha", fecha90d)
+        .not("concepto", "is", null)
+        .limit(500),
     ]);
 
     const profile    = profileRes.data;
@@ -68,8 +77,13 @@ export async function POST(req: NextRequest) {
     const servicios  = (serviciosRes.data ?? []) as {
       id: string; cliente_id: string; nombre: string; modalidad: string;
     }[];
+    const movimientos = (movimientosRes.data ?? []) as {
+      concepto: string | null; categoria_id: string | null;
+    }[];
 
-    // 4. Construir prompt
+    // 4. Construir catálogo dinámico y prompt
+    const catalogoDinamico = buildCatalogoDinamico(categorias, movimientos);
+
     const { sys, prompt } = buildInterpretPrompt({
       userText:          text,
       vtoDay:            profile?.vto_day_default ?? 10,
@@ -80,6 +94,7 @@ export async function POST(req: NextRequest) {
       servicios,
       asistente_nombre:  profile?.asistente_nombre ?? "Perchita",
       profesion:         profile?.profesion ?? "",
+      catalogoDinamico,
     });
 
     // 5. Llamar a Claude
