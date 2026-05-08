@@ -43,10 +43,11 @@ export function Header({ userEmail, modo }: HeaderProps) {
       {/* Logo */}
       <div className="flex items-center gap-3">
         <Link href="/dashboard" className="flex items-center gap-2">
-          <div className="w-7 h-7 rounded-lg bg-primary flex items-center justify-center">
-            <span className="text-primary-foreground font-bold text-sm">P</span>
+          {/* TODO: reemplazar placeholder por <img src="/icons/mango-square-transparent.png" /> cuando el usuario suba los íconos finales */}
+          <div className="w-7 h-7 rounded-lg bg-[#1e3a5f] flex items-center justify-center">
+            <span className="text-[#e8d9b4] font-bold text-sm">M</span>
           </div>
-          <span className="font-semibold text-sm">Perchapp</span>
+          <span className="font-semibold text-sm">MANGO</span>
         </Link>
 
         {/* Nav desktop */}

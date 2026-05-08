@@ -1,4 +1,4 @@
-# Cierre de Sesión 2 — Perchapp
+# Cierre de Sesión 2 — MANGO (ex-Perchapp)
 **Fecha:** 26 de abril de 2025
 
 ---
@@ -49,7 +49,7 @@ Después de las migrations:
 3. En Supabase → Table Editor: verificar filas en `profiles`, `cuentas`, `categorias`
 
 ### Google OAuth (opcional, cuando quieras)
-1. Google Cloud Console → nuevo proyecto `Perchapp` → OAuth consent screen → Credentials → OAuth client ID (Web)
+1. Google Cloud Console → nuevo proyecto `MANGO` → OAuth consent screen → Credentials → OAuth client ID (Web)
 2. Redirect URI: `https://voeyfiwlmhsdqdajwgrw.supabase.co/auth/v1/callback`
 3. Supabase → Authentication → Providers → Google → pegar Client ID y Secret
 
@@ -59,7 +59,7 @@ Después de las migrations:
   - Cada área tiene `modalidades` (array) y categorías de ingreso y egreso
   - Migration lista en `supabase/migrations/005_profesiones_v2.sql` — **pendiente correr en Supabase**
 - **Slogan "No te cuelgues"** agregado en:
-  - `/login` y `/signup`: debajo del título "Perchapp", tipografía xs, color muted
+  - `/login` y `/signup`: debajo del título "MANGO", tipografía xs, color muted (slogan eliminado en PR1a)
   - Onboarding paso 1: grande y centrado sobre el formulario
 - **Onboarding paso 2** actualizado: cards con nombre del área + fila de ejemplos en texto chico
 

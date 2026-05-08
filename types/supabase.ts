@@ -1,4 +1,4 @@
-// Tipos generados manualmente desde el schema de Perchapp.
+// Tipos generados manualmente desde el schema de MANGO.
 // Reemplazar con: npx supabase gen types typescript --project-id voeyfiwlmhsdqdajwgrw > types/supabase.ts
 // (requiere: npx supabase login)
 

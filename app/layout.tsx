@@ -8,8 +8,13 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "Perchapp",
+  title: "MANGO",
   description: "Gestión financiera con IA para freelancers de LATAM",
+  icons: {
+    icon: "/icons/favicon.svg",
+    shortcut: "/icons/favicon.svg",
+  },
+  manifest: "/manifest.json",
 };
 
 export default function RootLayout({

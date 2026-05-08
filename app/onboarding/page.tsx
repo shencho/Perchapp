@@ -93,8 +93,9 @@ export default function OnboardingPage() {
       <div className="w-full max-w-md">
         {/* Header */}
         <div className="flex flex-col items-center gap-2 mb-8 text-center">
-          <div className="w-10 h-10 rounded-xl bg-primary flex items-center justify-center">
-            <span className="text-primary-foreground font-bold text-lg">P</span>
+          {/* TODO: reemplazar placeholder por <img src="/icons/mango-square-transparent.png" /> cuando el usuario suba los íconos finales */}
+          <div className="w-10 h-10 rounded-xl bg-[#1e3a5f] flex items-center justify-center">
+            <span className="text-[#e8d9b4] font-bold text-lg">M</span>
           </div>
           <h1 className="text-xl font-semibold">Configurá tu cuenta</h1>
           <p className="text-sm text-muted-foreground">Paso {step} de {TOTAL_STEPS}</p>
@@ -114,8 +115,7 @@ export default function OnboardingPage() {
           {step === 1 && (
             <div className="flex flex-col gap-4">
               <div className="flex flex-col items-center gap-1 text-center mb-2">
-                <p className="text-3xl font-bold tracking-tight">Perchapp</p>
-                <p className="text-sm font-medium text-muted-foreground">No te cuelgues</p>
+                <p className="text-3xl font-bold tracking-tight">MANGO</p>
               </div>
               <div className="flex flex-col gap-1.5">
                 <h2 className="text-2xl font-semibold tracking-tight">¿Cómo te llamás?</h2>
@@ -168,7 +168,7 @@ export default function OnboardingPage() {
           {step === 3 && (
             <div className="flex flex-col gap-4">
               <div className="flex flex-col gap-1.5">
-                <h2 className="text-2xl font-semibold tracking-tight">¿Para qué usás Perchapp?</h2>
+                <h2 className="text-2xl font-semibold tracking-tight">¿Para qué usás MANGO?</h2>
                 <p className="text-sm text-muted-foreground">Podés cambiar esto después en tu perfil.</p>
               </div>
               <div className="flex flex-col gap-2">

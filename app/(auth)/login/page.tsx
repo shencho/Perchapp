@@ -74,11 +74,11 @@ export default function LoginPage() {
     <div className="flex flex-col gap-6">
       {/* Logo */}
       <div className="flex flex-col items-center gap-2 text-center">
-        <div className="w-10 h-10 rounded-xl bg-primary flex items-center justify-center">
-          <span className="text-primary-foreground font-bold text-lg">P</span>
+        {/* TODO: reemplazar placeholder por <img src="/icons/mango-square-transparent.png" /> cuando el usuario suba los íconos finales */}
+        <div className="w-10 h-10 rounded-xl bg-[#1e3a5f] flex items-center justify-center">
+          <span className="text-[#e8d9b4] font-bold text-lg">M</span>
         </div>
-        <h1 className="text-2xl font-semibold tracking-tight">Perchapp</h1>
-        <p className="text-xs font-medium text-muted-foreground tracking-wide">No te cuelgues</p>
+        <h1 className="text-2xl font-semibold tracking-tight">MANGO</h1>
         <p className="text-sm text-muted-foreground">
           Ingresá a tu cuenta
         </p>
