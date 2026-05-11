@@ -56,7 +56,7 @@ export default function OnboardingPage() {
     nombre: "",
     profesion: "",
     modo: "ambos",
-    asistente_nombre: "Perchita",
+    asistente_nombre: "MANGO AI",
   });
 
   function next() {
@@ -202,14 +202,14 @@ export default function OnboardingPage() {
                 <Label htmlFor="asistente">Nombre del asistente</Label>
                 <Input
                   id="asistente"
-                  placeholder="Perchita"
+                  placeholder="MANGO AI"
                   autoFocus
                   value={form.asistente_nombre}
                   onChange={(e) => setForm({ ...form, asistente_nombre: e.target.value })}
                   onKeyDown={(e) => e.key === "Enter" && canAdvance() && handleSubmit()}
                 />
               </div>
-              <p className="text-xs text-muted-foreground">Por defecto: Perchita</p>
+              <p className="text-xs text-muted-foreground">Por defecto: MANGO AI</p>
 
               {error && (
                 <p className="text-sm text-destructive text-center">{error}</p>

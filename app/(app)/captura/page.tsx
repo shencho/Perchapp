@@ -10,12 +10,7 @@ export default async function CapturaPage() {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  const [profileRes, cuentasRes, tarjetasRes, categoriasRes, clientesRes, personasRes, gruposRes] = await Promise.all([
-    supabase
-      .from("profiles")
-      .select("asistente_nombre")
-      .eq("id", user.id)
-      .single(),
+  const [cuentasRes, tarjetasRes, categoriasRes, clientesRes, personasRes, gruposRes] = await Promise.all([
     supabase
       .from("cuentas")
       .select("*")
@@ -62,7 +57,6 @@ export default async function CapturaPage() {
 
   return (
     <CapturaClient
-      asistente_nombre={profileRes.data?.asistente_nombre ?? "Perchita"}
       cuentas={cuentasRes.data ?? []}
       tarjetas={tarjetasRes.data ?? []}
       categorias={categoriasRes.data ?? []}
