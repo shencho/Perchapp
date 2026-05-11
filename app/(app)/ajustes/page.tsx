@@ -1,8 +1,8 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { PerfilPageContent } from "@/components/perfil/perfil-page-content";
+import { AjustesPageContent } from "@/components/ajustes/ajustes-page-content";
 
-export default async function PerfilPage() {
+export default async function AjustesPage() {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/login");
@@ -13,7 +13,7 @@ export default async function PerfilPage() {
   ]);
 
   return (
-    <PerfilPageContent
+    <AjustesPageContent
       profile={profile}
       profesiones={profesiones ?? []}
     />

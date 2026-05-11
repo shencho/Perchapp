@@ -1,9 +1,9 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { PlantillasPageContent } from "@/components/plantillas/plantillas-page-content";
+import { MovimientosRecurrentesPageContent } from "@/components/movimientos-recurrentes/movimientos-recurrentes-page-content";
 import { getPlantillas } from "@/lib/supabase/actions/plantillas";
 
-export default async function PlantillasPage() {
+export default async function MovimientosRecurrentesPage() {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/login");
@@ -25,7 +25,7 @@ export default async function PlantillasPage() {
   ]);
 
   return (
-    <PlantillasPageContent
+    <MovimientosRecurrentesPageContent
       plantillas={plantillas}
       cuentas={cuentas ?? []}
       tarjetas={tarjetas ?? []}

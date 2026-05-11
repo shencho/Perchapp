@@ -3,11 +3,9 @@ import type { NextConfig } from "next";
 const nextConfig: NextConfig = {
   async redirects() {
     return [
-      {
-        source: "/ajustes",
-        destination: "/perfil",
-        permanent: true,
-      },
+      { source: "/perfil",       destination: "/ajustes",                 permanent: true },
+      { source: "/preferencias", destination: "/ajustes",                 permanent: true },
+      { source: "/plantillas",   destination: "/movimientos-recurrentes", permanent: true },
     ];
   },
 };

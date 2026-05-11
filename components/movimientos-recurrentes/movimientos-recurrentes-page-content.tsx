@@ -79,7 +79,7 @@ function fmtMonto(n: number, moneda: string) {
   }).format(n);
 }
 
-export function PlantillasPageContent({ plantillas, cuentas, tarjetas, categorias, clientes, servicios }: Props) {
+export function MovimientosRecurrentesPageContent({ plantillas, cuentas, tarjetas, categorias, clientes, servicios }: Props) {
   const router = useRouter();
   const [dialogOpen, setDialogOpen]       = useState(false);
   const [deleteOpen, setDeleteOpen]       = useState(false);
@@ -202,7 +202,7 @@ export function PlantillasPageContent({ plantillas, cuentas, tarjetas, categoria
   return (
     <div className="flex flex-col gap-6">
       <div>
-        <h1 className="text-2xl font-semibold">Plantillas recurrentes</h1>
+        <h1 className="text-2xl font-semibold">Movimientos recurrentes</h1>
         <p className="text-sm text-muted-foreground mt-1">Gastos e ingresos que se repiten cada mes.</p>
       </div>
 
@@ -210,12 +210,12 @@ export function PlantillasPageContent({ plantillas, cuentas, tarjetas, categoria
         <div className="flex items-center justify-between">
           <p className="text-sm text-muted-foreground">
             {plantillas.length === 0
-              ? "Todavía no tenés plantillas recurrentes."
-              : `${plantillas.length} plantilla${plantillas.length !== 1 ? "s" : ""}`}
+              ? "Todavía no tenés movimientos recurrentes."
+              : `${plantillas.length} movimiento${plantillas.length !== 1 ? "s" : ""} recurrente${plantillas.length !== 1 ? "s" : ""}`}
           </p>
           <Button size="sm" onClick={openCreate}>
             <Plus className="h-4 w-4 mr-1" />
-            Nueva plantilla
+            Nuevo recurrente
           </Button>
         </div>
 
@@ -245,7 +245,7 @@ export function PlantillasPageContent({ plantillas, cuentas, tarjetas, categoria
                     <span className="text-xs text-muted-foreground">
                       Día {p.dia_mes} · {fmtMonto(p.monto_estimado, p.moneda)}
                       {instrumento && ` · ${instrumento}`}
-                      {!p.activo && " · inactiva"}
+                      {!p.activo && " · inactivo"}
                     </span>
                   </div>
                   <div className="flex items-center gap-1 shrink-0">
@@ -277,7 +277,7 @@ export function PlantillasPageContent({ plantillas, cuentas, tarjetas, categoria
         <FormDialog
           open={dialogOpen}
           onOpenChange={setDialogOpen}
-          title={editing ? "Editar plantilla" : "Nueva plantilla recurrente"}
+          title={editing ? "Editar movimiento recurrente" : "Nuevo movimiento recurrente"}
           onSubmit={handleSubmit(onSubmit)}
           isSubmitting={isSubmitting}
         >
@@ -428,8 +428,8 @@ export function PlantillasPageContent({ plantillas, cuentas, tarjetas, categoria
         <DeleteConfirm
           open={deleteOpen}
           onOpenChange={setDeleteOpen}
-          title="¿Eliminar plantilla?"
-          description={`"${toDelete?.nombre}" se eliminará permanentemente. Si ya generó movimientos, esta acción fallará — desactivala en su lugar.`}
+          title="¿Eliminar movimiento recurrente?"
+          description={`"${toDelete?.nombre}" se eliminará permanentemente. Si ya generó movimientos, esta acción fallará — desactivalo en su lugar.`}
           onConfirm={onDelete}
           isDeleting={isDeleting}
         />

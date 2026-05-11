@@ -1,5 +1,6 @@
 "use server";
 
+import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import type { PlantillaRecurrente } from "@/types/supabase";
 import { toLocalISO, clampDay } from "@/lib/domain/_utils/dates";
@@ -54,6 +55,7 @@ export async function createPlantilla(input: CreatePlantillaInput): Promise<Plan
     .single();
 
   if (error || !data) throw new Error(error?.message ?? "Error al crear plantilla");
+  revalidatePath("/movimientos-recurrentes");
   return data;
 }
 
@@ -69,6 +71,7 @@ export async function updatePlantilla(id: string, input: UpdatePlantillaInput): 
     .eq("user_id", user.id);
 
   if (error) throw new Error(error.message);
+  revalidatePath("/movimientos-recurrentes");
 }
 
 export async function deactivatePlantilla(id: string): Promise<void> {
@@ -96,6 +99,7 @@ export async function deletePlantilla(id: string): Promise<void> {
     .eq("user_id", user.id);
 
   if (error) throw new Error(error.message);
+  revalidatePath("/movimientos-recurrentes");
 }
 
 export async function buscarPlantillaParecida(input: {

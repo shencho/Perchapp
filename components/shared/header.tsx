@@ -23,9 +23,9 @@ const NAV_BASE = [
 ];
 
 export function Header({ userEmail, modo }: HeaderProps) {
-  const showClientes = modo === "profesional" || modo === "ambos";
-  const NAV_LINKS = showClientes
-    ? [...NAV_BASE, { href: "/clientes", label: "Clientes" }]
+  const showProfesional = modo === "profesional" || modo === "ambos";
+  const NAV_LINKS = showProfesional
+    ? [...NAV_BASE, { href: "/clientes", label: "Profesional" }]
     : NAV_BASE;
   const router = useRouter();
   const pathname = usePathname();
@@ -82,9 +82,9 @@ export function Header({ userEmail, modo }: HeaderProps) {
         <Button
           variant="ghost"
           size="icon-sm"
-          onClick={() => router.push("/perfil")}
+          onClick={() => router.push("/ajustes")}
           className="text-muted-foreground hover:text-foreground"
-          title="Perfil y ajustes"
+          title="Ajustes"
         >
           <Settings className="h-4 w-4" />
         </Button>
