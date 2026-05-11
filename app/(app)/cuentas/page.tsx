@@ -2,6 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
+import { CuentasConfigClient } from "@/components/cuentas/cuentas-config-client";
 import { calcularSaldoCuenta, type MovimientoParaSaldo } from "@/lib/domain/calcularSaldoCuenta";
 import { calcularConsumoTarjeta, getPeriodoCierre, getProximoVencimiento, getCicloDelProximoVencimiento } from "@/lib/domain/calcularConsumoTarjeta";
 import type { Cuenta, Tarjeta } from "@/types/supabase";
@@ -114,8 +115,7 @@ export default async function CuentasPage() {
         <h2 className="text-base font-semibold">Cuentas</h2>
         {saldosLiquidos.length === 0 ? (
           <p className="text-sm text-muted-foreground">
-            No tenés cuentas cargadas. Agregá una en{" "}
-            <Link href="/ajustes" className="underline">Ajustes → Cuentas</Link>.
+            No tenés cuentas cargadas. Agregá una en la sección de abajo.
           </p>
         ) : (
           <>
@@ -298,7 +298,7 @@ export default async function CuentasPage() {
       <section className="space-y-3">
         <h2 className="text-base font-semibold">Tarjetas</h2>
         {tarjetas.length === 0 ? (
-          <p className="text-sm text-muted-foreground">No tenés tarjetas cargadas. Agregá una en <Link href="/ajustes" className="underline">Ajustes → Tarjetas</Link>.</p>
+          <p className="text-sm text-muted-foreground">No tenés tarjetas cargadas. Agregá una en la sección de abajo.</p>
         ) : (
           <>
             {/* Desktop */}
@@ -357,6 +357,8 @@ export default async function CuentasPage() {
           </>
         )}
       </section>
+
+      <CuentasConfigClient cuentas={cuentas} tarjetas={tarjetas} />
     </div>
   );
 }

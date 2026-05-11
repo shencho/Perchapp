@@ -1,5 +1,6 @@
 "use server";
 
+import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import type { Grupo, Persona } from "@/types/supabase";
 import type { GrupoConMiembros } from "./grupos-types";
@@ -46,6 +47,7 @@ export async function createGrupo(nombre: string, miembro_ids: string[]): Promis
     if (pivotErr) throw new Error(pivotErr.message);
   }
 
+  revalidatePath("/personas");
   return grupo;
 }
 
@@ -66,7 +68,6 @@ export async function updateGrupo(
 
   if (nameErr) throw new Error(nameErr.message);
 
-  // Replace pivot: delete all + re-insert
   await supabase.from("grupo_miembros").delete().eq("grupo_id", id);
 
   if (miembro_ids.length > 0) {
@@ -75,6 +76,8 @@ export async function updateGrupo(
       .insert(miembro_ids.map((persona_id) => ({ grupo_id: id, persona_id })));
     if (pivotErr) throw new Error(pivotErr.message);
   }
+
+  revalidatePath("/personas");
 }
 
 export async function deleteGrupo(id: string): Promise<void> {
@@ -89,4 +92,5 @@ export async function deleteGrupo(id: string): Promise<void> {
     .eq("user_id", user.id);
 
   if (error) throw new Error(error.message);
+  revalidatePath("/personas");
 }

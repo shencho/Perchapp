@@ -82,9 +82,9 @@ export function Header({ userEmail, modo }: HeaderProps) {
         <Button
           variant="ghost"
           size="icon-sm"
-          onClick={() => router.push("/ajustes")}
+          onClick={() => router.push("/perfil")}
           className="text-muted-foreground hover:text-foreground"
-          title="Ajustes"
+          title="Perfil y ajustes"
         >
           <Settings className="h-4 w-4" />
         </Button>

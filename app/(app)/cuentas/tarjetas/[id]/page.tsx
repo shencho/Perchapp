@@ -182,7 +182,7 @@ export default async function TarjetaDetallePage({ params }: Props) {
       )}
 
       <p className="text-xs text-muted-foreground">
-        Para configurar la tarjeta, usá <Link href="/ajustes" className="underline hover:text-foreground">Ajustes → Tarjetas</Link>.
+        Para configurar la tarjeta, usá <Link href="/cuentas" className="underline hover:text-foreground">Cuentas</Link>.
       </p>
     </div>
   );

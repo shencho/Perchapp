@@ -25,7 +25,7 @@ export async function createCategoria(data: CategoriaData) {
   });
 
   if (error) throw new Error(error.message);
-  revalidatePath("/ajustes");
+  revalidatePath("/categorias");
 }
 
 export async function updateCategoria(id: string, data: CategoriaData) {
@@ -46,7 +46,7 @@ export async function updateCategoria(id: string, data: CategoriaData) {
     .eq("user_id", user.id);
 
   if (error) throw new Error(error.message);
-  revalidatePath("/ajustes");
+  revalidatePath("/categorias");
 }
 
 export async function createCategoriaInline(data: {
@@ -117,7 +117,7 @@ export async function archiveCategoria(id: string) {
     .eq("user_id", user.id);
 
   if (error) throw new Error(error.message);
-  revalidatePath("/ajustes");
+  revalidatePath("/categorias");
 }
 
 export async function aplicarTemplate(input: {
@@ -261,6 +261,6 @@ export async function aplicarTemplate(input: {
     }
   }
 
-  revalidatePath("/ajustes");
+  revalidatePath("/categorias");
   return { creadas, saltadas, reemplazadas, errores };
 }

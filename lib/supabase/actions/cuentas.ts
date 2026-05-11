@@ -45,7 +45,7 @@ export async function createCuenta(data: CuentaData) {
   });
 
   if (error) throw new Error(error.message);
-  revalidatePath("/ajustes");
+  revalidatePath("/cuentas");
 }
 
 export async function updateCuenta(id: string, data: Omit<CuentaData, "saldo">) {
@@ -65,7 +65,7 @@ export async function updateCuenta(id: string, data: Omit<CuentaData, "saldo">) 
     .eq("user_id", user.id);
 
   if (error) throw new Error(error.message);
-  revalidatePath("/ajustes");
+  revalidatePath("/cuentas");
 }
 
 export async function archiveCuenta(id: string) {
@@ -80,5 +80,5 @@ export async function archiveCuenta(id: string) {
     .eq("user_id", user.id);
 
   if (error) throw new Error(error.message);
-  revalidatePath("/ajustes");
+  revalidatePath("/cuentas");
 }

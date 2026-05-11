@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { ImportarTemplateModal } from "@/app/(app)/ajustes/_components/importar-template-modal";
+import { ImportarTemplateModal } from "@/components/categorias/importar-template-modal";
 import type { Categoria } from "@/types/supabase";
 import { Sparkles } from "lucide-react";
 

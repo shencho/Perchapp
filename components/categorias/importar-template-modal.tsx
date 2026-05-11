@@ -52,7 +52,6 @@ export function ImportarTemplateModal({ open, onOpenChange, categorias, onDone }
   const [loading, setLoading] = useState(false);
   const checkboxRefs = useRef<Record<string, HTMLInputElement | null>>({});
 
-  // Update indeterminate visual state on every checked change
   useEffect(() => {
     TEMPLATE_CATEGORIAS.forEach((cat, idx) => {
       if (cat.subcategorias.length === 0) return;
