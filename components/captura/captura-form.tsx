@@ -1,11 +1,10 @@
 "use client";
 
 import { useState, useRef, useCallback } from "react";
-import { useRouter } from "next/navigation";
 import { Mic, MicOff, Send, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { RevisionModal } from "./revision-modal";
+import { RevisionModal } from "@/app/(app)/captura/_components/revision-modal";
 import type { ParsedMovimiento } from "@/lib/ai/prompts/interpretMovement";
 import type { Cuenta, Tarjeta, Categoria, Persona } from "@/types/supabase";
 import type { GrupoConMiembros } from "@/lib/supabase/actions/grupos-types";
@@ -41,18 +40,33 @@ const FRASES_SUGERIDAS_INICIALES = [
   "Cargué nafta y pagué 100000 en efectivo.",
 ];
 
-interface Props {
+// ── Props ─────────────────────────────────────────────────────────────────────
+
+export type CapturaFormProps = {
+  onSuccess?: () => void;
+  variant?: "page" | "sheet";
+  initialText?: string;
   cuentas: Cuenta[];
   tarjetas: Tarjeta[];
   categorias: Categoria[];
   clientes: { id: string; nombre: string }[];
   personas: Persona[];
   grupos: GrupoConMiembros[];
-}
+};
 
-export function CapturaClient({ cuentas, tarjetas, categorias, clientes, personas, grupos }: Props) {
-  const router = useRouter();
-  const [texto, setTexto] = useState("");
+// ── Component ─────────────────────────────────────────────────────────────────
+
+export function CapturaForm({
+  onSuccess,
+  initialText = "",
+  cuentas,
+  tarjetas,
+  categorias,
+  clientes,
+  personas,
+  grupos,
+}: CapturaFormProps) {
+  const [texto, setTexto] = useState(initialText);
   const [estado, setEstado] = useState<"idle" | "loading" | "error">("idle");
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [parsed, setParsed] = useState<ParsedMovimiento | null>(null);
@@ -173,22 +187,13 @@ export function CapturaClient({ cuentas, tarjetas, categorias, clientes, persona
   function handleConfirmed() {
     setTexto("");
     setParsed(null);
-    router.push("/movimientos");
+    onSuccess?.();
   }
 
   // ── Render ─────────────────────────────────────────────────────────────────
 
   return (
-    <div className="flex flex-col items-center min-h-[calc(100vh-4rem)] px-4 py-8 max-w-xl mx-auto w-full">
-
-      {/* Hero */}
-      <div className="text-center mb-6">
-        <h1 className="text-2xl md:text-3xl font-semibold">¿Qué cargamos?</h1>
-        <p className="text-muted-foreground mt-2">
-          Contame tus movimientos y nos ordenamos.
-        </p>
-      </div>
-
+    <>
       {/* Frases sugeridas */}
       <div className="flex flex-wrap gap-2 justify-center mb-6 w-full">
         {FRASES_SUGERIDAS_INICIALES.map((frase) => (
@@ -295,6 +300,6 @@ export function CapturaClient({ cuentas, tarjetas, categorias, clientes, persona
         grupos={grupos}
         onConfirmed={handleConfirmed}
       />
-    </div>
+    </>
   );
 }
