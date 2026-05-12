@@ -1,33 +1,50 @@
-import type { Profile } from "@/types/supabase";
+import {
+  Home,
+  ArrowLeftRight,
+  BarChart3,
+  TrendingUp,
+  Briefcase,
+  Landmark,
+  Wallet,
+  CreditCard,
+  Users,
+  Tag,
+  RefreshCw,
+  Settings,
+  type LucideIcon,
+} from "lucide-react";
 
 export type NavItem = {
-  label: string;
   href: string;
-  icon: string;
+  label: string;
+  icon: LucideIcon;
+  desktopOnly?: boolean;
+  drawerOnly?: boolean;
 };
 
-export function getMainNavItems(profile: Profile): NavItem[] {
-  const items: NavItem[] = [
-    { label: "Inicio",                  href: "/dashboard",              icon: "Home" },
-    { label: "Movimientos",             href: "/movimientos",            icon: "ArrowLeftRight" },
-    { label: "Captura",                 href: "/captura",                icon: "Sparkles" },
-    { label: "Balances",                href: "/balances",               icon: "Scale" },
-    { label: "Préstamos",               href: "/prestamos",              icon: "Landmark" },
-    { label: "Cash Flow",               href: "/cash-flow",              icon: "LineChart" },
-  ];
-  if (profile.modo === "profesional" || profile.modo === "ambos") {
-    items.push({ label: "Profesional", href: "/clientes", icon: "Briefcase" });
-  }
-  return items;
-}
+export function getNavItems(modo: "personal" | "profesional" | "ambos" | null): NavItem[] {
+  const m = modo ?? "personal";
 
-export function getDrawerItems(): NavItem[] {
-  return [
-    { label: "Cuentas",                 href: "/cuentas",                icon: "Wallet" },
-    { label: "Tarjetas",                href: "/tarjetas",               icon: "CreditCard" },
-    { label: "Personas y grupos",       href: "/personas",               icon: "Users" },
-    { label: "Categorías",              href: "/categorias",             icon: "Tags" },
-    { label: "Movimientos recurrentes", href: "/movimientos-recurrentes", icon: "Repeat" },
-    { label: "Ajustes",                 href: "/ajustes",                icon: "Settings" },
+  const main: NavItem[] = [
+    { href: "/dashboard",   label: "Inicio",      icon: Home },
+    { href: "/movimientos", label: "Movimientos",  icon: ArrowLeftRight },
+    { href: "/balances",    label: "Balances",     icon: BarChart3 },
+    { href: "/prestamos",   label: "Préstamos",    icon: Landmark, desktopOnly: true },
+    { href: "/cash-flow",   label: "Cash Flow",    icon: TrendingUp, desktopOnly: true },
   ];
+
+  if (m === "profesional" || m === "ambos") {
+    main.push({ href: "/clientes", label: "Profesional", icon: Briefcase });
+  }
+
+  const drawer: NavItem[] = [
+    { href: "/cuentas",                 label: "Cuentas",                icon: Wallet,    drawerOnly: true },
+    { href: "/tarjetas",                label: "Tarjetas",               icon: CreditCard, drawerOnly: true },
+    { href: "/personas",                label: "Personas y grupos",      icon: Users,     drawerOnly: true },
+    { href: "/categorias",              label: "Categorías",             icon: Tag,       drawerOnly: true },
+    { href: "/movimientos-recurrentes", label: "Movimientos recurrentes", icon: RefreshCw, drawerOnly: true },
+    { href: "/ajustes",                 label: "Ajustes",                icon: Settings,  drawerOnly: true },
+  ];
+
+  return [...main, ...drawer];
 }
