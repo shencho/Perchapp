@@ -60,12 +60,12 @@ export function NavItemComponent({ item, variant, onClick }: Props) {
       href={item.href}
       onClick={onClick}
       className={cn(
-        "flex flex-col items-center justify-center gap-0.5 h-full w-full text-xs transition-colors",
+        "flex flex-col items-center justify-center gap-0.5 h-full w-full min-w-0 text-xs transition-colors",
         isActive ? "text-primary" : "text-muted-foreground hover:text-foreground"
       )}
     >
       <Icon className="h-5 w-5 shrink-0" />
-      <span className="truncate max-w-[56px] leading-none">{item.label}</span>
+      <span className="truncate max-w-[68px] leading-none">{item.labelShort ?? item.label}</span>
     </Link>
   );
 }

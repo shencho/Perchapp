@@ -34,9 +34,9 @@ export function MobileBottomNav({ modo, userEmail }: Props) {
 
         <NavigationDrawer
           trigger={
-            <button className="flex flex-col items-center justify-center gap-0.5 h-full w-full text-xs text-muted-foreground hover:text-foreground transition-colors">
+            <button className="flex flex-col items-center justify-center gap-0.5 h-full w-full min-w-0 text-xs text-muted-foreground hover:text-foreground transition-colors">
               <MoreHorizontal className="h-5 w-5 shrink-0" />
-              <span className="truncate max-w-[56px] leading-none">Más</span>
+              <span className="truncate max-w-[68px] leading-none">Más</span>
             </button>
           }
           modo={modo}

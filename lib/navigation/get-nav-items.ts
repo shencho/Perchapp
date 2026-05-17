@@ -17,6 +17,7 @@ import {
 export type NavItem = {
   href: string;
   label: string;
+  labelShort?: string; // Label corto para mobile bottom navbar
   icon: LucideIcon;
   desktopOnly?: boolean;
   drawerOnly?: boolean;
@@ -27,14 +28,14 @@ export function getNavItems(modo: "personal" | "profesional" | "ambos" | null): 
 
   const main: NavItem[] = [
     { href: "/dashboard",   label: "Inicio",      icon: Home },
-    { href: "/movimientos", label: "Movimientos",  icon: ArrowLeftRight },
+    { href: "/movimientos", label: "Movimientos",  labelShort: "Movs.",    icon: ArrowLeftRight },
     { href: "/balances",    label: "Balances",     icon: BarChart3 },
     { href: "/prestamos",   label: "Préstamos",    icon: Landmark, desktopOnly: true },
     { href: "/cash-flow",   label: "Cash Flow",    icon: TrendingUp, desktopOnly: true },
   ];
 
   if (m === "profesional" || m === "ambos") {
-    main.push({ href: "/clientes", label: "Profesional", icon: Briefcase });
+    main.push({ href: "/clientes", label: "Profesional", labelShort: "Profes.", icon: Briefcase });
   }
 
   const drawer: NavItem[] = [
