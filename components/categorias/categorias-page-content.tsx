@@ -132,7 +132,7 @@ export function CategoriasPageContent({ categorias }: Props) {
       </div>
 
       <div className="flex flex-col gap-4">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-wrap items-center justify-between gap-2">
           <p className="text-sm text-muted-foreground">
             {categorias.length === 0
               ? "Todavía no tenés categorías."

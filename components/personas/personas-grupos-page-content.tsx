@@ -112,7 +112,7 @@ function PersonasSection({ personas }: { personas: Persona[] }) {
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
           <h2 className="text-base font-semibold">Personas</h2>
           <p className="text-xs text-muted-foreground mt-0.5">
@@ -289,7 +289,7 @@ function GruposSection({
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
           <h2 className="text-base font-semibold">Grupos</h2>
           <p className="text-xs text-muted-foreground mt-0.5">

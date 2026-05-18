@@ -207,7 +207,7 @@ export function MovimientosRecurrentesPageContent({ plantillas, cuentas, tarjeta
       </div>
 
       <div className="flex flex-col gap-4">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-wrap items-center justify-between gap-2">
           <p className="text-sm text-muted-foreground">
             {plantillas.length === 0
               ? "Todavía no tenés movimientos recurrentes."
