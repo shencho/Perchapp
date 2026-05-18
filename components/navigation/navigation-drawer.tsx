@@ -13,7 +13,12 @@ interface Props {
 }
 
 export function NavigationDrawer({ trigger, modo, userEmail }: Props) {
-  const drawerItems = getNavItems(modo).filter((item) => item.drawerOnly);
+  const m = modo ?? "personal";
+  const drawerItems = getNavItems(modo).filter(
+    (item) => item.drawerOnly ||
+    item.desktopOnly ||
+    ((m === "profesional" || m === "ambos") && item.href === "/balances")
+  );
 
   return (
     <Sheet>
