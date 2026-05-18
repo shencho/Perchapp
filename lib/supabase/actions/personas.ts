@@ -1,5 +1,6 @@
 "use server";
 
+import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import type { Persona } from "@/types/supabase";
 
@@ -31,6 +32,7 @@ export async function createPersona(nombre: string, notas?: string | null): Prom
     .single();
 
   if (error || !data) throw new Error(error?.message ?? "Error al crear persona");
+  revalidatePath("/personas");
   return data;
 }
 
@@ -49,6 +51,7 @@ export async function updatePersona(
     .eq("user_id", user.id);
 
   if (error) throw new Error(error.message);
+  revalidatePath("/personas");
 }
 
 export async function deletePersona(id: string): Promise<void> {
@@ -63,4 +66,5 @@ export async function deletePersona(id: string): Promise<void> {
     .eq("user_id", user.id);
 
   if (error) throw new Error(error.message);
+  revalidatePath("/personas");
 }

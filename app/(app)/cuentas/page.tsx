@@ -2,9 +2,9 @@ import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
+import { CuentasConfigClient } from "@/components/cuentas/cuentas-config-client";
 import { calcularSaldoCuenta, type MovimientoParaSaldo } from "@/lib/domain/calcularSaldoCuenta";
-import { calcularConsumoTarjeta, getPeriodoCierre, getProximoVencimiento, getCicloDelProximoVencimiento } from "@/lib/domain/calcularConsumoTarjeta";
-import type { Cuenta, Tarjeta } from "@/types/supabase";
+import type { Cuenta } from "@/types/supabase";
 
 function fmt(n: number, moneda = "ARS") {
   return new Intl.NumberFormat("es-AR", {
@@ -47,23 +47,20 @@ export default async function CuentasPage() {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  const [cuentasRes, tarjetasRes, movRes] = await Promise.all([
+  const [cuentasRes, movRes] = await Promise.all([
     supabase.from("cuentas").select("*").eq("user_id", user.id).eq("archivada", false).order("orden"),
-    supabase.from("tarjetas").select("*").eq("user_id", user.id).eq("archivada", false).order("created_at"),
     supabase.from("movimientos")
-      .select("tipo, monto, moneda, cuenta_id, cuenta_destino_id, tarjeta_id, fecha")
+      .select("tipo, monto, cuenta_id, cuenta_destino_id")
       .eq("user_id", user.id),
   ]);
 
   const cuentas: Cuenta[] = cuentasRes.data ?? [];
-  const tarjetas: Tarjeta[] = tarjetasRes.data ?? [];
   const movimientos: MovimientoParaSaldo[] = (movRes.data ?? []).map(m => ({
     tipo: m.tipo,
     monto: m.monto,
     cuenta_id: m.cuenta_id,
     cuenta_destino_id: m.cuenta_destino_id,
   }));
-  const movimientosFull = movRes.data ?? [];
 
   const saldos = cuentas.map(c => ({
     cuenta: c,
@@ -85,23 +82,6 @@ export default async function CuentasPage() {
   const totalARS = saldos.filter(s => s.cuenta.moneda === "ARS").reduce((acc, s) => acc + s.saldo, 0);
   const totalUSD = saldos.filter(s => s.cuenta.moneda === "USD").reduce((acc, s) => acc + s.saldo, 0);
 
-  const consumos = tarjetas.map(t => {
-    if (!t.cierre_dia || !t.vencimiento_dia) {
-      const periodo = getPeriodoCierre(t.cierre_dia);
-      return {
-        tarjeta: t,
-        consumo: calcularConsumoTarjeta(t.id, movimientosFull, periodo.inicio, periodo.fin),
-        proximoVto: getProximoVencimiento(t.vencimiento_dia),
-      };
-    }
-    const ciclo = getCicloDelProximoVencimiento(t.cierre_dia, t.vencimiento_dia);
-    return {
-      tarjeta: t,
-      consumo: calcularConsumoTarjeta(t.id, movimientosFull, ciclo.inicio, ciclo.fin),
-      proximoVto: ciclo.fechaVencimiento,
-    };
-  });
-
   return (
     <div className="flex flex-col gap-8">
       <div>
@@ -114,8 +94,7 @@ export default async function CuentasPage() {
         <h2 className="text-base font-semibold">Cuentas</h2>
         {saldosLiquidos.length === 0 ? (
           <p className="text-sm text-muted-foreground">
-            No tenés cuentas cargadas. Agregá una en{" "}
-            <Link href="/ajustes" className="underline">Ajustes → Cuentas</Link>.
+            No tenés cuentas cargadas. Agregá una en la sección de abajo.
           </p>
         ) : (
           <>
@@ -294,69 +273,7 @@ export default async function CuentasPage() {
         </section>
       )}
 
-      {/* Sección C: Tarjetas */}
-      <section className="space-y-3">
-        <h2 className="text-base font-semibold">Tarjetas</h2>
-        {tarjetas.length === 0 ? (
-          <p className="text-sm text-muted-foreground">No tenés tarjetas cargadas. Agregá una en <Link href="/ajustes" className="underline">Ajustes → Tarjetas</Link>.</p>
-        ) : (
-          <>
-            {/* Desktop */}
-            <div className="hidden md:block rounded-lg border border-border overflow-hidden">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-border bg-surface">
-                    <th className="text-left px-4 py-2.5 font-medium text-muted-foreground">Tarjeta</th>
-                    <th className="text-left px-4 py-2.5 font-medium text-muted-foreground">Tipo</th>
-                    <th className="text-left px-4 py-2.5 font-medium text-muted-foreground">Banco</th>
-                    <th className="text-right px-4 py-2.5 font-medium text-muted-foreground">Consumo del período</th>
-                    <th className="text-right px-4 py-2.5 font-medium text-muted-foreground">Próx. vto.</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {consumos.map(({ tarjeta, consumo, proximoVto }) => (
-                    <tr key={tarjeta.id} className="border-b border-border last:border-0 hover:bg-surface/50 transition-colors">
-                      <td className="px-4 py-3">
-                        <Link href={`/cuentas/tarjetas/${tarjeta.id}`} className="font-medium hover:text-primary transition-colors">
-                          {tarjeta.nombre}
-                        </Link>
-                      </td>
-                      <td className="px-4 py-3 text-muted-foreground text-xs">{tarjeta.tipo ?? "—"}</td>
-                      <td className="px-4 py-3 text-muted-foreground text-xs">{tarjeta.banco_emisor ?? "—"}</td>
-                      <td className="px-4 py-3 text-right font-semibold tabular-nums text-red-400">
-                        {consumo > 0 ? fmt(consumo) : <span className="text-muted-foreground font-normal">$0</span>}
-                      </td>
-                      <td className="px-4 py-3 text-right text-muted-foreground text-xs">
-                        {proximoVto ? new Date(proximoVto + "T12:00:00").toLocaleDateString("es-AR", { day: "2-digit", month: "2-digit" }) : "—"}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-
-            {/* Mobile */}
-            <div className="md:hidden flex flex-col gap-2">
-              {consumos.map(({ tarjeta, consumo, proximoVto }) => (
-                <Link key={tarjeta.id} href={`/cuentas/tarjetas/${tarjeta.id}`} className="block border border-border rounded-lg p-3 bg-card hover:bg-surface/50 transition-colors">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="font-medium">{tarjeta.nombre}</p>
-                      <p className="text-xs text-muted-foreground mt-0.5">
-                        {tarjeta.tipo ?? "—"} · {tarjeta.banco_emisor ?? "—"}
-                        {proximoVto && ` · vto ${new Date(proximoVto + "T12:00:00").toLocaleDateString("es-AR", { day: "2-digit", month: "2-digit" })}`}
-                      </p>
-                    </div>
-                    <span className="font-semibold tabular-nums text-red-400 text-sm">
-                      {consumo > 0 ? fmt(consumo) : <span className="text-muted-foreground font-normal">$0</span>}
-                    </span>
-                  </div>
-                </Link>
-              ))}
-            </div>
-          </>
-        )}
-      </section>
+      <CuentasConfigClient cuentas={cuentas} />
     </div>
   );
 }

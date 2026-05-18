@@ -92,7 +92,7 @@ export async function POST(req: NextRequest) {
       categorias,
       clientes,
       servicios,
-      asistente_nombre:  profile?.asistente_nombre ?? "Perchita",
+      asistente_nombre:  profile?.asistente_nombre ?? "MANGO AI",
       profesion:         profile?.profesion ?? "",
       catalogoDinamico,
     });

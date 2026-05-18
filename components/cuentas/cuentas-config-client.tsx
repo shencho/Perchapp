@@ -16,7 +16,9 @@ import { createCuenta, updateCuenta, archiveCuenta } from "@/lib/supabase/action
 import type { InvSubtipo } from "@/lib/supabase/actions/cuentas";
 import type { Cuenta } from "@/types/supabase";
 
-const TIPOS = ["Banco", "Billetera virtual", "Efectivo", "Inversión"] as const;
+// ─── Cuentas ────────────────────────────────────────────────────────────────
+
+const TIPOS_CUENTA = ["Banco", "Billetera virtual", "Efectivo", "Inversión"] as const;
 const MONEDAS = ["ARS", "USD"] as const;
 
 const SUBTIPOS = [
@@ -29,9 +31,9 @@ const SUBTIPOS = [
   { value: "otros",       label: "Otros" },
 ] as const;
 
-const schema = z.object({
+const cuentaSchema = z.object({
   nombre: z.string().min(1, "El nombre es requerido"),
-  tipo: z.enum(TIPOS),
+  tipo: z.enum(TIPOS_CUENTA),
   moneda: z.enum(MONEDAS),
   saldo: z.number().min(0),
   inv_subtipo: z.string().nullable().optional(),
@@ -40,17 +42,13 @@ const schema = z.object({
   inv_tasa_anual: z.number().nullable().optional(),
 });
 
-type FormData = z.infer<typeof schema>;
-
-interface Props {
-  cuentas: Cuenta[];
-}
+type CuentaForm = z.infer<typeof cuentaSchema>;
 
 function formatSaldo(saldo: number, moneda: string) {
   return `${moneda} ${new Intl.NumberFormat("es-AR").format(saldo)}`;
 }
 
-export function CuentasTab({ cuentas }: Props) {
+function CuentasSection({ cuentas }: { cuentas: Cuenta[] }) {
   const router = useRouter();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
@@ -61,13 +59,12 @@ export function CuentasTab({ cuentas }: Props) {
   const [actionError, setActionError] = useState<string | null>(null);
 
   const { register, handleSubmit, control, reset, formState: { errors } } =
-    useForm<FormData>({ resolver: zodResolver(schema) });
+    useForm<CuentaForm>({ resolver: zodResolver(cuentaSchema) });
 
   const tipoWatched    = useWatch({ control, name: "tipo" });
   const subtipoWatched = useWatch({ control, name: "inv_subtipo" });
-
-  const esInversion  = tipoWatched === "Inversión";
-  const esPlazoFijo  = subtipoWatched === "plazo_fijo";
+  const esInversion    = tipoWatched === "Inversión";
+  const esPlazoFijo    = subtipoWatched === "plazo_fijo";
 
   function openCreate() {
     setEditing(null);
@@ -80,10 +77,8 @@ export function CuentasTab({ cuentas }: Props) {
   function openEdit(cuenta: Cuenta) {
     setEditing(cuenta);
     reset({
-      nombre: cuenta.nombre,
-      tipo: cuenta.tipo,
-      moneda: cuenta.moneda as "ARS" | "USD",
-      saldo: cuenta.saldo,
+      nombre: cuenta.nombre, tipo: cuenta.tipo,
+      moneda: cuenta.moneda as "ARS" | "USD", saldo: cuenta.saldo,
       inv_subtipo: cuenta.inv_subtipo ?? null,
       inv_fecha_vencimiento: cuenta.inv_fecha_vencimiento ?? null,
       inv_notas: cuenta.inv_notas ?? null,
@@ -93,36 +88,23 @@ export function CuentasTab({ cuentas }: Props) {
     setDialogOpen(true);
   }
 
-  function openArchive(cuenta: Cuenta) {
-    setToArchive(cuenta);
-    setActionError(null);
-    setDeleteOpen(true);
-  }
-
-  async function onSubmit(data: FormData) {
+  async function onSubmit(data: CuentaForm) {
     setIsSubmitting(true);
     setActionError(null);
     try {
       if (editing) {
         await updateCuenta(editing.id, {
-          nombre: data.nombre,
-          tipo: data.tipo,
-          moneda: data.moneda,
+          nombre: data.nombre, tipo: data.tipo, moneda: data.moneda,
           inv_subtipo: data.inv_subtipo as InvSubtipo | null | undefined,
           inv_fecha_vencimiento: data.inv_fecha_vencimiento,
-          inv_notas: data.inv_notas,
-          inv_tasa_anual: data.inv_tasa_anual,
+          inv_notas: data.inv_notas, inv_tasa_anual: data.inv_tasa_anual,
         });
       } else {
         await createCuenta({
-          nombre: data.nombre,
-          tipo: data.tipo,
-          moneda: data.moneda,
-          saldo: data.saldo,
+          nombre: data.nombre, tipo: data.tipo, moneda: data.moneda, saldo: data.saldo,
           inv_subtipo: data.inv_subtipo as InvSubtipo | null | undefined,
           inv_fecha_vencimiento: data.inv_fecha_vencimiento,
-          inv_notas: data.inv_notas,
-          inv_tasa_anual: data.inv_tasa_anual,
+          inv_notas: data.inv_notas, inv_tasa_anual: data.inv_tasa_anual,
         });
       }
       setDialogOpen(false);
@@ -150,12 +132,13 @@ export function CuentasTab({ cuentas }: Props) {
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex items-center justify-between">
-        <p className="text-sm text-muted-foreground">
-          {cuentas.length === 0
-            ? "Todavía no tenés cuentas."
-            : `${cuentas.length} cuenta${cuentas.length !== 1 ? "s" : ""}`}
-        </p>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <h2 className="text-base font-semibold">Cuentas</h2>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            {cuentas.length === 0 ? "Todavía no tenés cuentas." : `${cuentas.length} cuenta${cuentas.length !== 1 ? "s" : ""}`}
+          </p>
+        </div>
         <Button size="sm" onClick={openCreate}>
           <Plus className="h-4 w-4 mr-1" />
           Nueva cuenta
@@ -179,7 +162,7 @@ export function CuentasTab({ cuentas }: Props) {
                   <Pencil className="h-3.5 w-3.5" />
                 </Button>
                 <Button
-                  size="icon-sm" variant="ghost" onClick={() => openArchive(cuenta)}
+                  size="icon-sm" variant="ghost" onClick={() => { setToArchive(cuenta); setActionError(null); setDeleteOpen(true); }}
                   title="Archivar" className="text-muted-foreground hover:text-destructive"
                 >
                   <Archive className="h-3.5 w-3.5" />
@@ -201,8 +184,8 @@ export function CuentasTab({ cuentas }: Props) {
       >
         <div className="flex flex-col gap-4">
           <div className="flex flex-col gap-1.5">
-            <Label htmlFor="nombre">Nombre</Label>
-            <Input id="nombre" placeholder="Ej: Banco Nación" autoFocus {...register("nombre")} />
+            <Label htmlFor="c-nombre">Nombre</Label>
+            <Input id="c-nombre" placeholder="Ej: Banco Nación" autoFocus {...register("nombre")} />
             {errors.nombre && <p className="text-xs text-destructive">{errors.nombre.message}</p>}
           </div>
 
@@ -210,7 +193,7 @@ export function CuentasTab({ cuentas }: Props) {
             <Label>Tipo</Label>
             <Controller name="tipo" control={control} render={({ field }) => (
               <NamedSelect
-                options={TIPOS.map(t => ({ value: t, label: t }))}
+                options={TIPOS_CUENTA.map(t => ({ value: t, label: t }))}
                 value={field.value}
                 onValueChange={(v) => v && field.onChange(v)}
                 placeholder="Seleccionar tipo..."
@@ -234,20 +217,16 @@ export function CuentasTab({ cuentas }: Props) {
             </div>
             {!editing && (
               <div className="flex flex-col gap-1.5 flex-1">
-                <Label htmlFor="saldo">Saldo inicial</Label>
-                <Input id="saldo" type="number" placeholder="0" {...register("saldo", { valueAsNumber: true })} />
+                <Label htmlFor="c-saldo">Saldo inicial</Label>
+                <Input id="c-saldo" type="number" placeholder="0" {...register("saldo", { valueAsNumber: true })} />
                 {errors.saldo && <p className="text-xs text-destructive">{errors.saldo.message}</p>}
               </div>
             )}
           </div>
 
-          {/* Campos extra para Inversión */}
           {esInversion && (
             <div className="space-y-3 rounded-lg border border-border p-3 bg-surface/40">
-              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                Detalles de inversión
-              </p>
-
+              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Detalles de inversión</p>
               <div className="flex flex-col gap-1.5">
                 <Label>Subtipo</Label>
                 <Controller name="inv_subtipo" control={control} render={({ field }) => (
@@ -260,39 +239,22 @@ export function CuentasTab({ cuentas }: Props) {
                   />
                 )} />
               </div>
-
-              {/* Campos solo para plazo fijo */}
               {esPlazoFijo && (
                 <div className="grid grid-cols-2 gap-2">
                   <div className="flex flex-col gap-1.5">
-                    <Label htmlFor="inv_tasa_anual">Tasa anual (%)</Label>
-                    <Input
-                      id="inv_tasa_anual"
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      placeholder="Ej. 118"
-                      {...register("inv_tasa_anual", { valueAsNumber: true, setValueAs: v => v === "" ? null : Number(v) })}
-                    />
+                    <Label htmlFor="c-tasa">Tasa anual (%)</Label>
+                    <Input id="c-tasa" type="number" min="0" step="0.01" placeholder="Ej. 118"
+                      {...register("inv_tasa_anual", { valueAsNumber: true, setValueAs: v => v === "" ? null : Number(v) })} />
                   </div>
                   <div className="flex flex-col gap-1.5">
-                    <Label htmlFor="inv_fecha_vencimiento">Fecha vencimiento</Label>
-                    <Input
-                      id="inv_fecha_vencimiento"
-                      type="date"
-                      {...register("inv_fecha_vencimiento")}
-                    />
+                    <Label htmlFor="c-vto">Fecha vencimiento</Label>
+                    <Input id="c-vto" type="date" {...register("inv_fecha_vencimiento")} />
                   </div>
                 </div>
               )}
-
               <div className="flex flex-col gap-1.5">
-                <Label htmlFor="inv_notas">Notas <span className="text-muted-foreground font-normal">(opcional)</span></Label>
-                <Input
-                  id="inv_notas"
-                  placeholder="Ej. Cuenta en Balanz, broker XYZ…"
-                  {...register("inv_notas")}
-                />
+                <Label htmlFor="c-inv-notas">Notas <span className="text-muted-foreground font-normal">(opcional)</span></Label>
+                <Input id="c-inv-notas" placeholder="Ej. Cuenta en Balanz, broker XYZ…" {...register("inv_notas")} />
               </div>
             </div>
           )}
@@ -309,6 +271,20 @@ export function CuentasTab({ cuentas }: Props) {
         onConfirm={onArchive}
         isDeleting={isArchiving}
       />
+    </div>
+  );
+}
+
+// ─── Export ──────────────────────────────────────────────────────────────────
+
+interface Props {
+  cuentas: Cuenta[];
+}
+
+export function CuentasConfigClient({ cuentas }: Props) {
+  return (
+    <div className="flex flex-col gap-10 pt-4 border-t border-border mt-4">
+      <CuentasSection cuentas={cuentas} />
     </div>
   );
 }

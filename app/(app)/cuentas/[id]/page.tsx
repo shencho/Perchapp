@@ -334,8 +334,8 @@ export default async function CuentaDetallePage({ params, searchParams }: Props)
 
       <p className="text-xs text-muted-foreground">
         {esInversion
-          ? <>Los ajustes de valor creados desde esta pantalla aparecen como movimientos en <Link href="/movimientos" className="underline hover:text-foreground">Movimientos</Link>. Para editar los datos de la inversión, usá <Link href="/ajustes" className="underline hover:text-foreground">Ajustes → Cuentas</Link>.</>
-          : <>Para editar movimientos, usá la sección <Link href="/movimientos" className="underline hover:text-foreground">Movimientos</Link>. Para configurar la cuenta, usá <Link href="/ajustes" className="underline hover:text-foreground">Ajustes → Cuentas</Link>.</>
+          ? <>Los ajustes de valor creados desde esta pantalla aparecen como movimientos en <Link href="/movimientos" className="underline hover:text-foreground">Movimientos</Link>. Para editar los datos de la inversión, usá <Link href="/cuentas" className="underline hover:text-foreground">Cuentas</Link>.</>
+          : <>Para editar movimientos, usá la sección <Link href="/movimientos" className="underline hover:text-foreground">Movimientos</Link>. Para configurar la cuenta, usá <Link href="/cuentas" className="underline hover:text-foreground">Cuentas</Link>.</>
         }
       </p>
     </div>

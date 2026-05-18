@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Plus, Pencil, Trash2, Users, Check, X } from "lucide-react";
+import { Plus, Pencil, Trash2, Users, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -26,16 +26,22 @@ interface Props {
   grupos: GrupoConMiembros[];
 }
 
-export function PersonasGruposTab({ personas, grupos }: Props) {
+export function PersonasGruposPageContent({ personas, grupos }: Props) {
   return (
-    <div className="flex flex-col gap-10">
-      <PersonasSection personas={personas} />
-      <GruposSection grupos={grupos} personas={personas} />
+    <div className="flex flex-col gap-6">
+      <div>
+        <h1 className="text-2xl font-semibold">Personas y grupos</h1>
+        <p className="text-sm text-muted-foreground mt-1">
+          Agenda personal para gastos compartidos.
+        </p>
+      </div>
+      <div className="flex flex-col gap-10">
+        <PersonasSection personas={personas} />
+        <GruposSection grupos={grupos} personas={personas} />
+      </div>
     </div>
   );
 }
-
-// ── Personas ──────────────────────────────────────────────────────────────────
 
 function PersonasSection({ personas }: { personas: Persona[] }) {
   const router = useRouter();
@@ -106,7 +112,7 @@ function PersonasSection({ personas }: { personas: Persona[] }) {
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
           <h2 className="text-base font-semibold">Personas</h2>
           <p className="text-xs text-muted-foreground mt-0.5">
@@ -119,7 +125,6 @@ function PersonasSection({ personas }: { personas: Persona[] }) {
         </Button>
       </div>
 
-      {/* Form inline */}
       {showForm && (
         <div className="border border-primary/30 bg-primary/5 rounded-lg px-4 py-3 flex flex-col gap-3">
           <p className="text-sm font-medium">{editing ? "Editar persona" : "Nueva persona"}</p>
@@ -156,7 +161,6 @@ function PersonasSection({ personas }: { personas: Persona[] }) {
         </div>
       )}
 
-      {/* Lista */}
       {personas.length === 0 && !showForm ? (
         <p className="text-sm text-muted-foreground py-4 text-center border border-dashed border-border rounded-lg">
           Todavía no tenés personas guardadas.
@@ -201,8 +205,6 @@ function PersonasSection({ personas }: { personas: Persona[] }) {
     </div>
   );
 }
-
-// ── Grupos ────────────────────────────────────────────────────────────────────
 
 function GruposSection({
   grupos,
@@ -287,7 +289,7 @@ function GruposSection({
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
           <h2 className="text-base font-semibold">Grupos</h2>
           <p className="text-xs text-muted-foreground mt-0.5">
@@ -306,11 +308,9 @@ function GruposSection({
         </p>
       )}
 
-      {/* Form inline */}
       {showForm && (
         <div className="border border-primary/30 bg-primary/5 rounded-lg px-4 py-3 flex flex-col gap-4">
           <p className="text-sm font-medium">{editing ? "Editar grupo" : "Nuevo grupo"}</p>
-
           <div className="flex flex-col gap-1.5">
             <Label>Nombre del grupo <span className="text-destructive">*</span></Label>
             <Input
@@ -321,7 +321,6 @@ function GruposSection({
               onKeyDown={(e) => { if (e.key === "Escape") cancelForm(); }}
             />
           </div>
-
           <div className="flex flex-col gap-2">
             <Label>Miembros</Label>
             {personas.length === 0 ? (
@@ -337,14 +336,10 @@ function GruposSection({
                       onClick={() => toggleMiembro(p.id)}
                       className="flex items-center gap-3 w-full px-3 py-2.5 border-b border-border last:border-b-0 text-sm hover:bg-surface/60 transition-colors text-left"
                     >
-                      <span
-                        className={cn(
-                          "flex h-4 w-4 items-center justify-center rounded border flex-shrink-0",
-                          checked
-                            ? "bg-primary border-primary"
-                            : "border-border bg-transparent",
-                        )}
-                      >
+                      <span className={cn(
+                        "flex h-4 w-4 items-center justify-center rounded border flex-shrink-0",
+                        checked ? "bg-primary border-primary" : "border-border bg-transparent",
+                      )}>
                         {checked && <Check className="h-3 w-3 text-primary-foreground" />}
                       </span>
                       <span className={checked ? "text-foreground" : "text-muted-foreground"}>
@@ -364,9 +359,7 @@ function GruposSection({
                 : `${seleccionados.size} miembro${seleccionados.size !== 1 ? "s" : ""} seleccionado${seleccionados.size !== 1 ? "s" : ""}`}
             </p>
           </div>
-
           {error && <p className="text-xs text-destructive">{error}</p>}
-
           <div className="flex gap-2">
             <Button size="sm" onClick={handleSave} disabled={saving}>
               {saving ? "Guardando…" : "Guardar"}
@@ -378,7 +371,6 @@ function GruposSection({
         </div>
       )}
 
-      {/* Lista de grupos */}
       {grupos.length === 0 && !showForm ? (
         <p className="text-sm text-muted-foreground py-4 text-center border border-dashed border-border rounded-lg">
           Todavía no tenés grupos.

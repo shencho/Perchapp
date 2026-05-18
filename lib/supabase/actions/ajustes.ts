@@ -4,15 +4,14 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 
-export interface UpdateProfileData {
+export interface UpdateAjustesData {
   nombre: string;
   modo: "personal" | "profesional" | "ambos";
   profesion: string;
   asistente_nombre: string;
-  vto_day_default: number;
 }
 
-export async function updateProfile(data: UpdateProfileData) {
+export async function updateAjustes(data: UpdateAjustesData) {
   const supabase = await createClient();
   const {
     data: { user },
@@ -26,7 +25,6 @@ export async function updateProfile(data: UpdateProfileData) {
       modo: data.modo,
       profesion: data.profesion,
       asistente_nombre: data.asistente_nombre,
-      vto_day_default: data.vto_day_default,
     })
     .eq("id", user.id);
 

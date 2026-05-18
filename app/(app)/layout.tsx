@@ -1,8 +1,10 @@
 import { redirect } from "next/navigation";
+import { Toaster } from "sonner";
 import { createClient } from "@/lib/supabase/server";
-import { Header } from "@/components/shared/header";
+import { DesktopSidebar } from "@/components/navigation/desktop-sidebar";
+import { MobileBottomNav } from "@/components/navigation/mobile-bottom-nav";
+import { PerchitaFAB } from "@/components/navigation/perchita-fab";
 
-// Layout protegido: requiere sesión activa y onboarding completado.
 export default async function AppLayout({
   children,
 }: {
@@ -17,10 +19,9 @@ export default async function AppLayout({
     redirect("/login");
   }
 
-  // Verificar que el usuario completó el onboarding
   const { data: profile } = await supabase
     .from("profiles")
-    .select("onboarding_completado, modo")
+    .select("onboarding_completado, modo, asistente_nombre")
     .eq("id", user.id)
     .single();
 
@@ -28,10 +29,16 @@ export default async function AppLayout({
     redirect("/onboarding");
   }
 
+  const asistenteNombre = profile.asistente_nombre ?? "MANGO AI";
+  const modo = profile.modo ?? "personal";
+
   return (
-    <div className="min-h-screen flex flex-col">
-      <Header userEmail={user.email} modo={profile.modo ?? "personal"} />
-      <main className="flex-1 p-4 md:p-6">{children}</main>
+    <div className="min-h-screen md:flex md:flex-row">
+      <DesktopSidebar modo={modo} asistenteNombre={asistenteNombre} userEmail={user.email} />
+      <main className="flex-1 p-4 md:p-6 pb-20 md:pb-0">{children}</main>
+      <MobileBottomNav modo={modo} userEmail={user.email} />
+      <PerchitaFAB />
+      <Toaster />
     </div>
   );
 }

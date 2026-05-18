@@ -1,6 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
-import { CapturaClient } from "./_components/captura-client";
+import { CapturaFormPage } from "./_components/captura-form-page";
 import type { GrupoConMiembros } from "@/lib/supabase/actions/grupos-types";
 import type { Persona } from "@/types/supabase";
 
@@ -10,12 +10,7 @@ export default async function CapturaPage() {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  const [profileRes, cuentasRes, tarjetasRes, categoriasRes, clientesRes, personasRes, gruposRes] = await Promise.all([
-    supabase
-      .from("profiles")
-      .select("asistente_nombre")
-      .eq("id", user.id)
-      .single(),
+  const [cuentasRes, tarjetasRes, categoriasRes, clientesRes, personasRes, gruposRes] = await Promise.all([
     supabase
       .from("cuentas")
       .select("*")
@@ -61,14 +56,22 @@ export default async function CapturaPage() {
   }));
 
   return (
-    <CapturaClient
-      asistente_nombre={profileRes.data?.asistente_nombre ?? "Perchita"}
-      cuentas={cuentasRes.data ?? []}
-      tarjetas={tarjetasRes.data ?? []}
-      categorias={categoriasRes.data ?? []}
-      clientes={(clientesRes.data ?? []) as { id: string; nombre: string }[]}
-      personas={(personasRes.data ?? []) as Persona[]}
-      grupos={grupos}
-    />
+    <div className="flex flex-col items-center min-h-[calc(100vh-4rem)] px-4 py-8 max-w-xl mx-auto w-full">
+      <div className="text-center mb-6">
+        <h1 className="text-2xl md:text-3xl font-semibold">¿Qué cargamos?</h1>
+        <p className="text-muted-foreground mt-2">
+          Contame tus movimientos y nos ordenamos.
+        </p>
+      </div>
+
+      <CapturaFormPage
+        cuentas={cuentasRes.data ?? []}
+        tarjetas={tarjetasRes.data ?? []}
+        categorias={categoriasRes.data ?? []}
+        clientes={(clientesRes.data ?? []) as { id: string; nombre: string }[]}
+        personas={(personasRes.data ?? []) as Persona[]}
+        grupos={grupos}
+      />
+    </div>
   );
 }

@@ -1,11 +1,10 @@
 "use client";
 
 import { useState, useRef, useCallback } from "react";
-import { useRouter } from "next/navigation";
 import { Mic, MicOff, Send, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { RevisionModal } from "./revision-modal";
+import { RevisionModal } from "@/app/(app)/captura/_components/revision-modal";
 import type { ParsedMovimiento } from "@/lib/ai/prompts/interpretMovement";
 import type { Cuenta, Tarjeta, Categoria, Persona } from "@/types/supabase";
 import type { GrupoConMiembros } from "@/lib/supabase/actions/grupos-types";
@@ -32,40 +31,47 @@ declare global {
   }
 }
 
-// ── Ejemplos rotativos ────────────────────────────────────────────────────────
+// ── Frases sugeridas ──────────────────────────────────────────────────────────
 
-const EJEMPLOS = [
-  "Gasté 15 mil en el super con débito",
-  "Pagué el Netflix con tarjeta de crédito",
-  "Me llegó transferencia de 80 palos por el proyecto",
-  "Cargué nafta, 25 mil con Mercado Pago",
-  "Pagué el alquiler con transferencia, 350 lucas",
-  "Compré remedios en la farmacia, 8 mil en efectivo",
-  "Me debitaron la prepaga, 45 mil",
+const FRASES_SUGERIDAS_INICIALES = [
+  "Pagué la luz 65 lucas con la Master.",
+  "Salí a comer y gasté 35000 con transferencia desde Mercado Pago.",
+  "Se debitó Netflix de mi tarjeta VISA $7000.",
+  "Cargué nafta y pagué 100000 en efectivo.",
 ];
 
-interface Props {
-  asistente_nombre: string;
+// ── Props ─────────────────────────────────────────────────────────────────────
+
+export type CapturaFormProps = {
+  onSuccess?: () => void;
+  variant?: "page" | "sheet";
+  initialText?: string;
   cuentas: Cuenta[];
   tarjetas: Tarjeta[];
   categorias: Categoria[];
   clientes: { id: string; nombre: string }[];
   personas: Persona[];
   grupos: GrupoConMiembros[];
-}
+};
 
-export function CapturaClient({ asistente_nombre, cuentas, tarjetas, categorias, clientes, personas, grupos }: Props) {
-  const router = useRouter();
-  const [texto, setTexto] = useState("");
+// ── Component ─────────────────────────────────────────────────────────────────
+
+export function CapturaForm({
+  onSuccess,
+  initialText = "",
+  cuentas,
+  tarjetas,
+  categorias,
+  clientes,
+  personas,
+  grupos,
+}: CapturaFormProps) {
+  const [texto, setTexto] = useState(initialText);
   const [estado, setEstado] = useState<"idle" | "loading" | "error">("idle");
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [parsed, setParsed] = useState<ParsedMovimiento | null>(null);
   const [revisionOpen, setRevisionOpen] = useState(false);
   const [escuchando, setEscuchando] = useState(false);
-  const [ejemplos] = useState(() => {
-    // Mezclar y tomar 5
-    return [...EJEMPLOS].sort(() => Math.random() - 0.5).slice(0, 5);
-  });
 
   const recognitionRef = useRef<SpeechRecognitionInstance | null>(null);
   const silenceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -181,41 +187,26 @@ export function CapturaClient({ asistente_nombre, cuentas, tarjetas, categorias,
   function handleConfirmed() {
     setTexto("");
     setParsed(null);
-    router.push("/movimientos");
+    onSuccess?.();
   }
 
   // ── Render ─────────────────────────────────────────────────────────────────
 
-  const inicial = asistente_nombre.charAt(0).toUpperCase();
-
   return (
-    <div className="flex flex-col items-center min-h-[calc(100vh-4rem)] px-4 py-8 max-w-xl mx-auto w-full">
-
-      {/* Hero */}
-      <div className="flex flex-col items-center text-center mb-8">
-        <div className="w-16 h-16 rounded-full bg-primary flex items-center justify-center mb-3 shadow-lg">
-          <span className="text-primary-foreground font-bold text-2xl">{inicial}</span>
-        </div>
-        <h1 className="text-xl font-semibold">Hola, soy {asistente_nombre}</h1>
-        <p className="text-muted-foreground text-sm mt-1 italic">No te cuelgues</p>
-        <p className="text-muted-foreground text-sm mt-3">
-          Contame en palabras simples qué movimiento querés registrar.
-        </p>
-      </div>
-
-      {/* Ejemplos sugeridos */}
+    <>
+      {/* Frases sugeridas */}
       <div className="flex flex-wrap gap-2 justify-center mb-6 w-full">
-        {ejemplos.map((ejemplo) => (
+        {FRASES_SUGERIDAS_INICIALES.map((frase) => (
           <button
-            key={ejemplo}
+            key={frase}
             type="button"
             onClick={() => {
-              setTexto(ejemplo);
+              setTexto(frase);
               textareaRef.current?.focus();
             }}
             className="text-xs px-3 py-1.5 rounded-full border border-border bg-surface text-muted-foreground hover:text-foreground hover:border-foreground/40 transition-colors"
           >
-            {ejemplo}
+            {frase}
           </button>
         ))}
       </div>
@@ -309,6 +300,6 @@ export function CapturaClient({ asistente_nombre, cuentas, tarjetas, categorias,
         grupos={grupos}
         onConfirmed={handleConfirmed}
       />
-    </div>
+    </>
   );
 }

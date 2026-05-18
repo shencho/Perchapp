@@ -97,7 +97,7 @@ export async function createProfile(data: OnboardingData) {
       nombre: data.nombre,
       profesion: data.profesion,
       modo: data.modo,
-      asistente_nombre: data.asistente_nombre || "Perchita",
+      asistente_nombre: data.asistente_nombre || "MANGO AI",
       onboarding_completado: true,
     });
 

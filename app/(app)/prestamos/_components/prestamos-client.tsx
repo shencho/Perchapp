@@ -59,7 +59,7 @@ export function PrestamosClient({ prestamos, personas }: Props) {
   return (
     <div className="flex flex-col gap-4">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
           <h1 className="text-xl font-semibold">Préstamos</h1>
           <p className="text-xs text-muted-foreground mt-0.5">{prestamos.length} en total</p>
