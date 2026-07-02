@@ -9,13 +9,12 @@ import { MangoAIButton } from "@/components/navigation/mango-ai-button";
 import { getNavItems } from "@/lib/navigation/get-nav-items";
 
 interface Props {
-  modo: "personal" | "profesional" | "ambos" | null;
   asistenteNombre: string;
   userEmail?: string;
 }
 
-export function DesktopSidebar({ modo, asistenteNombre, userEmail }: Props) {
-  const sidebarItems = getNavItems(modo).filter((item) => !item.drawerOnly);
+export function DesktopSidebar({ asistenteNombre, userEmail }: Props) {
+  const sidebarItems = getNavItems().filter((item) => !item.drawerOnly);
 
   return (
     <aside className="hidden md:flex flex-col w-60 border-r border-border h-screen sticky top-0 bg-card shrink-0">
@@ -46,7 +45,6 @@ export function DesktopSidebar({ modo, asistenteNombre, userEmail }: Props) {
               Más
             </Button>
           }
-          modo={modo}
           userEmail={userEmail}
         />
       </div>

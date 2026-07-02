@@ -3,7 +3,6 @@ import {
   ArrowLeftRight,
   BarChart3,
   TrendingUp,
-  Briefcase,
   Landmark,
   Wallet,
   CreditCard,
@@ -23,9 +22,7 @@ export type NavItem = {
   drawerOnly?: boolean;
 };
 
-export function getNavItems(modo: "personal" | "profesional" | "ambos" | null): NavItem[] {
-  const m = modo ?? "personal";
-
+export function getNavItems(): NavItem[] {
   const main: NavItem[] = [
     { href: "/dashboard",   label: "Inicio",      icon: Home },
     { href: "/movimientos", label: "Movimientos",  labelShort: "Movs.",    icon: ArrowLeftRight },
@@ -33,10 +30,6 @@ export function getNavItems(modo: "personal" | "profesional" | "ambos" | null): 
     { href: "/prestamos",   label: "Préstamos",    icon: Landmark, desktopOnly: true },
     { href: "/cash-flow",   label: "Cash Flow",    icon: TrendingUp, desktopOnly: true },
   ];
-
-  if (m === "profesional" || m === "ambos") {
-    main.push({ href: "/clientes", label: "Profesional", labelShort: "Profes.", icon: Briefcase });
-  }
 
   const drawer: NavItem[] = [
     { href: "/cuentas",                 label: "Cuentas",                icon: Wallet,    drawerOnly: true },
