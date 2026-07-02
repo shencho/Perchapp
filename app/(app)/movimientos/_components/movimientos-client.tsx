@@ -8,7 +8,6 @@ import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { NamedSelect } from "@/components/ui/named-select";
 import { deleteMovimiento, duplicateMovimiento } from "@/lib/supabase/actions/movimientos";
-import { deletePagoFromMovimiento } from "@/lib/supabase/actions/pagos";
 import {
   getParticipantes,
   marcarCobrado,
@@ -16,7 +15,7 @@ import {
   getBalanceGasto,
 } from "@/lib/supabase/actions/gastos-compartidos";
 import type { ResultadoBalanceGrupal } from "@/lib/domain/calcularBalanceGrupal";
-import { TIPOS_MOV, METODOS, AMBITOS } from "@/lib/supabase/actions/movimientos-types";
+import { TIPOS_MOV, METODOS } from "@/lib/supabase/actions/movimientos-types";
 import { MovimientoEditor } from "./movimiento-editor";
 import { GenerarPendientesModal } from "./generar-pendientes-modal";
 import type { Movimiento, Cuenta, Tarjeta, Categoria, Persona, GastoCompartidoParticipante } from "@/types/supabase";
@@ -30,8 +29,6 @@ type MovimientoConRelaciones = Movimiento & {
   cuentas?: { id: string; nombre: string; tipo: string } | null;
   cuenta_destino?: { id: string; nombre: string } | null;
   tarjetas?: { id: string; nombre: string } | null;
-  clientes?: { id: string; nombre: string } | null;
-  servicios_cliente?: { id: string; nombre: string } | null;
   gastos_compartidos_participantes?: { id: string; estado: string; monto: number }[] | null;
   prestamos?: { id: string; tipo: string; institucion_nombre: string | null; persona_id: string | null; personas?: { nombre: string } | null } | null;
 };
@@ -42,7 +39,6 @@ interface Props {
   cuentas: Cuenta[];
   tarjetas: Tarjeta[];
   categorias: Categoria[];
-  clientes: { id: string; nombre: string }[];
   personas: Persona[];
   grupos: GrupoConMiembros[];
   mesActual: string;
@@ -428,7 +424,7 @@ function getMeses() {
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
-export function MovimientosClient({ movimientos, total, cuentas, tarjetas, categorias, clientes, personas, grupos, mesActual, compartidoInicial, nombreUsuario, plantillasPendientes = [], generarInicialId }: Props) {
+export function MovimientosClient({ movimientos, total, cuentas, tarjetas, categorias, personas, grupos, mesActual, compartidoInicial, nombreUsuario, plantillasPendientes = [], generarInicialId }: Props) {
   const router = useRouter();
   const [, startTransition] = useTransition();
 
@@ -441,7 +437,6 @@ export function MovimientosClient({ movimientos, total, cuentas, tarjetas, categ
   const [busqueda, setBusqueda] = useState("");
   const [filtroMes, setFiltroMes] = useState(mesActual);
   const [filtroTipo, setFiltroTipo] = useState<string>("todos");
-  const [filtroAmbito, setFiltroAmbito] = useState<string>("todos");
   const [filtroMetodo, setFiltroMetodo] = useState<string>("todos");
   const [filtroCuenta, setFiltroCuenta] = useState<string>("todas");
   const [filtroCategoria, setFiltroCategoria] = useState<string>("todas");
@@ -457,7 +452,6 @@ export function MovimientosClient({ movimientos, total, cuentas, tarjetas, categ
       if (!(m.concepto?.toLowerCase().includes(b) || m.descripcion?.toLowerCase().includes(b))) return false;
     }
     if (filtroTipo !== "todos" && m.tipo !== filtroTipo) return false;
-    if (filtroAmbito !== "todos" && m.ambito !== filtroAmbito) return false;
     if (filtroMetodo !== "todos" && m.metodo !== filtroMetodo) return false;
     if (filtroCuenta !== "todas" && m.cuenta_id !== filtroCuenta) return false;
     if (filtroCategoria !== "todas" && m.categoria_id !== filtroCategoria) return false;
@@ -481,24 +475,14 @@ export function MovimientosClient({ movimientos, total, cuentas, tarjetas, categ
   }
 
   async function handleEliminar(m: MovimientoConRelaciones) {
-    const isProfesionalIngreso = m.tipo === "Ingreso" && m.ambito === "Profesional";
     const prestamo = nombrePrestamo(m);
 
-    let msg: string;
-    if (prestamo) {
-      msg = `⚠ Este movimiento está vinculado al préstamo "${prestamo}". Eliminarlo desvinculará el pago del préstamo. ¿Confirmás?`;
-    } else if (isProfesionalIngreso) {
-      msg = "¿Eliminar este movimiento? Si tiene un pago vinculado, también se eliminará junto a las asignaciones de registros.";
-    } else {
-      msg = "¿Eliminar este movimiento?";
-    }
+    const msg = prestamo
+      ? `⚠ Este movimiento está vinculado al préstamo "${prestamo}". Eliminarlo desvinculará el pago del préstamo. ¿Confirmás?`
+      : "¿Eliminar este movimiento?";
 
     if (!confirm(msg)) return;
-    if (isProfesionalIngreso) {
-      await deletePagoFromMovimiento(m.id);
-    } else {
-      await deleteMovimiento(m.id);
-    }
+    await deleteMovimiento(m.id);
     startTransition(() => router.refresh());
   }
 
@@ -571,15 +555,6 @@ export function MovimientosClient({ movimientos, total, cuentas, tarjetas, categ
           className={cn("h-8 text-sm w-36", filtroTipo !== "todos" && "ring-1 ring-primary/50 border-primary/50")}
         />
 
-        {/* Ámbito */}
-        <NamedSelect
-          options={[{ value: "todos", label: "Todos" }, ...AMBITOS.map(a => ({ value: a, label: a }))]}
-          value={filtroAmbito !== "todos" ? filtroAmbito : ""}
-          onValueChange={(v) => setFiltroAmbito(v ?? "todos")}
-          placeholder="Ámbito"
-          className={cn("h-8 text-sm w-32", filtroAmbito !== "todos" && "ring-1 ring-primary/50 border-primary/50")}
-        />
-
         {/* Método */}
         <NamedSelect
           options={[{ value: "todos", label: "Todos los métodos" }, ...METODOS.map(m => ({ value: m, label: m }))]}
@@ -638,7 +613,6 @@ export function MovimientosClient({ movimientos, total, cuentas, tarjetas, categ
               <thead>
                 <tr className="border-b border-border bg-surface">
                   <th className="text-left px-4 py-2.5 font-medium text-muted-foreground">Fecha</th>
-                  <th className="text-left px-4 py-2.5 font-medium text-muted-foreground">Ámbito</th>
                   <th className="text-left px-4 py-2.5 font-medium text-muted-foreground">Concepto</th>
                   <th className="text-left px-4 py-2.5 font-medium text-muted-foreground">Método</th>
                   <th className="text-right px-4 py-2.5 font-medium text-muted-foreground">Monto</th>
@@ -658,31 +632,11 @@ export function MovimientosClient({ movimientos, total, cuentas, tarjetas, categ
                         {formatFecha(m.fecha)}
                       </td>
                       <td className="px-4 py-3">
-                        <span className={cn(
-                          "text-xs px-1.5 py-0.5 rounded-full border",
-                          m.ambito === "Profesional"
-                            ? "bg-blue-900/40 text-blue-300 border-blue-800"
-                            : "bg-surface text-muted-foreground border-border"
-                        )}>
-                          {m.ambito}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3">
                         <div className="font-medium truncate max-w-[200px]">
                           {m.concepto || m.descripcion || "—"}
                         </div>
                         {m.categorias && (
                           <div className="text-xs text-muted-foreground">{m.categorias.nombre}</div>
-                        )}
-                        {m.ambito === "Profesional" && m.clientes && (
-                          <div className="flex items-center gap-1 mt-0.5 flex-wrap">
-                            <span className="text-xs text-blue-300 bg-blue-900/20 border border-blue-800/40 px-1.5 py-0.5 rounded">
-                              {m.clientes.nombre}
-                            </span>
-                            {m.servicios_cliente && (
-                              <span className="text-xs text-muted-foreground">· {m.servicios_cliente.nombre}</span>
-                            )}
-                          </div>
                         )}
                         {m.es_compartido && partsTotal > 0 && (
                           <div className="mt-0.5 space-y-1">
@@ -766,7 +720,7 @@ export function MovimientosClient({ movimientos, total, cuentas, tarjetas, categ
                     </tr>
                     {isExpanded && (
                       <tr className="border-b border-border bg-surface/30">
-                        <td colSpan={7} className="px-6 py-2">
+                        <td colSpan={6} className="px-6 py-2">
                           <CompartidoPanel
                             movimientoId={m.id}
                             concepto={m.concepto}
@@ -821,16 +775,6 @@ export function MovimientosClient({ movimientos, total, cuentas, tarjetas, categ
                           {m.metodo && <><span>·</span><span>{m.metodo}</span></>}
                           {m.categorias && <><span>·</span><span>{m.categorias.nombre}</span></>}
                         </div>
-                        {m.ambito === "Profesional" && m.clientes && (
-                          <div className="flex items-center gap-1 mt-1 flex-wrap">
-                            <span className="text-xs text-blue-300 bg-blue-900/20 border border-blue-800/40 px-1.5 py-0.5 rounded">
-                              {m.clientes.nombre}
-                            </span>
-                            {m.servicios_cliente && (
-                              <span className="text-xs text-muted-foreground">· {m.servicios_cliente.nombre}</span>
-                            )}
-                          </div>
-                        )}
                         {m.es_compartido && partsTotal > 0 && (
                           <div className="mt-0.5 space-y-1">
                             <div className="flex items-center gap-1 text-xs text-muted-foreground">
@@ -932,7 +876,6 @@ export function MovimientosClient({ movimientos, total, cuentas, tarjetas, categ
         cuentas={cuentas}
         tarjetas={tarjetas}
         categorias={categorias}
-        clientes={clientes}
         personas={personas}
         grupos={grupos}
       />
@@ -942,7 +885,6 @@ export function MovimientosClient({ movimientos, total, cuentas, tarjetas, categ
         open={generarOpen}
         onClose={() => setGenerarOpen(false)}
         plantillasPendientes={plantillasPendientes}
-        clientes={clientes}
         initialSelectedId={generarInicialId}
       />
     </div>

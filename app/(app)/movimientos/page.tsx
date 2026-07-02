@@ -59,7 +59,7 @@ export default async function MovimientosPage({ searchParams }: Props) {
     .range(pagina * PAGE_SIZE, (pagina + 1) * PAGE_SIZE - 1);
 
   // Cargar movimientos + relaciones + datos de filtros + plantillas en paralelo
-  const [movRes, cuentasRes, tarjetasRes, categoriasRes, clientesRes, personasRes, gruposRes, plantillas] = await Promise.all([
+  const [movRes, cuentasRes, tarjetasRes, categoriasRes, personasRes, gruposRes, plantillas] = await Promise.all([
     movQuery,
     supabase
       .from("cuentas")
@@ -77,12 +77,6 @@ export default async function MovimientosPage({ searchParams }: Props) {
       .select("*")
       .eq("user_id", user.id)
       .eq("archivada", false)
-      .order("nombre"),
-    supabase
-      .from("clientes")
-      .select("id, nombre")
-      .eq("user_id", user.id)
-      .eq("archivado", false)
       .order("nombre"),
     supabase
       .from("personas")
@@ -129,7 +123,6 @@ export default async function MovimientosPage({ searchParams }: Props) {
       cuentas={cuentasRes.data ?? []}
       tarjetas={tarjetasRes.data ?? []}
       categorias={categoriasRes.data ?? []}
-      clientes={(clientesRes.data ?? []) as { id: string; nombre: string }[]}
       personas={(personasRes.data ?? []) as Persona[]}
       grupos={grupos}
       mesActual={mesActual}
