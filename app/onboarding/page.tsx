@@ -6,46 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
-const PROFESIONES = [
-  {
-    slug: "salud-bienestar",
-    label: "Salud y bienestar",
-    ejemplos: "psicóloga, kinesióloga, nutricionista, fonoaudióloga, personal trainer",
-  },
-  {
-    slug: "educacion",
-    label: "Educación",
-    ejemplos: "profesor particular, profesor de idiomas, tutor, profesor de música",
-  },
-  {
-    slug: "servicios-profesionales",
-    label: "Servicios profesionales",
-    ejemplos: "consultor, abogado, contador, asesor financiero, coach ejecutivo",
-  },
-  {
-    slug: "creatividad-digital",
-    label: "Creatividad y digital",
-    ejemplos: "diseñador, programador, fotógrafo, marketer, redactor, traductor",
-  },
-  {
-    slug: "belleza-cuidado",
-    label: "Belleza y cuidado personal",
-    ejemplos: "peluquera, manicura, esteticista, maquilladora, depiladora",
-  },
-  {
-    slug: "generico",
-    label: "Otro / Genérico",
-    ejemplos: "para quienes no encajan en las opciones anteriores",
-  },
-];
-
-const MODOS = [
-  { value: "personal",     label: "Personal",     desc: "Gestiono mis finanzas personales" },
-  { value: "profesional",  label: "Profesional",  desc: "Gestiono mi actividad laboral"   },
-  { value: "ambos",        label: "Ambos",         desc: "Personal y profesional juntos"   },
-] as const;
-
-const TOTAL_STEPS = 4;
+const TOTAL_STEPS = 2;
 
 export default function OnboardingPage() {
   const [step, setStep] = useState(1);
@@ -54,8 +15,6 @@ export default function OnboardingPage() {
 
   const [form, setForm] = useState<OnboardingData>({
     nombre: "",
-    profesion: "",
-    modo: "ambos",
     asistente_nombre: "MANGO AI",
   });
 
@@ -69,9 +28,7 @@ export default function OnboardingPage() {
 
   function canAdvance() {
     if (step === 1) return form.nombre.trim().length > 0;
-    if (step === 2) return form.profesion.length > 0;
-    if (step === 3) return form.modo.length > 0;
-    if (step === 4) return form.asistente_nombre.trim().length > 0;
+    if (step === 2) return form.asistente_nombre.trim().length > 0;
     return false;
   }
 
@@ -135,64 +92,8 @@ export default function OnboardingPage() {
             </div>
           )}
 
-          {/* Step 2 — Profesión */}
+          {/* Step 2 — Asistente */}
           {step === 2 && (
-            <div className="flex flex-col gap-4">
-              <div className="flex flex-col gap-1.5">
-                <h2 className="text-2xl font-semibold tracking-tight">¿A qué te dedicás?</h2>
-                <p className="text-sm text-muted-foreground">Elegí la opción que mejor describe tu actividad.</p>
-              </div>
-              <div className="flex flex-col gap-2">
-                {PROFESIONES.map((prof) => (
-                  <button
-                    key={prof.slug}
-                    type="button"
-                    onClick={() => setForm({ ...form, profesion: prof.slug })}
-                    className={`w-full text-left px-4 py-3 rounded-lg border transition-colors ${
-                      form.profesion === prof.slug
-                        ? "border-primary bg-primary/10"
-                        : "border-border bg-card hover:bg-muted"
-                    }`}
-                  >
-                    <p className={`text-sm font-medium ${form.profesion === prof.slug ? "text-primary" : ""}`}>
-                      {prof.label}
-                    </p>
-                    <p className="text-xs text-muted-foreground mt-0.5">ej: {prof.ejemplos}</p>
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Step 3 — Modo */}
-          {step === 3 && (
-            <div className="flex flex-col gap-4">
-              <div className="flex flex-col gap-1.5">
-                <h2 className="text-2xl font-semibold tracking-tight">¿Para qué usás MANGO?</h2>
-                <p className="text-sm text-muted-foreground">Podés cambiar esto después en tu perfil.</p>
-              </div>
-              <div className="flex flex-col gap-2">
-                {MODOS.map((m) => (
-                  <button
-                    key={m.value}
-                    type="button"
-                    onClick={() => setForm({ ...form, modo: m.value })}
-                    className={`w-full text-left px-4 py-3 rounded-lg border transition-colors ${
-                      form.modo === m.value
-                        ? "border-primary bg-primary/10"
-                        : "border-border bg-card hover:bg-muted"
-                    }`}
-                  >
-                    <p className={`text-sm font-medium ${form.modo === m.value ? "text-primary" : ""}`}>{m.label}</p>
-                    <p className="text-xs text-muted-foreground">{m.desc}</p>
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Step 4 — Asistente */}
-          {step === 4 && (
             <div className="flex flex-col gap-4">
               <div className="flex flex-col gap-1.5">
                 <h2 className="text-2xl font-semibold tracking-tight">¿Cómo llamás a tu asistente?</h2>

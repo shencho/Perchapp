@@ -7,15 +7,11 @@ export default async function AjustesPage() {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  const [{ data: profile }, { data: profesiones }] = await Promise.all([
-    supabase.from("profiles").select("*").eq("id", user.id).single(),
-    supabase.from("profesiones_templates").select("nombre, slug").order("nombre"),
-  ]);
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("*")
+    .eq("id", user.id)
+    .single();
 
-  return (
-    <AjustesPageContent
-      profile={profile}
-      profesiones={profesiones ?? []}
-    />
-  );
+  return <AjustesPageContent profile={profile} />;
 }
