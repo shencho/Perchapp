@@ -25,10 +25,10 @@ export async function POST(req: NextRequest) {
 
     // 3. Cargar contexto del usuario en paralelo
     const fecha90d = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
-    const [profileRes, cuentasRes, tarjetasRes, categoriasRes, clientesRes, serviciosRes, movimientosRes] = await Promise.all([
+    const [profileRes, cuentasRes, tarjetasRes, categoriasRes, movimientosRes] = await Promise.all([
       supabase
         .from("profiles")
-        .select("vto_day_default, asistente_nombre, profesion")
+        .select("vto_day_default, asistente_nombre")
         .eq("id", user.id)
         .single(),
       supabase
@@ -47,18 +47,6 @@ export async function POST(req: NextRequest) {
         .eq("user_id", user.id)
         .eq("archivada", false),
       supabase
-        .from("clientes")
-        .select("id, nombre")
-        .eq("user_id", user.id)
-        .eq("archivado", false)
-        .order("nombre"),
-      supabase
-        .from("servicios_cliente")
-        .select("id, cliente_id, nombre, modalidad")
-        .eq("user_id", user.id)
-        .eq("archivado", false)
-        .order("nombre"),
-      supabase
         .from("movimientos")
         .select("concepto, categoria_id")
         .eq("user_id", user.id)
@@ -73,10 +61,6 @@ export async function POST(req: NextRequest) {
     const categorias = (categoriasRes.data ?? []) as {
       id: string; nombre: string; tipo: string; parent_id: string | null;
     }[];
-    const clientes   = (clientesRes.data  ?? []) as { id: string; nombre: string }[];
-    const servicios  = (serviciosRes.data ?? []) as {
-      id: string; cliente_id: string; nombre: string; modalidad: string;
-    }[];
     const movimientos = (movimientosRes.data ?? []) as {
       concepto: string | null; categoria_id: string | null;
     }[];
@@ -90,10 +74,7 @@ export async function POST(req: NextRequest) {
       cuentas,
       tarjetas,
       categorias,
-      clientes,
-      servicios,
       asistente_nombre:  profile?.asistente_nombre ?? "MANGO AI",
-      profesion:         profile?.profesion ?? "",
       catalogoDinamico,
     });
 

@@ -49,7 +49,6 @@ export type CapturaFormProps = {
   cuentas: Cuenta[];
   tarjetas: Tarjeta[];
   categorias: Categoria[];
-  clientes: { id: string; nombre: string }[];
   personas: Persona[];
   grupos: GrupoConMiembros[];
 };
@@ -62,7 +61,6 @@ export function CapturaForm({
   cuentas,
   tarjetas,
   categorias,
-  clientes,
   personas,
   grupos,
 }: CapturaFormProps) {
@@ -295,7 +293,6 @@ export function CapturaForm({
         cuentas={cuentas}
         tarjetas={tarjetas}
         categorias={categorias}
-        clientes={clientes}
         personas={personas}
         grupos={grupos}
         onConfirmed={handleConfirmed}

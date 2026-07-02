@@ -6,19 +6,13 @@ export interface PromptParams {
   cuentas: { id: string; nombre: string; moneda: string }[];
   tarjetas: { id: string; nombre: string }[];
   categorias: { id: string; nombre: string; tipo: string; parent_id: string | null }[];
-  clientes: { id: string; nombre: string }[];
-  servicios: { id: string; cliente_id: string; nombre: string; modalidad: string }[];
   asistente_nombre: string;
-  profesion: string;
   catalogoDinamico: string;
   combosHistoricos?: string;
 }
 
 export interface ParsedMovimiento {
   tipo:              "Ingreso" | "Egreso";
-  ambito:            "Personal" | "Profesional";
-  cliente_id:        string | null;
-  servicio_id:       string | null;
   categoria:         string | null;
   subcategoria:      string | null;
   categoria_id:      string | null;
@@ -106,10 +100,7 @@ export function buildInterpretPrompt(params: PromptParams): { sys: string; promp
     cuentas,
     tarjetas,
     categorias,
-    clientes,
-    servicios,
     asistente_nombre,
-    profesion,
     catalogoDinamico,
     combosHistoricos = "",
   } = params;
@@ -121,16 +112,6 @@ export function buildInterpretPrompt(params: PromptParams): { sys: string; promp
   const tarjetasStr = tarjetas.length
     ? tarjetas.map((t) => `id="${t.id}" nombre="${t.nombre}"`).join("\n")
     : "(sin tarjetas)";
-
-  const clientesStr = clientes.length
-    ? clientes.map((c) => `- "${c.nombre}" (id: ${c.id})`).join("\n")
-    : "(sin clientes)";
-
-  const serviciosStr = servicios.length
-    ? servicios.map((s) => `- "${s.nombre}" [cliente_id: ${s.cliente_id}, modalidad: ${s.modalidad}] (id: ${s.id})`).join("\n")
-    : "(sin servicios)";
-
-  const profesionCtx = profesion ? `El usuario es ${profesion}.` : "";
 
   const sys = `Sos "${asistente_nombre}", un asistente financiero argentino que interpreta mensajes en rioplatense para registrar movimientos. Respondés SIEMPRE con JSON válido, sin texto extra, sin backticks.`;
 
@@ -158,26 +139,15 @@ ${tarjetasStr}
 CATEGORÍAS DEL USUARIO (devolvé categoria_id y subcategoria_id con los IDs exactos de esta lista; si no existe, devolvé null):
 ${formatCategorias(categorias)}
 
-ÁMBITO DEL MOVIMIENTO:
-${profesionCtx}
-El campo "ambito" indica si el movimiento es personal o profesional:
-- "Personal": gastos o ingresos cotidianos (compras, servicios del hogar, sueldo en relación de dependencia, etc.)
-- "Profesional": ingresos por trabajo independiente (cobranzas a clientes, honorarios, facturación) o gastos directamente vinculados a servicios prestados.
+CATÁLOGO DEL USUARIO PARA EGRESOS:
 
-Reglas para decidir el ámbito:
-1. Si la frase menciona el nombre o apodo de un cliente de la lista → ambito="Profesional", cliente_id=su id.
-2. Si usa palabras como "cobré", "me pagó", "facturé", "sesión con", "consulta de", "honorarios", "cliente" → probablemente "Profesional".
-3. Si es ambiguo o no hay señales profesionales → ambito="Personal", cliente_id=null, servicio_id=null.
-
-CATÁLOGO DEL USUARIO PARA EGRESOS PERSONALES:
-
-Cuando interpretes un egreso de ámbito Personal, PREFERÍ usar las categorías y subcategorías de este catálogo.
+Cuando interpretes un egreso, PREFERÍ usar las categorías y subcategorías de este catálogo.
 
 REGLAS:
 1. Si encontrás match claro → usar el nombre EXACTO del catálogo en "categoria" y "subcategoria".
 2. Si la frase es ambigua o no matchea con confianza → devolver categoria=null, subcategoria=null, categoria_id=null. El usuario completará manualmente.
 3. NO inventes categorías que no estén en el catálogo. Es preferible devolver null que sugerir una categoría que no existe.
-4. Para Ingresos o egresos Profesionales, ignorá este catálogo y usá tu criterio (no tenemos catálogo para esos casos todavía).
+4. Para Ingresos, ignorá este catálogo y usá tu criterio (no tenemos catálogo para esos casos todavía).
 5. Si encontrás match en el catálogo Y la categoría/subcategoría existe en la lista de CATEGORÍAS DEL USUARIO (arriba) con el mismo nombre, devolvé también el categoria_id / subcategoria_id correspondiente. Si está en el catálogo pero NO en la lista DB → devolvé los nombres como string pero IDs en null (el usuario deberá crearla).
 
 EJEMPLOS:
@@ -190,12 +160,6 @@ EJEMPLOS:
 
 CATÁLOGO:
 ${catalogoDinamico}
-
-CLIENTES ACTIVOS DEL USUARIO (si la frase menciona uno, vinculalo en cliente_id):
-${clientesStr}
-
-SERVICIOS DISPONIBLES (si la frase menciona uno y hay cliente matcheado, vinculalo en servicio_id):
-${serviciosStr}
 
 MAESTROS (usá estos valores exactos):
 Métodos: Efectivo, Transferencia, Billetera virtual, Crédito, Débito automático, Débito
@@ -239,9 +203,6 @@ INPUT: """${userText}"""
 Devolvé SOLO este JSON (sin backticks, sin texto extra):
 {
   "tipo": "Egreso" o "Ingreso",
-  "ambito": "Personal" o "Profesional",
-  "cliente_id": "uuid del cliente si matchea en la lista, sino null",
-  "servicio_id": "uuid del servicio si matchea en la lista y hay cliente, sino null",
   "categoria": "nombre de la categoría padre del catálogo si matchea, sino null",
   "subcategoria": "nombre de la subcategoría del catálogo si matchea, sino null",
   "categoria_id": "id exacto de la categoría padre si existe en la lista DB, sino null",
