@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   TrendingUp, TrendingDown, Minus, X, AlertTriangle,
-  Clock, Landmark, Users, Wallet, ChevronRight,
+  Clock, Landmark, Wallet, ChevronRight,
   CircleDollarSign, PieChart as PieChartIcon, BarChart3,
 } from "lucide-react";
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from "recharts";
@@ -19,7 +19,7 @@ export type MovGrafico = {
   tipo: "Ingreso" | "Egreso" | "Transferencia";
   monto: number; moneda: string; fecha: string;
   cuenta_id: string | null; cuenta_destino_id: string | null;
-  categoria_id: string | null; ambito: string; necesidad: number | null;
+  categoria_id: string | null; necesidad: number | null;
 };
 
 export type CuentaConSaldo = {
@@ -41,14 +41,14 @@ export type PrestamoResumen = {
 
 export type Alerta = {
   id: string;
-  tipo: "tarjeta_vence" | "mora_cliente" | "plazo_fijo_vencido" | "plantilla_pendiente" | "plantilla_atrasada";
+  tipo: "tarjeta_vence" | "plazo_fijo_vencido" | "plantilla_pendiente" | "plantilla_atrasada";
   urgencia: "alta" | "media";
   titulo: string; descripcion: string; href: string;
   referencia_id?: string;
 };
 
 export interface DashboardData {
-  perfil: { nombre: string; asistente_nombre: string | null; email: string; modo: string };
+  perfil: { nombre: string; asistente_nombre: string | null; email: string };
   hero: {
     totalARS: number; totalUSD: number;
     ingresosDelMes: number; egresosDelMes: number;
@@ -65,11 +65,6 @@ export interface DashboardData {
   analisis: {
     topCategorias: { id: string; nombre: string; monto: number; porcentaje: number }[];
     porNecesidad: { nivel: number; monto: number }[];
-    totalPersonal: number; totalProfesional: number;
-  };
-  profesional: null | {
-    facturadoMes: number; cobradoMes: number; saldoPendienteTotal: number;
-    topDeudores: { id: string; nombre: string; saldo: number }[];
   };
   alertas: Alerta[];
 }
@@ -107,7 +102,7 @@ const NECESIDAD_CHART_COLORS: Record<number, string> = {
 };
 
 const BLOQUE_LABELS: Record<string, string> = {
-  grafico: "Gráfico", cuentas: "Cuentas", profesional: "Profesional",
+  grafico: "Gráfico", cuentas: "Cuentas",
   compartidos: "Compartidos", prestamos: "Préstamos", inversiones: "Inversiones",
   analisis: "Análisis", alertas: "Alertas",
 };
@@ -316,46 +311,6 @@ function BloqueCuentas({ cuentas, tarjetas }: { cuentas: CuentaConSaldo[]; tarje
   );
 }
 
-// ── Bloque Profesional ────────────────────────────────────────────────────────
-
-function BloqueProfesional({ datos }: { datos: NonNullable<DashboardData["profesional"]> }) {
-  return (
-    <div className="space-y-3">
-      <div className="grid grid-cols-3 gap-3">
-        {[
-          { label: "Facturado", value: datos.facturadoMes, color: "text-foreground" },
-          { label: "Cobrado", value: datos.cobradoMes, color: "text-green-400" },
-          { label: "Pendiente", value: datos.saldoPendienteTotal, color: datos.saldoPendienteTotal > 0 ? "text-amber-400" : "text-muted-foreground" },
-        ].map(k => (
-          <div key={k.label} className="border border-border rounded-lg p-3 bg-card">
-            <p className="text-xs text-muted-foreground">{k.label}</p>
-            <p className={cn("text-sm font-bold tabular-nums mt-0.5", k.color)}>{fmt(k.value)}</p>
-          </div>
-        ))}
-      </div>
-
-      {datos.topDeudores.length > 0 && (
-        <div className="rounded-lg border border-border divide-y divide-border">
-          {datos.topDeudores.map(d => (
-            <Link key={d.id} href={`/clientes/${d.id}`}
-              className="flex items-center justify-between px-4 py-3 hover:bg-surface/50 transition-colors">
-              <div className="flex items-center gap-2">
-                <Users className="h-3.5 w-3.5 text-muted-foreground" />
-                <span className="text-sm font-medium">{d.nombre}</span>
-              </div>
-              <span className="text-sm font-semibold tabular-nums text-amber-400">{fmt(d.saldo)}</span>
-            </Link>
-          ))}
-        </div>
-      )}
-
-      <Link href="/clientes" className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors">
-        Ver clientes <ChevronRight className="h-3 w-3" />
-      </Link>
-    </div>
-  );
-}
-
 // ── Bloque Compartidos ────────────────────────────────────────────────────────
 
 function BloqueCompartidos({ datos }: { datos: DashboardData["compartidos"] }) {
@@ -507,7 +462,7 @@ function BloqueInversiones({ inversiones }: { inversiones: CuentaConSaldo[] }) {
 // ── Bloque Análisis ───────────────────────────────────────────────────────────
 
 function BloqueAnalisis({ analisis }: { analisis: DashboardData["analisis"] }) {
-  const { topCategorias, porNecesidad, totalPersonal, totalProfesional } = analisis;
+  const { topCategorias, porNecesidad } = analisis;
 
   return (
     <div className="space-y-4">
@@ -532,29 +487,8 @@ function BloqueAnalisis({ analisis }: { analisis: DashboardData["analisis"] }) {
         </div>
       )}
 
-      {/* Por ámbito + por necesidad */}
+      {/* Por necesidad */}
       <div className="flex flex-col sm:flex-row gap-4">
-        {/* Ámbito */}
-        {(totalPersonal > 0 || totalProfesional > 0) && (
-          <div className="flex-1 space-y-2">
-            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Por ámbito</p>
-            <div className="flex gap-2 flex-wrap">
-              {totalPersonal > 0 && (
-                <div className="border border-border rounded-lg px-3 py-2 bg-card">
-                  <p className="text-xs text-muted-foreground">Personal</p>
-                  <p className="text-sm font-semibold tabular-nums">{fmt(totalPersonal)}</p>
-                </div>
-              )}
-              {totalProfesional > 0 && (
-                <div className="border border-border rounded-lg px-3 py-2 bg-card">
-                  <p className="text-xs text-muted-foreground">Profesional</p>
-                  <p className="text-sm font-semibold tabular-nums">{fmt(totalProfesional)}</p>
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-
         {/* Necesidad - pie chart */}
         {porNecesidad.length > 0 && (
           <div className="space-y-2">
@@ -644,8 +578,6 @@ export function DashboardClient({ data }: { data: DashboardData }) {
   const { hiddenBlocks, toggleBlock } = useBlockToggle();
   const router = useRouter();
 
-  const esProf = data.perfil.modo !== "personal";
-
   async function handleSilenciar(alerta: Alerta) {
     if (!alerta.referencia_id) return;
     const now = new Date();
@@ -665,7 +597,6 @@ export function DashboardClient({ data }: { data: DashboardData }) {
     ...(data.inversiones.length > 0 ? ["inversiones"] : []),
     ...(data.compartidos.totalPendiente > 0 ? ["compartidos"] : []),
     "analisis",
-    ...(esProf && data.profesional ? ["profesional"] : []),
   ];
   const bloquesOcultos = hiddenBlocks.filter(id => bloquesDisponibles.includes(id));
 
@@ -720,13 +651,6 @@ export function DashboardClient({ data }: { data: DashboardData }) {
       <DashBlock id="cuentas" title="Cuentas y tarjetas" hiddenBlocks={hiddenBlocks} onToggle={toggleBlock}>
         <BloqueCuentas cuentas={data.cuentasLiquidas} tarjetas={data.tarjetas} />
       </DashBlock>
-
-      {/* Profesional */}
-      {esProf && data.profesional && (
-        <DashBlock id="profesional" title="Profesional" hiddenBlocks={hiddenBlocks} onToggle={toggleBlock}>
-          <BloqueProfesional datos={data.profesional} />
-        </DashBlock>
-      )}
 
       {/* Préstamos */}
       {data.prestamos.length > 0 && (
