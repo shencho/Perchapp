@@ -10,13 +10,11 @@ export const METODOS = [
 ] as const;
 
 export const TIPOS_MOV      = ["Ingreso", "Egreso", "Transferencia"] as const;
-export const AMBITOS        = ["Personal", "Profesional"] as const;
 export const CLASIFICACIONES = ["Fijo", "Variable", "Cuotas"] as const;
 export const FRECUENCIAS    = ["Corriente", "No corriente"] as const;
 
 export const movimientoSchema = z.object({
   tipo:               z.enum(TIPOS_MOV),
-  ambito:             z.enum(AMBITOS).default("Personal"),
   monto:              z.number().positive("El monto debe ser mayor a 0"),
   moneda:             z.enum(["ARS", "USD"]).default("ARS"),
   tipo_cambio:        z.number().positive().nullable().optional(),
@@ -36,8 +34,6 @@ export const movimientoSchema = z.object({
   cantidad:           z.number().int().min(1).default(1),
   unitario:           z.number().positive().nullable().optional(),
   observaciones:      z.string().nullable().optional(),
-  cliente_id:         z.string().uuid().nullable().optional(),
-  servicio_id:        z.string().uuid().nullable().optional(),
   fecha:              z.string().optional(),
   es_compartido:           z.boolean().optional(),
   gc_mi_parte:             z.number().positive().nullable().optional(),

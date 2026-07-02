@@ -13,12 +13,6 @@ import { NamedSelect } from "@/components/ui/named-select";
 import { cn } from "@/lib/utils";
 import { createMovimiento, updateMovimiento } from "@/lib/supabase/actions/movimientos";
 import { createPlantilla, buscarPlantillaParecida } from "@/lib/supabase/actions/plantillas";
-import { getServicios } from "@/lib/supabase/actions/servicios";
-import {
-  getPagoByMovimientoId,
-  syncPagoFromMovimiento,
-  unlinkPagoFromMovimiento,
-} from "@/lib/supabase/actions/pagos";
 import {
   getParticipantes,
   upsertParticipantes,
@@ -27,10 +21,8 @@ import {
 } from "@/lib/supabase/actions/gastos-compartidos";
 import type { ParticipanteInput, PagadorFormInput } from "@/lib/supabase/actions/gastos-compartidos-types";
 import { createPersona } from "@/lib/supabase/actions/personas";
-import { RegistrarPagoModal } from "./registrar-pago-modal";
 import {
   TIPOS_MOV,
-  AMBITOS,
   METODOS,
   CLASIFICACIONES,
   FRECUENCIAS,
@@ -58,7 +50,6 @@ interface ParticipanteForm {
 
 const schema = z.object({
   tipo:              z.enum(TIPOS_MOV),
-  ambito:            z.enum(AMBITOS),
   moneda:            z.enum(["ARS", "USD"]),
   tipo_cambio:       z.number().positive().nullable().optional(),
   monto:             z.number().positive("El monto debe ser mayor a 0"),
@@ -78,15 +69,10 @@ const schema = z.object({
   cantidad:          z.number().int().min(1),
   observaciones:     z.string().nullable().optional(),
   fecha:             z.string().optional(),
-  cliente_id:        z.string().nullable().optional(),
-  servicio_id:       z.string().nullable().optional(),
   crear_recurrente:   z.boolean().optional(),
   nombre_plantilla:   z.string().optional(),
   dia_mes_recurrente: z.number().int().min(1).max(31).optional(),
 }).superRefine((data, ctx) => {
-  if (data.ambito === "Profesional" && data.tipo !== "Transferencia" && !data.cliente_id) {
-    ctx.addIssue({ code: z.ZodIssueCode.custom, message: "El cliente es requerido", path: ["cliente_id"] });
-  }
   if (data.crear_recurrente === true) {
     if (!data.nombre_plantilla || data.nombre_plantilla.trim().length < 2) {
       ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Nombre requerido (mínimo 2 caracteres)", path: ["nombre_plantilla"] });
@@ -109,7 +95,6 @@ interface Props {
   cuentas: Cuenta[];
   tarjetas: Tarjeta[];
   categorias: Categoria[];
-  clientes?: { id: string; nombre: string }[];
   defaultValues?: Partial<FormData>;
   suggestCategoria?: string;
   personas?: Persona[];
@@ -146,17 +131,13 @@ function todayStr() {
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
-export function MovimientoEditor({ open, onClose, onSaved, editing, cuentas, tarjetas, categorias, clientes = [], defaultValues, suggestCategoria, personas = [], grupos = [] }: Props) {
+export function MovimientoEditor({ open, onClose, onSaved, editing, cuentas, tarjetas, categorias, defaultValues, suggestCategoria, personas = [], grupos = [] }: Props) {
   const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [localCategorias, setLocalCategorias] = useState<Categoria[]>(categorias);
   const [padreId, setPadreId] = useState<string | null>(null);
   const [subcatId, setSubcatId] = useState<string | null>(null);
-  const [serviciosCliente, setServiciosCliente] = useState<{ id: string; nombre: string; modalidad: string }[]>([]);
-  const [pagoModalOpen, setPagoModalOpen] = useState(false);
-  const [pendingPayload, setPendingPayload] = useState<MovimientoInput | null>(null);
-  const [linkedPago, setLinkedPago] = useState<{ id: string; registro_creado_id: string | null } | null>(null);
 
   // Gasto compartido
   const [esCompartido, setEsCompartido] = useState(false);
@@ -189,15 +170,12 @@ export function MovimientoEditor({ open, onClose, onSaved, editing, cuentas, tar
     resolver: zodResolver(schema),
     defaultValues: {
       tipo:          "Egreso",
-      ambito:        "Personal",
       moneda:        "ARS",
       clasificacion: "Variable",
       cuotas:        1,
       frecuencia:       "Corriente",
       cantidad:         1,
       fecha:            todayStr(),
-      cliente_id:       null,
-      servicio_id:      null,
       crear_recurrente: false,
       ...defaultValues,
     },
@@ -222,7 +200,6 @@ export function MovimientoEditor({ open, onClose, onSaved, editing, cuentas, tar
       resolveCatId(editing.categoria_id);
       reset({
         tipo:              editing.tipo as FormData["tipo"],
-        ambito:            editing.ambito as FormData["ambito"],
         moneda:            (editing.moneda ?? "ARS") as "ARS" | "USD",
         tipo_cambio:       editing.tipo_cambio ?? undefined,
         monto:             editing.monto,
@@ -241,20 +218,15 @@ export function MovimientoEditor({ open, onClose, onSaved, editing, cuentas, tar
         cantidad:          editing.cantidad ?? 1,
         observaciones:     editing.observaciones ?? undefined,
         fecha:             editing.fecha ?? todayStr(),
-        cliente_id:        editing.cliente_id ?? null,
-        servicio_id:       editing.servicio_id ?? null,
       });
     } else if (defaultValues) {
       resolveCatId(defaultValues.categoria_id as string | null | undefined);
-      reset({ tipo: "Egreso", ambito: "Personal", moneda: "ARS", clasificacion: "Variable", cuotas: 1, frecuencia: "Corriente", cantidad: 1, fecha: todayStr(), ...defaultValues });
+      reset({ tipo: "Egreso", moneda: "ARS", clasificacion: "Variable", cuotas: 1, frecuencia: "Corriente", cantidad: 1, fecha: todayStr(), ...defaultValues });
     } else {
       setPadreId(null);
       setSubcatId(null);
-      reset({ tipo: "Egreso", ambito: "Personal", moneda: "ARS", clasificacion: "Variable", cuotas: 1, frecuencia: "Corriente", cantidad: 1, fecha: todayStr() });
+      reset({ tipo: "Egreso", moneda: "ARS", clasificacion: "Variable", cuotas: 1, frecuencia: "Corriente", cantidad: 1, fecha: todayStr() });
     }
-    setPagoModalOpen(false);
-    setPendingPayload(null);
-    setLinkedPago(null);
 
     // Gasto compartido
     setEsCompartido(editing?.es_compartido ?? false);
@@ -312,19 +284,8 @@ export function MovimientoEditor({ open, onClose, onSaved, editing, cuentas, tar
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editing, open]);
 
-  // Cargar pago vinculado cuando se edita un movimiento Profesional
-  useEffect(() => {
-    if (editing?.id && editing?.ambito === "Profesional") {
-      getPagoByMovimientoId(editing.id)
-        .then((p) => setLinkedPago(p))
-        .catch(() => setLinkedPago(null));
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [editing?.id]);
-
   // Valores observados para condicionales
   const tipo         = watch("tipo");
-  const ambito       = watch("ambito");
   const moneda       = watch("moneda");
   const clasificacion = watch("clasificacion");
   const metodo       = watch("metodo");
@@ -332,7 +293,6 @@ export function MovimientoEditor({ open, onClose, onSaved, editing, cuentas, tar
   const cuotas       = watch("cuotas");
   const monto        = watch("monto");
   const cantidad     = watch("cantidad");
-  const clienteId        = watch("cliente_id");
   const crearRecurrente  = watch("crear_recurrente");
 
   // Pre-llenar nombre_plantilla con concepto cuando el usuario activa el checkbox
@@ -342,11 +302,6 @@ export function MovimientoEditor({ open, onClose, onSaved, editing, cuentas, tar
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [crearRecurrente, getValues, setValue]);
-
-  // REGLA 1: detectar si el pago vinculado se desvinculará al guardar
-  const pagoSeDesvinculara =
-    !!editing && !!linkedPago &&
-    (ambito !== (editing.ambito as string) || clienteId !== editing.cliente_id);
 
   // Resetear gasto compartido si se cambia el tipo
   useEffect(() => {
@@ -367,24 +322,6 @@ export function MovimientoEditor({ open, onClose, onSaved, editing, cuentas, tar
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [monto, esCompartido, pagadoresAutoSync]);
 
-  // Limpiar cliente/servicio cuando se cambia a Personal
-  useEffect(() => {
-    if (ambito !== "Profesional") {
-      setValue("cliente_id", null);
-      setValue("servicio_id", null);
-      setServiciosCliente([]);
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ambito]);
-
-  // Cargar servicios cuando cambia el cliente
-  useEffect(() => {
-    if (!clienteId) { setServiciosCliente([]); return; }
-    getServicios(clienteId)
-      .then((s) => setServiciosCliente(s.filter((sv) => !sv.archivado).map((sv) => ({ id: sv.id, nombre: sv.nombre, modalidad: sv.modalidad }))))
-      .catch(() => setServiciosCliente([]));
-  }, [clienteId]);
-
   // Categorías padre (sin parent_id)
   const catsPadre = localCategorias.filter((c) => !c.parent_id && (
     tipo === "Transferencia" ? false : c.tipo === tipo || c.tipo === "Ambos"
@@ -401,7 +338,7 @@ export function MovimientoEditor({ open, onClose, onSaved, editing, cuentas, tar
   const showTarjeta = metodo === "Crédito" || (metodo === "Débito automático" && debita_de === "tarjeta");
   const showFechaVto = showTarjeta;
   const showDebitaDe = metodo === "Débito automático";
-  const showNecesidad = tipo === "Egreso" && ambito === "Personal";
+  const showNecesidad = tipo === "Egreso";
   const showCuotasChip = clasificacion === "Cuotas";
   const showTipoCambio = moneda === "USD";
   const showCuentaDestino = tipo === "Transferencia";
@@ -503,20 +440,10 @@ export function MovimientoEditor({ open, onClose, onSaved, editing, cuentas, tar
         debita_de:         showDebitaDe ? (values.debita_de ?? null) : null,
         cuenta_destino_id: showCuentaDestino ? (values.cuenta_destino_id ?? null) : null,
         observaciones:     values.observaciones ?? null,
-        cliente_id:        values.ambito === "Profesional" ? (values.cliente_id ?? null) : null,
-        servicio_id:       values.ambito === "Profesional" ? (values.servicio_id ?? null) : null,
         unitario:          clasificacion === "Cuotas" ? unitario : values.monto,
         es_compartido:     esCompartido,
         gc_mi_parte:       esCompartido ? gcMiParte : null,
       };
-
-      // Interceptar Ingreso Profesional nuevo → modal de pago
-      if (!editing && values.tipo === "Ingreso" && values.ambito === "Profesional" && values.cliente_id) {
-        setPendingPayload(payload);
-        setPagoModalOpen(true);
-        setIsSubmitting(false);
-        return;
-      }
 
       // Preparar participantes para upsert: resolver "guardar en agenda" primero
       const participantesInput: ParticipanteInput[] = [];
@@ -547,20 +474,6 @@ export function MovimientoEditor({ open, onClose, onSaved, editing, cuentas, tar
       }
 
       if (editing) {
-        // REGLA 1: sincronizar o desvincular pago vinculado
-        if (linkedPago) {
-          const ambitoChanged = values.ambito !== (editing.ambito as string);
-          const clienteChanged = values.cliente_id !== editing.cliente_id;
-          if (ambitoChanged || clienteChanged) {
-            await unlinkPagoFromMovimiento(editing.id);
-          } else {
-            await syncPagoFromMovimiento(editing.id, {
-              monto:             values.monto,
-              fecha:             values.fecha ?? new Date().toISOString().slice(0, 10),
-              cuenta_destino_id: values.cuenta_id ?? null,
-            });
-          }
-        }
         await updateMovimiento(editing.id, payload);
         if (esCompartido) {
           await Promise.all([
@@ -608,9 +521,6 @@ export function MovimientoEditor({ open, onClose, onSaved, editing, cuentas, tar
               moneda:         values.moneda,
               dia_mes:        values.dia_mes_recurrente!,
               tipo:           values.tipo as "Egreso" | "Ingreso",
-              ambito:         values.ambito,
-              cliente_id:     values.ambito === "Profesional" ? (values.cliente_id ?? null) : null,
-              servicio_id:    values.ambito === "Profesional" ? (values.servicio_id ?? null) : null,
               metodo:         values.metodo ?? undefined,
               debita_de:      values.debita_de ?? null,
               cuenta_id:      values.cuenta_id ?? null,
@@ -644,26 +554,6 @@ export function MovimientoEditor({ open, onClose, onSaved, editing, cuentas, tar
 
   return (
     <>
-    {/* Modal de pago — z-[60], por encima del editor z-50 */}
-    {pagoModalOpen && pendingPayload && (
-      <RegistrarPagoModal
-        open={pagoModalOpen}
-        onClose={() => { setPagoModalOpen(false); setPendingPayload(null); }}
-        onConfirm={() => {
-          setPagoModalOpen(false);
-          setPendingPayload(null);
-          router.refresh();
-          onSaved?.();
-          onClose();
-        }}
-        cliente={{
-          id: pendingPayload.cliente_id!,
-          nombre: clientes.find((c) => c.id === pendingPayload.cliente_id)?.nombre ?? "",
-        }}
-        movimientoData={pendingPayload}
-        serviciosDisponibles={serviciosCliente}
-      />
-    )}
     {open && (
     <div className="fixed inset-0 z-50 flex items-start justify-center p-4 pt-10 sm:items-center sm:pt-4">
       {/* Backdrop */}
@@ -685,95 +575,21 @@ export function MovimientoEditor({ open, onClose, onSaved, editing, cuentas, tar
         <form onSubmit={handleSubmit(onSubmit)} className="overflow-y-auto flex-1">
           <div className="px-5 py-4 space-y-4">
 
-            {/* TIPO + ÁMBITO */}
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1.5">
-                <Label>Tipo</Label>
-                <Controller
-                  name="tipo"
-                  control={control}
-                  render={({ field }) => (
-                    <NamedSelect
-                      options={TIPOS_MOV.map(t => ({ value: t, label: t }))}
-                      value={field.value}
-                      onValueChange={(v) => v && field.onChange(v)}
-                      className="w-full"
-                    />
-                  )}
-                />
-              </div>
-
-              {tipo !== "Transferencia" && (
-                <div className="space-y-1.5">
-                  <Label>Ámbito</Label>
-                  <Controller
-                    name="ambito"
-                    control={control}
-                    render={({ field }) => (
-                      <NamedSelect
-                        options={AMBITOS.map(a => ({ value: a, label: a }))}
-                        value={field.value}
-                        onValueChange={(v) => v && field.onChange(v)}
-                        className="w-full"
-                      />
-                    )}
+            {/* TIPO */}
+            <div className="space-y-1.5">
+              <Label>Tipo</Label>
+              <Controller
+                name="tipo"
+                control={control}
+                render={({ field }) => (
+                  <NamedSelect
+                    options={TIPOS_MOV.map(t => ({ value: t, label: t }))}
+                    value={field.value}
+                    onValueChange={(v) => v && field.onChange(v)}
+                    className="w-full"
                   />
-                </div>
-              )}
-
-              {ambito === "Profesional" && tipo !== "Transferencia" && (
-                <div className="col-span-2">
-                  {clientes.length === 0 ? (
-                    <p className="text-xs text-muted-foreground border border-dashed border-border rounded-md px-3 py-2">
-                      Aún no tenés clientes. Agregalos en{" "}
-                      <a href="/clientes" className="underline hover:text-foreground">/clientes</a>{" "}
-                      para vincularlos a movimientos.
-                    </p>
-                  ) : (
-                    <div className="grid grid-cols-2 gap-3">
-                      <div className="space-y-1.5">
-                        <Label>Cliente</Label>
-                        <Controller
-                          name="cliente_id"
-                          control={control}
-                          render={({ field }) => (
-                            <NamedSelect
-                              options={clientes.map((c) => ({ value: c.id, label: c.nombre }))}
-                              value={field.value ?? ""}
-                              onValueChange={(v) => {
-                                field.onChange(v || null);
-                                setValue("servicio_id", null);
-                              }}
-                              placeholder="Seleccionar cliente…"
-                              className="w-full"
-                            />
-                          )}
-                        />
-                        {errors.cliente_id && (
-                          <p className="text-xs text-destructive">{errors.cliente_id.message}</p>
-                        )}
-                      </div>
-                      <div className="space-y-1.5">
-                        <Label>Servicio</Label>
-                        <Controller
-                          name="servicio_id"
-                          control={control}
-                          render={({ field }) => (
-                            <NamedSelect
-                              options={serviciosCliente.map((s) => ({ value: s.id, label: s.nombre }))}
-                              value={field.value ?? ""}
-                              onValueChange={(v) => field.onChange(v || null)}
-                              placeholder="Opcional…"
-                              disabled={!clienteId}
-                              className="w-full"
-                            />
-                          )}
-                        />
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
+                )}
+              />
             </div>
 
             {/* MONEDA + TIPO DE CAMBIO */}
@@ -1578,18 +1394,6 @@ export function MovimientoEditor({ open, onClose, onSaved, editing, cuentas, tar
 
           {/* Footer */}
           <div className="px-5 py-4 border-t border-border flex-shrink-0 space-y-2">
-            {editing && linkedPago && (
-              <p className={cn(
-                "text-xs px-2 py-1.5 rounded border",
-                pagoSeDesvinculara
-                  ? "bg-amber-950/30 border-amber-800/40 text-amber-300"
-                  : "bg-surface border-border text-muted-foreground",
-              )}>
-                {pagoSeDesvinculara
-                  ? "Al guardar se desvinculará el pago del cliente asociado a este movimiento."
-                  : "Este movimiento tiene un pago vinculado. Los cambios de monto y fecha se sincronizarán."}
-              </p>
-            )}
             <div className="flex items-center justify-between gap-3">
               {error && <p className="text-xs text-destructive flex-1">{error}</p>}
               <div className="flex gap-2 ml-auto">

@@ -213,7 +213,12 @@ export async function createPagoFromMovimiento(data: CreatePagoFromMovimientoInp
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error("No autenticado");
 
-  const m = data.movimientoData;
+  // TODO: cleanup en BLOQUE 10 (pagos.ts se elimina completo). Cast temporal por
+  // los campos pro removidos de MovimientoInput (ambito/servicio_id).
+  const m = data.movimientoData as typeof data.movimientoData & {
+    ambito?: string | null;
+    servicio_id?: string | null;
+  };
   const today = new Date().toISOString().slice(0, 10);
 
   // 1. Insertar movimiento

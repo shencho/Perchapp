@@ -162,7 +162,6 @@ export function RevisionModal({
     try {
       await createMovimiento({
         tipo:              parsed.tipo,
-        ambito:            "Personal", // TODO: cleanup en BLOQUE 2 (drop de ambito en el schema)
         monto:             parsed.final,
         moneda:            parsed.moneda,
         tipo_cambio:       parsed.tipoCambio ?? null,
