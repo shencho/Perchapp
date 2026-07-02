@@ -31,8 +31,6 @@ export async function getMovimientos(filtros: MovimientosFiltros = {}) {
       cuentas:cuenta_id ( id, nombre, tipo ),
       cuenta_destino:cuenta_destino_id ( id, nombre ),
       tarjetas:tarjeta_id ( id, nombre ),
-      clientes:cliente_id ( id, nombre ),
-      servicios_cliente:servicio_id ( id, nombre ),
       prestamos:prestamo_id ( id, tipo, institucion_nombre, persona_id, personas ( nombre ) ),
       gastos_compartidos_participantes ( id, estado, monto )
     `, { count: "exact" })
@@ -49,7 +47,6 @@ export async function getMovimientos(filtros: MovimientosFiltros = {}) {
   }
 
   if (filtros.tipo)         query = query.eq("tipo", filtros.tipo);
-  if (filtros.ambito)       query = query.eq("ambito", filtros.ambito);
   if (filtros.categoria_id) query = query.eq("categoria_id", filtros.categoria_id);
   if (filtros.metodo)       query = query.eq("metodo", filtros.metodo);
   if (filtros.cuenta_id)    query = query.eq("cuenta_id", filtros.cuenta_id);
@@ -71,7 +68,6 @@ export async function createMovimiento(input: MovimientoInput): Promise<{ id: st
   const row = {
     user_id:           userId,
     tipo:              parsed.tipo,
-    ambito:            parsed.ambito,
     monto:             parsed.monto,
     moneda:            parsed.moneda,
     tipo_cambio:       parsed.tipo_cambio ?? null,
@@ -91,8 +87,6 @@ export async function createMovimiento(input: MovimientoInput): Promise<{ id: st
     cantidad:          parsed.cantidad,
     unitario:          parsed.unitario ?? null,
     observaciones:     parsed.observaciones ?? null,
-    cliente_id:        parsed.ambito === "Profesional" ? (parsed.cliente_id ?? null) : null,
-    servicio_id:       parsed.ambito === "Profesional" ? (parsed.servicio_id ?? null) : null,
     fecha:             parsed.fecha ?? new Date().toISOString().slice(0, 10),
     es_compartido:     parsed.es_compartido ?? false,
     gc_mi_parte:       parsed.gc_mi_parte ?? null,

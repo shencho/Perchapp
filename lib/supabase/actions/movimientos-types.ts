@@ -49,7 +49,6 @@ export type MovimientoInput = z.infer<typeof movimientoSchema>;
 export interface MovimientosFiltros {
   mes?: string;
   tipo?: string;
-  ambito?: string;
   categoria_id?: string;
   metodo?: string;
   cuenta_id?: string;
