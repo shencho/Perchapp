@@ -20,59 +20,8 @@ const CATEGORIAS_BASE: {
   { nombre: "Otros ingresos",      tipo: "Ingreso", subs: ["Reintegros", "Regalos"] },
 ];
 
-// Categorías adicionales planas por área profesional (se agregan sin duplicar nombres)
-const CATEGORIAS_POR_AREA: Record<string, { nombre: string; tipo: "Ingreso" | "Egreso" }[]> = {
-  "salud-bienestar": [
-    { nombre: "Sesión individual",       tipo: "Ingreso" },
-    { nombre: "Sesión pareja/familia",   tipo: "Ingreso" },
-    { nombre: "Evaluación",              tipo: "Ingreso" },
-    { nombre: "Plan mensual",            tipo: "Ingreso" },
-    { nombre: "Material profesional",    tipo: "Egreso"  },
-    { nombre: "Capacitaciones",          tipo: "Egreso"  },
-    { nombre: "Supervisiones",           tipo: "Egreso"  },
-    { nombre: "Alquiler de consultorio", tipo: "Egreso"  },
-  ],
-  "educacion": [
-    { nombre: "Clase individual",          tipo: "Ingreso" },
-    { nombre: "Clase grupal",              tipo: "Ingreso" },
-    { nombre: "Curso completo",            tipo: "Ingreso" },
-    { nombre: "Material didáctico",        tipo: "Egreso"  },
-    { nombre: "Plataformas (Zoom, Teams)", tipo: "Egreso"  },
-    { nombre: "Certificaciones",           tipo: "Egreso"  },
-  ],
-  "servicios-profesionales": [
-    { nombre: "Honorarios profesionales", tipo: "Ingreso" },
-    { nombre: "Asesoría puntual",         tipo: "Ingreso" },
-    { nombre: "Proyecto",                 tipo: "Ingreso" },
-    { nombre: "Retainer mensual",         tipo: "Ingreso" },
-    { nombre: "Software profesional",     tipo: "Egreso"  },
-    { nombre: "Capacitaciones",           tipo: "Egreso"  },
-    { nombre: "Almuerzos comerciales",    tipo: "Egreso"  },
-  ],
-  "creatividad-digital": [
-    { nombre: "Proyecto",                   tipo: "Ingreso" },
-    { nombre: "Iguala mensual",             tipo: "Ingreso" },
-    { nombre: "Licencias / Royalties",      tipo: "Ingreso" },
-    { nombre: "Software (Adobe, Figma...)", tipo: "Egreso"  },
-    { nombre: "Hardware",                   tipo: "Egreso"  },
-    { nombre: "Cursos",                     tipo: "Egreso"  },
-    { nombre: "Stock fotográfico",          tipo: "Egreso"  },
-  ],
-  "belleza-cuidado": [
-    { nombre: "Servicio individual", tipo: "Ingreso" },
-    { nombre: "Paquete",             tipo: "Ingreso" },
-    { nombre: "Membresía",           tipo: "Ingreso" },
-    { nombre: "Insumos",             tipo: "Egreso"  },
-    { nombre: "Equipamiento",        tipo: "Egreso"  },
-    { nombre: "Alquiler de espacio", tipo: "Egreso"  },
-  ],
-  "generico": [],
-};
-
 export interface OnboardingData {
   nombre: string;
-  profesion: string;
-  modo: "personal" | "profesional" | "ambos";
   asistente_nombre: string;
 }
 
@@ -95,8 +44,7 @@ export async function createProfile(data: OnboardingData) {
     .upsert({
       id: userId,
       nombre: data.nombre,
-      profesion: data.profesion,
-      modo: data.modo,
+      modo: "personal",
       asistente_nombre: data.asistente_nombre || "MANGO AI",
       onboarding_completado: true,
     });
@@ -115,8 +63,6 @@ export async function createProfile(data: OnboardingData) {
   if (cuentaError) throw new Error(cuentaError.message);
 
   // 3. Crear categorías base (jerárquicas: padres + subcategorías)
-  const nombresExistentes = new Set<string>(); // para no duplicar con área
-
   for (const cat of CATEGORIAS_BASE) {
     // Insertar categoría padre
     const { data: insertedParent, error: parentError } = await supabase
@@ -126,7 +72,6 @@ export async function createProfile(data: OnboardingData) {
       .single();
 
     if (parentError) throw new Error(parentError.message);
-    nombresExistentes.add(cat.nombre.toLowerCase());
 
     // Insertar subcategorías
     if (cat.subs.length > 0) {
@@ -141,20 +86,7 @@ export async function createProfile(data: OnboardingData) {
     }
   }
 
-  // 4. Agregar categorías del área profesional (solo las que no duplican nombre)
-  const categoriasArea = CATEGORIAS_POR_AREA[data.profesion] ?? [];
-  const catAreaFiltradas = categoriasArea.filter(
-    (c) => !nombresExistentes.has(c.nombre.toLowerCase())
-  );
-
-  if (catAreaFiltradas.length > 0) {
-    const { error: areaError } = await supabase.from("categorias").insert(
-      catAreaFiltradas.map((c) => ({ user_id: userId, nombre: c.nombre, tipo: c.tipo }))
-    );
-    if (areaError) throw new Error(areaError.message);
-  }
-
-  // 5. Crear feature_flags vacío
+  // 4. Crear feature_flags vacío
   const { error: flagsError } = await supabase.from("feature_flags").upsert({
     user_id: userId,
     flags: {},
@@ -162,6 +94,6 @@ export async function createProfile(data: OnboardingData) {
 
   if (flagsError) throw new Error(flagsError.message);
 
-  // 6. Redirigir a categorías sugeridas
+  // 5. Redirigir a categorías sugeridas
   redirect("/onboarding/categorias-sugeridas");
 }

@@ -8,16 +8,12 @@ import { getNavItems } from "@/lib/navigation/get-nav-items";
 
 interface Props {
   trigger: ReactElement;
-  modo: "personal" | "profesional" | "ambos" | null;
   userEmail?: string;
 }
 
-export function NavigationDrawer({ trigger, modo, userEmail }: Props) {
-  const m = modo ?? "personal";
-  const drawerItems = getNavItems(modo).filter(
-    (item) => item.drawerOnly ||
-    item.desktopOnly ||
-    ((m === "profesional" || m === "ambos") && item.href === "/balances")
+export function NavigationDrawer({ trigger, userEmail }: Props) {
+  const drawerItems = getNavItems().filter(
+    (item) => item.drawerOnly || item.desktopOnly
   );
 
   return (

@@ -10,7 +10,7 @@ export default async function CapturaPage() {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  const [cuentasRes, tarjetasRes, categoriasRes, clientesRes, personasRes, gruposRes] = await Promise.all([
+  const [cuentasRes, tarjetasRes, categoriasRes, personasRes, gruposRes] = await Promise.all([
     supabase
       .from("cuentas")
       .select("*")
@@ -27,12 +27,6 @@ export default async function CapturaPage() {
       .select("*")
       .eq("user_id", user.id)
       .eq("archivada", false)
-      .order("nombre"),
-    supabase
-      .from("clientes")
-      .select("id, nombre")
-      .eq("user_id", user.id)
-      .eq("archivado", false)
       .order("nombre"),
     supabase
       .from("personas")
@@ -68,7 +62,6 @@ export default async function CapturaPage() {
         cuentas={cuentasRes.data ?? []}
         tarjetas={tarjetasRes.data ?? []}
         categorias={categoriasRes.data ?? []}
-        clientes={(clientesRes.data ?? []) as { id: string; nombre: string }[]}
         personas={(personasRes.data ?? []) as Persona[]}
         grupos={grupos}
       />

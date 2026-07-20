@@ -9,12 +9,11 @@ interface Props {
   cuentas: Cuenta[];
   tarjetas: Tarjeta[];
   categorias: Categoria[];
-  clientes: { id: string; nombre: string }[];
   personas: Persona[];
   grupos: GrupoConMiembros[];
 }
 
-export function CapturaFormPage({ cuentas, tarjetas, categorias, clientes, personas, grupos }: Props) {
+export function CapturaFormPage({ cuentas, tarjetas, categorias, personas, grupos }: Props) {
   const router = useRouter();
   return (
     <CapturaForm
@@ -23,7 +22,6 @@ export function CapturaFormPage({ cuentas, tarjetas, categorias, clientes, perso
       cuentas={cuentas}
       tarjetas={tarjetas}
       categorias={categorias}
-      clientes={clientes}
       personas={personas}
       grupos={grupos}
     />

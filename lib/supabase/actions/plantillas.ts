@@ -11,9 +11,6 @@ export interface CreatePlantillaInput {
   moneda: string;
   dia_mes: number;
   tipo?: "Egreso" | "Ingreso";
-  ambito?: "Personal" | "Profesional";
-  cliente_id?: string | null;
-  servicio_id?: string | null;
   metodo?: PlantillaRecurrente["metodo"];
   debita_de?: "cuenta" | "tarjeta" | null;
   cuenta_id?: string | null;
@@ -189,9 +186,6 @@ export async function generarMovimientosDePlantillas(
       categoria_id:            p.categoria_id,
       clasificacion:           p.clasificacion ?? "Fijo",
       concepto:                p.concepto ?? null,
-      ambito:                  (p.ambito ?? "Personal") as "Personal" | "Profesional",
-      cliente_id:              p.cliente_id ?? null,
-      servicio_id:             p.servicio_id ?? null,
       frecuencia:              "Corriente" as const,
       plantilla_recurrente_id: p.id,
     };

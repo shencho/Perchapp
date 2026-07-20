@@ -12,15 +12,11 @@ export default async function MovimientosRecurrentesPage() {
     { data: cuentas },
     { data: tarjetas },
     { data: categorias },
-    { data: clientesRaw },
-    { data: serviciosRaw },
     plantillas,
   ] = await Promise.all([
     supabase.from("cuentas").select("*").eq("user_id", user.id).eq("archivada", false).order("orden"),
     supabase.from("tarjetas").select("*").eq("user_id", user.id).eq("archivada", false).order("created_at"),
     supabase.from("categorias").select("*").eq("user_id", user.id).eq("archivada", false).order("orden"),
-    supabase.from("clientes").select("id, nombre").eq("user_id", user.id).eq("archivado", false).order("nombre"),
-    supabase.from("servicios_cliente").select("id, cliente_id, nombre").eq("user_id", user.id).eq("archivado", false).order("nombre"),
     getPlantillas(),
   ]);
 
@@ -30,8 +26,6 @@ export default async function MovimientosRecurrentesPage() {
       cuentas={cuentas ?? []}
       tarjetas={tarjetas ?? []}
       categorias={categorias ?? []}
-      clientes={clientesRaw ?? []}
-      servicios={serviciosRaw ?? []}
     />
   );
 }

@@ -6,8 +6,6 @@ import { createClient } from "@/lib/supabase/server";
 
 export interface UpdateAjustesData {
   nombre: string;
-  modo: "personal" | "profesional" | "ambos";
-  profesion: string;
   asistente_nombre: string;
 }
 
@@ -22,8 +20,6 @@ export async function updateAjustes(data: UpdateAjustesData) {
     .from("profiles")
     .update({
       nombre: data.nombre,
-      modo: data.modo,
-      profesion: data.profesion,
       asistente_nombre: data.asistente_nombre,
     })
     .eq("id", user.id);

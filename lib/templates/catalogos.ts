@@ -145,16 +145,6 @@ export const TEMPLATE_CATEGORIAS: TemplateCategoria[] = [
     ],
   },
   {
-    nombre: "Profesional", tipo: "Egreso",
-    subcategorias: [
-      { nombre: "Suscripciones" },
-      { nombre: "Materiales" },
-      { nombre: "Marketing" },
-      { nombre: "Honorarios" },
-      { nombre: "Servicios de terceros" },
-    ],
-  },
-  {
     nombre: "Inversiones", tipo: "Egreso",
     subcategorias: [
       { nombre: "Comisiones" },
@@ -173,10 +163,6 @@ export const TEMPLATE_CATEGORIAS: TemplateCategoria[] = [
       { nombre: "Aguinaldo" },
       { nombre: "Vacaciones" },
     ],
-  },
-  {
-    nombre: "Honorarios profesionales", tipo: "Ingreso",
-    subcategorias: [],
   },
   {
     nombre: "Renta inmobiliaria", tipo: "Ingreso",

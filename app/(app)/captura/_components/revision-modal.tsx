@@ -18,7 +18,6 @@ interface Props {
   cuentas: Cuenta[];
   tarjetas: Tarjeta[];
   categorias: Categoria[];
-  clientes: { id: string; nombre: string }[];
   personas: Persona[];
   grupos: GrupoConMiembros[];
   onConfirmed: () => void;
@@ -91,9 +90,6 @@ function parsedToEditorDefaults(
 
   return {
     tipo:              p.tipo,
-    ambito:            p.ambito ?? "Personal",
-    cliente_id:        p.cliente_id ?? null,
-    servicio_id:       p.servicio_id ?? null,
     moneda:            p.moneda,
     tipo_cambio:       p.tipoCambio ?? undefined,
     monto:             p.final,
@@ -123,7 +119,6 @@ export function RevisionModal({
   cuentas,
   tarjetas,
   categorias,
-  clientes,
   personas,
   grupos,
   onConfirmed,
@@ -167,9 +162,6 @@ export function RevisionModal({
     try {
       await createMovimiento({
         tipo:              parsed.tipo,
-        ambito:            parsed.ambito ?? "Personal",
-        cliente_id:        parsed.cliente_id ?? null,
-        servicio_id:       parsed.servicio_id ?? null,
         monto:             parsed.final,
         moneda:            parsed.moneda,
         tipo_cambio:       parsed.tipoCambio ?? null,
@@ -234,8 +226,6 @@ export function RevisionModal({
             {/* Resumen completo */}
             <div className="bg-surface rounded-lg p-4 space-y-2 text-sm">
               <Row label="Tipo"          value={parsed.tipo}       accent={parsed.tipo === "Ingreso" ? "green" : "red"} />
-              <Row label="Ámbito"        value={parsed.ambito ?? "Personal"} />
-              {parsed.cliente_id && <Row label="Cliente" value={clientes.find((c) => c.id === parsed.cliente_id)?.nombre ?? parsed.cliente_id} />}
               <Row label="Concepto"      value={parsed.concepto} />
               {parsed.descripcion && <Row label="Descripción" value={parsed.descripcion} />}
 
@@ -323,7 +313,6 @@ export function RevisionModal({
           cuentas={cuentas}
           tarjetas={tarjetas}
           categorias={categorias}
-          clientes={clientes}
           personas={personas}
           grupos={grupos}
           defaultValues={

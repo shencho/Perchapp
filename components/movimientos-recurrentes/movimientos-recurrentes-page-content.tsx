@@ -29,7 +29,6 @@ const CLASIFICACIONES = ["Fijo", "Variable", "Cuotas"] as const;
 
 const schema = z.object({
   tipo:           z.enum(["Egreso", "Ingreso"]),
-  ambito:         z.enum(["Personal", "Profesional"]),
   nombre:         z.string().min(1, "Requerido"),
   monto_estimado: z.number().nonnegative("Debe ser ≥ 0"),
   moneda:         z.enum(["ARS", "USD"]),
@@ -38,8 +37,6 @@ const schema = z.object({
   debita_de:      z.enum(["cuenta", "tarjeta"]).nullable().optional(),
   cuenta_id:      z.string().nullable().optional(),
   tarjeta_id:     z.string().nullable().optional(),
-  cliente_id:     z.string().nullable().optional(),
-  servicio_id:    z.string().nullable().optional(),
   clasificacion:  z.enum(CLASIFICACIONES).nullable().optional(),
   concepto:       z.string().nullable().optional(),
   fecha_inicio:   z.string().optional(),
@@ -56,10 +53,9 @@ const schema = z.object({
 type FormData = z.infer<typeof schema>;
 
 const EMPTY: FormData = {
-  tipo: "Egreso", ambito: "Personal",
+  tipo: "Egreso",
   nombre: "", monto_estimado: 0, moneda: "ARS", dia_mes: 1,
   metodo: null, debita_de: null, cuenta_id: null, tarjeta_id: null,
-  cliente_id: null, servicio_id: null,
   clasificacion: "Fijo", concepto: null, fecha_inicio: "", notas: null,
 };
 
@@ -68,8 +64,6 @@ interface Props {
   cuentas: Cuenta[];
   tarjetas: Tarjeta[];
   categorias: Categoria[];
-  clientes: { id: string; nombre: string }[];
-  servicios: { id: string; cliente_id: string; nombre: string }[];
 }
 
 function fmtMonto(n: number, moneda: string) {
@@ -79,7 +73,7 @@ function fmtMonto(n: number, moneda: string) {
   }).format(n);
 }
 
-export function MovimientosRecurrentesPageContent({ plantillas, cuentas, tarjetas, categorias, clientes, servicios }: Props) {
+export function MovimientosRecurrentesPageContent({ plantillas, cuentas, tarjetas, categorias }: Props) {
   const router = useRouter();
   const [dialogOpen, setDialogOpen]       = useState(false);
   const [deleteOpen, setDeleteOpen]       = useState(false);
@@ -96,9 +90,7 @@ export function MovimientosRecurrentesPageContent({ plantillas, cuentas, tarjeta
     useForm<FormData>({ resolver: zodResolver(schema), defaultValues: EMPTY });
 
   const tipo       = watch("tipo");
-  const ambito     = watch("ambito");
   const debita_de  = watch("debita_de");
-  const clienteId  = watch("cliente_id");
 
   const catsPadre = categorias.filter(c => !c.parent_id && (
     tipo === "Ingreso"
@@ -106,11 +98,9 @@ export function MovimientosRecurrentesPageContent({ plantillas, cuentas, tarjeta
       : (c.tipo === "Egreso" || c.tipo === "Ambos")
   ));
   const catsHijas = padreId ? categorias.filter(c => c.parent_id === padreId) : [];
-  const serviciosFiltrados = servicios.filter(s => s.cliente_id === clienteId);
 
   useEffect(() => { setSubcatId(null); }, [padreId]);
   useEffect(() => { setPadreId(null); setSubcatId(null); }, [tipo]);
-  useEffect(() => { setValue("servicio_id", null); }, [clienteId, setValue]);
 
   function resolveCatId(catId: string | null | undefined) {
     if (!catId) { setPadreId(null); setSubcatId(null); return; }
@@ -133,7 +123,6 @@ export function MovimientosRecurrentesPageContent({ plantillas, cuentas, tarjeta
     resolveCatId(p.categoria_id);
     reset({
       tipo:           (p.tipo ?? "Egreso") as "Egreso" | "Ingreso",
-      ambito:         (p.ambito ?? "Personal") as "Personal" | "Profesional",
       nombre:         p.nombre,
       monto_estimado: p.monto_estimado,
       moneda:         p.moneda as "ARS" | "USD",
@@ -142,8 +131,6 @@ export function MovimientosRecurrentesPageContent({ plantillas, cuentas, tarjeta
       debita_de:      p.debita_de ?? null,
       cuenta_id:      p.cuenta_id ?? null,
       tarjeta_id:     p.tarjeta_id ?? null,
-      cliente_id:     p.cliente_id ?? null,
-      servicio_id:    p.servicio_id ?? null,
       clasificacion:  p.clasificacion ?? null,
       concepto:       p.concepto ?? null,
       fecha_inicio:   p.fecha_inicio ?? "",
@@ -161,8 +148,6 @@ export function MovimientosRecurrentesPageContent({ plantillas, cuentas, tarjeta
         ...data,
         categoria_id: subcatId ?? padreId ?? null,
         fecha_inicio: data.fecha_inicio || new Date().toISOString().slice(0, 10),
-        cliente_id:  (data.ambito === "Profesional" && data.tipo === "Ingreso") ? (data.cliente_id ?? null) : null,
-        servicio_id: (data.ambito === "Profesional" && data.tipo === "Ingreso") ? (data.servicio_id ?? null) : null,
       };
       if (editing) await updatePlantilla(editing.id, payload);
       else         await createPlantilla(payload);
@@ -282,27 +267,15 @@ export function MovimientosRecurrentesPageContent({ plantillas, cuentas, tarjeta
           isSubmitting={isSubmitting}
         >
           <div className="flex flex-col gap-3">
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1.5">
-                <Label>Tipo</Label>
-                <Controller name="tipo" control={control} render={({ field }) => (
-                  <NamedSelect
-                    options={[{ value: "Egreso", label: "Egreso" }, { value: "Ingreso", label: "Ingreso" }]}
-                    value={field.value}
-                    onValueChange={v => field.onChange(v ?? "Egreso")}
-                  />
-                )} />
-              </div>
-              <div className="space-y-1.5">
-                <Label>Ámbito</Label>
-                <Controller name="ambito" control={control} render={({ field }) => (
-                  <NamedSelect
-                    options={[{ value: "Personal", label: "Personal" }, { value: "Profesional", label: "Profesional" }]}
-                    value={field.value}
-                    onValueChange={v => field.onChange(v ?? "Personal")}
-                  />
-                )} />
-              </div>
+            <div className="space-y-1.5">
+              <Label>Tipo</Label>
+              <Controller name="tipo" control={control} render={({ field }) => (
+                <NamedSelect
+                  options={[{ value: "Egreso", label: "Egreso" }, { value: "Ingreso", label: "Ingreso" }]}
+                  value={field.value}
+                  onValueChange={v => field.onChange(v ?? "Egreso")}
+                />
+              )} />
             </div>
 
             <div className="space-y-1.5">
@@ -345,25 +318,6 @@ export function MovimientosRecurrentesPageContent({ plantillas, cuentas, tarjeta
                 <Label>Subcategoría</Label>
                 <NamedSelect options={catsHijas.map(c => ({ value: c.id, label: c.nombre }))} value={subcatId} onValueChange={v => setSubcatId(v)} placeholder="Sin subcategoría" />
               </div>
-            )}
-
-            {ambito === "Profesional" && tipo === "Ingreso" && (
-              <>
-                <div className="space-y-1.5">
-                  <Label>Cliente</Label>
-                  <Controller name="cliente_id" control={control} render={({ field }) => (
-                    <NamedSelect options={clientes.map(c => ({ value: c.id, label: c.nombre }))} value={field.value ?? null} onValueChange={v => field.onChange(v)} placeholder="Sin cliente" />
-                  )} />
-                </div>
-                {serviciosFiltrados.length > 0 && (
-                  <div className="space-y-1.5">
-                    <Label>Servicio</Label>
-                    <Controller name="servicio_id" control={control} render={({ field }) => (
-                      <NamedSelect options={serviciosFiltrados.map(s => ({ value: s.id, label: s.nombre }))} value={field.value ?? null} onValueChange={v => field.onChange(v)} placeholder="Sin servicio" />
-                    )} />
-                  </div>
-                )}
-              </>
             )}
 
             {tipo === "Egreso" && (

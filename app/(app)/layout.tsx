@@ -21,7 +21,7 @@ export default async function AppLayout({
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("onboarding_completado, modo, asistente_nombre")
+    .select("onboarding_completado, asistente_nombre")
     .eq("id", user.id)
     .single();
 
@@ -30,13 +30,12 @@ export default async function AppLayout({
   }
 
   const asistenteNombre = profile.asistente_nombre ?? "MANGO AI";
-  const modo = profile.modo ?? "personal";
 
   return (
     <div className="min-h-screen md:flex md:flex-row">
-      <DesktopSidebar modo={modo} asistenteNombre={asistenteNombre} userEmail={user.email} />
+      <DesktopSidebar asistenteNombre={asistenteNombre} userEmail={user.email} />
       <main className="flex-1 p-4 md:p-6 pb-20 md:pb-0">{children}</main>
-      <MobileBottomNav modo={modo} userEmail={user.email} />
+      <MobileBottomNav userEmail={user.email} />
       <PerchitaFAB />
       <Toaster />
     </div>

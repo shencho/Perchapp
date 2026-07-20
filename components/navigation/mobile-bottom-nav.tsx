@@ -6,20 +6,15 @@ import { NavigationDrawer } from "@/components/navigation/navigation-drawer";
 import { getNavItems } from "@/lib/navigation/get-nav-items";
 
 interface Props {
-  modo: "personal" | "profesional" | "ambos" | null;
   userEmail?: string;
 }
 
-export function MobileBottomNav({ modo, userEmail }: Props) {
-  const allItems = getNavItems(modo);
-  const m = modo ?? "personal";
+export function MobileBottomNav({ userEmail }: Props) {
+  const allItems = getNavItems();
 
   const inicio = allItems.find((i) => i.href === "/dashboard")!;
   const movimientos = allItems.find((i) => i.href === "/movimientos")!;
-  const rightPrimary =
-    m === "profesional" || m === "ambos"
-      ? allItems.find((i) => i.href === "/clientes")!
-      : allItems.find((i) => i.href === "/balances")!;
+  const rightPrimary = allItems.find((i) => i.href === "/balances")!;
 
   return (
     <nav className="md:hidden fixed bottom-0 left-0 right-0 h-16 border-t border-border bg-background z-30">
@@ -39,7 +34,6 @@ export function MobileBottomNav({ modo, userEmail }: Props) {
               <span className="truncate max-w-[68px] leading-none">Más</span>
             </button>
           }
-          modo={modo}
           userEmail={userEmail}
         />
       </div>

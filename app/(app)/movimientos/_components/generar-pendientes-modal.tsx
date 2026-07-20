@@ -16,7 +16,6 @@ interface Props {
   open: boolean;
   onClose: () => void;
   plantillasPendientes: PlantillaConEstado[];
-  clientes?: { id: string; nombre: string }[];
   initialSelectedId?: string;
 }
 
@@ -27,7 +26,7 @@ function fmtFecha(iso: string) {
 }
 
 export function GenerarPendientesModal({
-  open, onClose, plantillasPendientes, clientes = [], initialSelectedId,
+  open, onClose, plantillasPendientes, initialSelectedId,
 }: Props) {
   const router = useRouter();
   const [montos, setMontos]           = useState<Record<string, number>>({});
@@ -129,11 +128,6 @@ export function GenerarPendientesModal({
                           {p.tipo ?? "Egreso"}
                         </span>
                       </div>
-                      {p.ambito === "Profesional" && p.cliente_id && (
-                        <div className="text-xs text-muted-foreground mt-0.5">
-                          {clientes.find(c => c.id === p.cliente_id)?.nombre ?? "Cliente"}
-                        </div>
-                      )}
                       {atrasada ? (
                         <div className="flex items-center gap-1 text-xs text-orange-400 mt-0.5">
                           <AlertTriangle className="h-3 w-3" />

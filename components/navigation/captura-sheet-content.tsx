@@ -11,7 +11,6 @@ export type CapturaData = {
   cuentas: Cuenta[];
   tarjetas: Tarjeta[];
   categorias: Categoria[];
-  clientes: { id: string; nombre: string }[];
   personas: Persona[];
   grupos: GrupoConMiembros[];
 };
@@ -37,7 +36,7 @@ export function CapturaSheetContent({ onSuccess, cachedData, onDataFetched }: Pr
       } = await supabase.auth.getUser();
       if (!user) throw new Error("no user");
 
-      const [cuentasRes, tarjetasRes, categoriasRes, clientesRes, personasRes, gruposRes] =
+      const [cuentasRes, tarjetasRes, categoriasRes, personasRes, gruposRes] =
         await Promise.all([
           supabase
             .from("cuentas")
@@ -55,12 +54,6 @@ export function CapturaSheetContent({ onSuccess, cachedData, onDataFetched }: Pr
             .select("*")
             .eq("user_id", user.id)
             .eq("archivada", false)
-            .order("nombre"),
-          supabase
-            .from("clientes")
-            .select("id, nombre")
-            .eq("user_id", user.id)
-            .eq("archivado", false)
             .order("nombre"),
           supabase
             .from("personas")
@@ -89,7 +82,6 @@ export function CapturaSheetContent({ onSuccess, cachedData, onDataFetched }: Pr
         cuentas: cuentasRes.data ?? [],
         tarjetas: tarjetasRes.data ?? [],
         categorias: categoriasRes.data ?? [],
-        clientes: (clientesRes.data ?? []) as { id: string; nombre: string }[],
         personas: (personasRes.data ?? []) as Persona[],
         grupos,
       };
@@ -142,7 +134,6 @@ export function CapturaSheetContent({ onSuccess, cachedData, onDataFetched }: Pr
         cuentas={data.cuentas}
         tarjetas={data.tarjetas}
         categorias={data.categorias}
-        clientes={data.clientes}
         personas={data.personas}
         grupos={data.grupos}
       />

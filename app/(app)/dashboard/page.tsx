@@ -1,7 +1,6 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getPrestamos } from "@/lib/supabase/actions/prestamos";
-import { getClientes } from "@/lib/supabase/actions/clientes";
 import { calcularSaldoCuenta } from "@/lib/domain/calcularSaldoCuenta";
 import { montoPropio } from "@/lib/domain/_utils/movimiento";
 import { calcularConsumoTarjeta, getPeriodoCierre, getProximoVencimiento, getCicloDelProximoVencimiento } from "@/lib/domain/calcularConsumoTarjeta";
@@ -27,12 +26,9 @@ export default async function DashboardPage() {
   // ── Phase 1: perfil ────────────────────────────────────────────────────────
   const { data: perfilData } = await supabase
     .from("profiles")
-    .select("nombre, asistente_nombre, modo")
+    .select("nombre, asistente_nombre")
     .eq("id", user.id)
     .single();
-
-  const modo = perfilData?.modo ?? "personal";
-  const esProf = modo === "profesional" || modo === "ambos";
 
   // ── Fechas de referencia ───────────────────────────────────────────────────
   const now = new Date();
@@ -57,7 +53,7 @@ export default async function DashboardPage() {
       .select("*")
       .eq("user_id", user.id).eq("archivada", false),
     supabase.from("movimientos")
-      .select("tipo, monto, moneda, fecha, cuenta_id, cuenta_destino_id, tarjeta_id, categoria_id, ambito, necesidad, plantilla_recurrente_id, es_compartido, gc_mi_parte, es_reembolso")
+      .select("tipo, monto, moneda, fecha, cuenta_id, cuenta_destino_id, tarjeta_id, categoria_id, necesidad, plantilla_recurrente_id, es_compartido, gc_mi_parte, es_reembolso")
       .eq("user_id", user.id)
       .gte("fecha", fechaDesde24m),
     supabase.from("categorias")
@@ -76,24 +72,6 @@ export default async function DashboardPage() {
   const movimientos = movimientosRes.data ?? [];
   const categorias  = categoriasRes.data ?? [];
   const compartidos = gastosRes.data ?? [];
-
-  // ── Phase 3: datos profesionales (solo si aplica) ──────────────────────────
-  let clientesRaw: Awaited<ReturnType<typeof getClientes>> = [];
-  let registrosMes: { monto: number }[] = [];
-  let pagosMes: { monto: number }[] = [];
-
-  if (esProf) {
-    const [cl, rm, pm] = await Promise.all([
-      getClientes(false),
-      supabase.from("registros_trabajo").select("monto")
-        .eq("user_id", user.id).gte("fecha", inicioMesActual).lte("fecha", finMesActual),
-      supabase.from("pagos_cliente").select("monto")
-        .eq("user_id", user.id).gte("fecha", inicioMesActual).lte("fecha", finMesActual),
-    ]);
-    clientesRaw = cl;
-    registrosMes = rm.data ?? [];
-    pagosMes = pm.data ?? [];
-  }
 
   // ── Saldos de cuentas ──────────────────────────────────────────────────────
   const movSaldo = movimientos.map(m => ({
@@ -218,23 +196,6 @@ export default async function DashboardPage() {
     }))
     .filter(n => n.monto > 0);
 
-  const totalPersonal     = movEgresoMes.filter(m => m.ambito === "Personal").reduce((acc, m) => acc + montoPropio(m), 0);
-  const totalProfesional  = movEgresoMes.filter(m => m.ambito === "Profesional").reduce((acc, m) => acc + montoPropio(m), 0);
-
-  // ── Profesional ────────────────────────────────────────────────────────────
-  let profesional: DashboardData["profesional"] = null;
-  if (esProf) {
-    const facturadoMes = registrosMes.reduce((acc, r) => acc + r.monto, 0);
-    const cobradoMes = pagosMes.reduce((acc, p) => acc + p.monto, 0);
-    const saldoPendienteTotal = clientesRaw.reduce((acc, c) => acc + (c.saldo_pendiente ?? 0), 0);
-    const topDeudores = clientesRaw
-      .filter(c => c.saldo_pendiente > 0)
-      .sort((a, b) => b.saldo_pendiente - a.saldo_pendiente)
-      .slice(0, 3)
-      .map(c => ({ id: c.id, nombre: c.nombre, saldo: c.saldo_pendiente }));
-    profesional = { facturadoMes, cobradoMes, saldoPendienteTotal, topDeudores };
-  }
-
   // ── Alertas ────────────────────────────────────────────────────────────────
   const alertas: Alerta[] = [];
 
@@ -296,27 +257,12 @@ export default async function DashboardPage() {
       });
     });
 
-  // Clientes en mora (solo modo profesional)
-  if (profesional) {
-    profesional.topDeudores.forEach(d => {
-      alertas.push({
-        id: `mora-${d.id}`,
-        tipo: "mora_cliente",
-        urgencia: "media",
-        titulo: `${d.nombre} tiene deuda pendiente`,
-        descripcion: `${fmtARS(d.saldo)} sin cobrar`,
-        href: `/clientes/${d.id}`,
-      });
-    });
-  }
-
   // ── Ensamblar DashboardData ────────────────────────────────────────────────
   const dashboardData: DashboardData = {
     perfil: {
       nombre: perfilData?.nombre ?? "",
       asistente_nombre: perfilData?.asistente_nombre ?? null,
       email: user.email ?? "",
-      modo,
     },
     hero: {
       totalARS, totalUSD,
@@ -331,15 +277,13 @@ export default async function DashboardPage() {
       monto: m.tipo === "Egreso" ? montoPropio(m) : m.monto, moneda: m.moneda, fecha: m.fecha,
       cuenta_id: m.cuenta_id, cuenta_destino_id: m.cuenta_destino_id,
       categoria_id: m.categoria_id,
-      ambito: m.ambito ?? "Personal",
       necesidad: m.necesidad ?? null,
     })),
     cuentasParaFiltro: cuentasLiquidas.map(c => ({ id: c.id, nombre: c.nombre })),
     ajusteInversionIds,
     prestamos: prestamosResumen,
     compartidos: { totalPendiente: totalCompartidoPendiente, porPersona: compartidosPorPersona },
-    analisis: { topCategorias, porNecesidad, totalPersonal, totalProfesional },
-    profesional,
+    analisis: { topCategorias, porNecesidad },
     alertas,
   };
 
