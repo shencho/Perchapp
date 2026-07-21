@@ -6,6 +6,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { MangoLogo } from "@/components/ui/mango-logo";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -74,11 +75,8 @@ export default function LoginPage() {
     <div className="flex flex-col gap-6">
       {/* Logo */}
       <div className="flex flex-col items-center gap-2 text-center">
-        {/* TODO: reemplazar placeholder por <img src="/icons/mango-square-transparent.png" /> cuando el usuario suba los íconos finales */}
-        <div className="w-10 h-10 rounded-xl bg-[#1e3a5f] flex items-center justify-center">
-          <span className="text-[#e8d9b4] font-bold text-lg">M</span>
-        </div>
-        <h1 className="text-2xl font-semibold tracking-tight">MANGO</h1>
+        <MangoLogo size={40} />
+        <h1 className="text-2xl font-display font-extrabold tracking-tight text-navy">MANGO</h1>
         <p className="text-sm text-muted-foreground">
           Ingresá a tu cuenta
         </p>
