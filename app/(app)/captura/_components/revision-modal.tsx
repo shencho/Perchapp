@@ -24,9 +24,9 @@ interface Props {
 }
 
 const CONFIANZA_STYLES: Record<string, string> = {
-  alta:  "bg-green-900/50 text-green-300 border-green-800",
-  media: "bg-yellow-900/50 text-yellow-300 border-yellow-800",
-  baja:  "bg-red-900/50 text-red-300 border-red-800",
+  alta:  "bg-success/10 text-success border-success/20",
+  media: "bg-warning/10 text-warning border-warning/20",
+  baja:  "bg-danger/10 text-danger border-danger/20",
 };
 
 // ── Cuenta inferida ───────────────────────────────────────────────────────────
@@ -203,7 +203,7 @@ export function RevisionModal({
           {/* Header */}
           <div className="flex items-center justify-between px-5 py-4 border-b border-border">
             <div className="flex items-center gap-2">
-              <CheckCircle className="h-4 w-4 text-green-400" />
+              <CheckCircle className="h-4 w-4 text-success" />
               <h2 className="font-semibold text-base">¿Esto es lo que querías registrar?</h2>
             </div>
             <Button variant="ghost" size="icon-sm" onClick={onClose}>
@@ -345,8 +345,8 @@ function Row({
       <span className="text-muted-foreground">{label}</span>
       <span className={cn(
         "font-medium text-right",
-        accent === "green" && "text-green-400",
-        accent === "red"   && "text-red-400",
+        accent === "green" && "text-success",
+        accent === "red"   && "text-danger",
         muted              && "text-muted-foreground",
       )}>
         {String(value)}

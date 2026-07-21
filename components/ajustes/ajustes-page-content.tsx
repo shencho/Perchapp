@@ -104,7 +104,7 @@ export function AjustesPageContent({ profile }: Props) {
         </section>
 
         {error && <p className="text-sm text-destructive">{error}</p>}
-        {saved && <p className="text-sm text-green-500">Cambios guardados.</p>}
+        {saved && <p className="text-sm text-success">Cambios guardados.</p>}
 
         <Button type="submit" className="w-fit" disabled={isPending}>
           {isPending ? "Guardando..." : "Guardar cambios"}

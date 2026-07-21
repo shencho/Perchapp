@@ -23,9 +23,9 @@ import type { Categoria } from "@/types/supabase";
 const TIPOS = ["Ingreso", "Egreso", "Ambos"] as const;
 
 const TIPO_COLORS: Record<string, string> = {
-  Ingreso: "text-green-500",
-  Egreso:  "text-red-400",
-  Ambos:   "text-blue-400",
+  Ingreso: "text-success",
+  Egreso:  "text-danger",
+  Ambos:   "text-info",
 };
 
 const schema = z.object({
