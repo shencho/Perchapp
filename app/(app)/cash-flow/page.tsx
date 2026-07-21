@@ -79,7 +79,7 @@ export default async function CashFlowPage() {
   return (
     <div className="max-w-2xl mx-auto px-4 py-6 space-y-6">
       <div className="flex items-center gap-3">
-        <Link href="/dashboard" className="text-muted-foreground hover:text-foreground transition-colors">
+        <Link href="/dashboard" className="text-muted-foreground hover:text-gold transition-colors">
           <ArrowLeft className="h-5 w-5" />
         </Link>
         <div>

@@ -145,7 +145,7 @@ function DashBlock({
         <h2 className="text-base font-semibold">{title}</h2>
         <button
           onClick={() => onToggle(id)}
-          className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+          className="flex items-center gap-1 text-xs text-muted-foreground hover:text-gold transition-colors"
           title="Ocultar bloque"
         >
           <X className="h-3 w-3" />
@@ -304,7 +304,7 @@ function BloqueCuentas({ cuentas, tarjetas }: { cuentas: CuentaConSaldo[]; tarje
         </div>
       )}
 
-      <Link href="/cuentas" className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors">
+      <Link href="/cuentas" className="flex items-center gap-1 text-xs text-muted-foreground hover:text-gold transition-colors">
         Ver patrimonio completo <ChevronRight className="h-3 w-3" />
       </Link>
     </div>
@@ -335,7 +335,7 @@ function BloqueCompartidos({ datos }: { datos: DashboardData["compartidos"] }) {
         </div>
       )}
 
-      <Link href="/movimientos?compartido=true" className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors">
+      <Link href="/movimientos?compartido=true" className="flex items-center gap-1 text-xs text-muted-foreground hover:text-gold transition-colors">
         Ver movimientos compartidos <ChevronRight className="h-3 w-3" />
       </Link>
     </div>
@@ -386,7 +386,7 @@ function BloquePrestamos({ prestamos }: { prestamos: PrestamoResumen[] }) {
         </div>
       )}
 
-      <Link href="/prestamos" className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors">
+      <Link href="/prestamos" className="flex items-center gap-1 text-xs text-muted-foreground hover:text-gold transition-colors">
         Ver préstamos <ChevronRight className="h-3 w-3" />
       </Link>
     </div>
@@ -452,7 +452,7 @@ function BloqueInversiones({ inversiones }: { inversiones: CuentaConSaldo[] }) {
         })}
       </div>
 
-      <Link href="/cuentas" className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors">
+      <Link href="/cuentas" className="flex items-center gap-1 text-xs text-muted-foreground hover:text-gold transition-colors">
         Ver cuentas <ChevronRight className="h-3 w-3" />
       </Link>
     </div>
@@ -558,7 +558,7 @@ function BloqueAlertas({
             </Link>
             {puedeSilenciar && (
               <button
-                className="px-3 py-3 text-muted-foreground hover:text-foreground transition-colors shrink-0"
+                className="px-3 py-3 text-muted-foreground hover:text-gold transition-colors shrink-0"
                 title="Silenciar esta alerta"
                 onClick={() => onSilenciar(a)}
               >
@@ -628,7 +628,7 @@ export function DashboardClient({ data }: { data: DashboardData }) {
             <h2 className="text-base font-semibold">Alertas</h2>
             <button
               onClick={() => toggleBlock("alertas")}
-              className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+              className="flex items-center gap-1 text-xs text-muted-foreground hover:text-gold transition-colors"
             >
               <X className="h-3 w-3" />
               Ocultar

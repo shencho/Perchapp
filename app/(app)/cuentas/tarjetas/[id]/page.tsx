@@ -80,7 +80,7 @@ export default async function TarjetaDetallePage({ params }: Props) {
   return (
     <div className="flex flex-col gap-6">
       {/* Back */}
-      <Link href="/cuentas" className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors w-fit">
+      <Link href="/cuentas" className="flex items-center gap-1 text-sm text-muted-foreground hover:text-gold transition-colors w-fit">
         <ChevronLeft className="h-4 w-4" />
         Patrimonio
       </Link>
