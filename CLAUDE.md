@@ -52,9 +52,9 @@ All DB mutations go in `lib/supabase/actions/`. Files use `"use server"` at the 
 `types/supabase.ts` is maintained manually. When the schema changes, update this file too (or regenerate: `npx supabase gen types typescript --project-id voeyfiwlmhsdqdajwgrw > types/supabase.ts`). Row-level helper types (`Profile`, `Cuenta`, `Tarjeta`, etc.) are exported from the bottom of that file.
 
 ### Styling
-- **Dark mode only** — `html` always has `dark` class; there is no light theme in V1.
+- **Light mode only (MANGO brand, PR2 Visual)** — the `<html>` has no `dark` class; there is no dark theme. Tokens live in `:root` as hex. Don't use `dark:` prefixes.
 - Tailwind v4 via `@import "tailwindcss"` in `globals.css` — no `tailwind.config.js`.
 - shadcn/ui with `style: "base-nova"`. Add components with `npx shadcn add <component>`.
-- Custom design tokens beyond shadcn defaults: `--surface`, `--surface-2`, `--success`, `--warning`, `--subtle`.
+- MANGO brand tokens (utilities `bg-*`/`text-*`/`border-*`): `navy` `#1E3A5F`, `cream` `#E8D9B4`, `gold` `#C98A2B`. Semantic: `success` `#10B981`, `danger` `#EF4444`, `warning` `#F59E0B`, `info` `#3B82F6`. Plus `surface`/`surface-2` (`#F9FAFB`/`#F3F4F6`), `subtle` (`#9CA3AF`). Fonts: `font-sans` (Manrope), `font-display` (Poppins, wordmark), `font-mono` (Space Grotesk, cifras).
 - `cn()` utility in `lib/utils.ts` (`clsx` + `tailwind-merge`).
 - Path alias `@/` maps to the repo root.

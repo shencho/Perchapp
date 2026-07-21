@@ -41,7 +41,7 @@ export default function RootLayout({
   return (
     <html
       lang="es"
-      className={`${manrope.variable} ${poppins.variable} ${spaceGrotesk.variable} dark h-full antialiased`}
+      className={`${manrope.variable} ${poppins.variable} ${spaceGrotesk.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">{children}</body>
     </html>
