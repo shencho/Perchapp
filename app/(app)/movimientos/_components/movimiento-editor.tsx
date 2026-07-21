@@ -5,7 +5,7 @@ import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useRouter } from "next/navigation";
-import { X, Plus, Trash2, Users, AlertTriangle, Lock, Unlock, RefreshCw } from "lucide-react";
+import { X, Plus, Trash2, Users, AlertTriangle, Lock, Unlock, RefreshCw, CreditCard } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -761,7 +761,7 @@ export function MovimientoEditor({ open, onClose, onSaved, editing, cuentas, tar
                 </div>
                 {cuotas > 1 && monto > 0 && (
                   <div className="inline-flex items-center gap-1.5 bg-surface border border-border rounded-full px-3 py-1 text-sm text-muted-foreground">
-                    <span>💳</span>
+                    <CreditCard className="h-3.5 w-3.5" />
                     <span>
                       {cuotas} cuotas de {formatMonto(unitario, moneda)} · {formatMonto(total, moneda)} total
                     </span>
