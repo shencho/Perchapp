@@ -30,12 +30,12 @@ const SUBTIPO_LABELS: Record<string, string> = {
 };
 
 const SUBTIPO_COLORS: Record<string, string> = {
-  plazo_fijo: "bg-amber-500/15 text-amber-400 border-amber-500/30",
-  cripto:     "bg-purple-500/15 text-purple-400 border-purple-500/30",
-  fci:        "bg-blue-500/15 text-blue-400 border-blue-500/30",
-  acciones:   "bg-indigo-500/15 text-indigo-400 border-indigo-500/30",
-  usd_fisico: "bg-green-500/15 text-green-400 border-green-500/30",
-  balanz:     "bg-sky-500/15 text-sky-400 border-sky-500/30",
+  plazo_fijo: "bg-warning/10 text-warning border-warning/20",
+  cripto:     "bg-info/10 text-info border-info/20",
+  fci:        "bg-info/10 text-info border-info/20",
+  acciones:   "bg-info/10 text-info border-info/20",
+  usd_fisico: "bg-success/10 text-success border-success/20",
+  balanz:     "bg-info/10 text-info border-info/20",
   otros:      "bg-muted/50 text-muted-foreground border-border",
 };
 
@@ -135,11 +135,11 @@ export default async function CuentaDetallePage({ params, searchParams }: Props)
       : null;
 
   const NECESIDAD_COLORS: Record<number, string> = {
-    1: "bg-red-900/50 text-red-300 border-red-800",
-    2: "bg-orange-900/50 text-orange-300 border-orange-800",
-    3: "bg-yellow-900/50 text-yellow-300 border-yellow-800",
-    4: "bg-green-900/50 text-green-300 border-green-800",
-    5: "bg-emerald-900/50 text-emerald-300 border-emerald-800",
+    1: "bg-danger/10 text-danger border-danger/20",
+    2: "bg-warning/10 text-warning border-warning/20",
+    3: "bg-warning/10 text-warning border-warning/20",
+    4: "bg-success/10 text-success border-success/20",
+    5: "bg-success/10 text-success border-success/20",
   };
 
   return (
@@ -158,7 +158,7 @@ export default async function CuentaDetallePage({ params, searchParams }: Props)
           <span className="text-xs text-muted-foreground">{cuenta.moneda}</span>
         </div>
         <div className="mt-2 flex items-baseline gap-3 flex-wrap">
-          <span className="text-3xl font-bold tabular-nums">{fmt(saldoActual, cuenta.moneda)}</span>
+          <span className="text-3xl font-bold tabular-nums font-mono">{fmt(saldoActual, cuenta.moneda)}</span>
           <span className="text-sm text-muted-foreground">saldo actual</span>
           {esVolatil && (
             <ActualizarValorModal
@@ -182,7 +182,7 @@ export default async function CuentaDetallePage({ params, searchParams }: Props)
               {SUBTIPO_LABELS[subtipo] ?? subtipo}
             </span>
             {vencida && (
-              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-red-500/15 text-red-400 border border-red-500/30">
+              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-danger/10 text-danger border border-danger/20">
                 Vencido
               </span>
             )}
@@ -193,7 +193,7 @@ export default async function CuentaDetallePage({ params, searchParams }: Props)
               {cuenta.inv_tasa_anual != null && (
                 <div className="border border-border rounded-lg p-3 bg-card">
                   <p className="text-xs text-muted-foreground">Tasa anual</p>
-                  <p className="text-base font-semibold mt-0.5 tabular-nums">{cuenta.inv_tasa_anual}%</p>
+                  <p className="text-base font-semibold mt-0.5 tabular-nums font-mono">{cuenta.inv_tasa_anual}%</p>
                   <p className="text-xs text-muted-foreground">TNA</p>
                 </div>
               )}
@@ -201,9 +201,9 @@ export default async function CuentaDetallePage({ params, searchParams }: Props)
                 <div className="border border-border rounded-lg p-3 bg-card">
                   <p className="text-xs text-muted-foreground">Vencimiento</p>
                   {vencida ? (
-                    <p className="text-base font-semibold mt-0.5 text-red-400">Vencido</p>
+                    <p className="text-base font-semibold mt-0.5 text-danger">Vencido</p>
                   ) : (
-                    <p className="text-base font-semibold mt-0.5 tabular-nums">{diasRestantes}d</p>
+                    <p className="text-base font-semibold mt-0.5 tabular-nums font-mono">{diasRestantes}d</p>
                   )}
                   {cuenta.inv_fecha_vencimiento && (
                     <p className="text-xs text-muted-foreground">
@@ -215,7 +215,7 @@ export default async function CuentaDetallePage({ params, searchParams }: Props)
               {montoAlVencimiento != null && (
                 <div className="border border-border rounded-lg p-3 bg-card">
                   <p className="text-xs text-muted-foreground">Estimado al vencer</p>
-                  <p className="text-base font-semibold mt-0.5 tabular-nums text-green-400">{fmt(montoAlVencimiento, cuenta.moneda)}</p>
+                  <p className="text-base font-semibold mt-0.5 tabular-nums font-mono text-success">{fmt(montoAlVencimiento, cuenta.moneda)}</p>
                   <p className="text-xs text-muted-foreground">con interés simple</p>
                 </div>
               )}
@@ -245,13 +245,13 @@ export default async function CuentaDetallePage({ params, searchParams }: Props)
       {/* KPIs */}
       <div className="grid grid-cols-3 gap-3">
         {[
-          { label: "Ingresos", value: ingresosDelMes, color: "text-green-400" },
-          { label: "Egresos", value: egresosDelMes, color: "text-red-400" },
-          { label: "Balance", value: balanceDelMes, color: balanceDelMes >= 0 ? "text-green-400" : "text-red-400" },
+          { label: "Ingresos", value: ingresosDelMes, color: "text-success" },
+          { label: "Egresos", value: egresosDelMes, color: "text-danger" },
+          { label: "Balance", value: balanceDelMes, color: balanceDelMes >= 0 ? "text-success" : "text-danger" },
         ].map(({ label, value, color }) => (
           <div key={label} className="border border-border rounded-lg p-3 bg-card">
             <p className="text-xs text-muted-foreground">{label}</p>
-            <p className={cn("text-base font-semibold tabular-nums mt-0.5", color)}>
+            <p className={cn("text-base font-semibold tabular-nums font-mono mt-0.5", color)}>
               {balanceDelMes >= 0 && label === "Balance" ? "+" : ""}{fmt(value, cuenta.moneda)}
             </p>
           </div>
@@ -288,8 +288,8 @@ export default async function CuentaDetallePage({ params, searchParams }: Props)
                       </td>
                       <td className="px-4 py-3 text-muted-foreground text-xs">{m.metodo ?? "—"}</td>
                       <td className={cn(
-                        "px-4 py-3 text-right font-semibold tabular-nums",
-                        m.tipo === "Ingreso" ? "text-green-400" : m.tipo === "Egreso" ? "text-red-400" : "text-muted-foreground"
+                        "px-4 py-3 text-right font-semibold tabular-nums font-mono",
+                        m.tipo === "Ingreso" ? "text-success" : m.tipo === "Egreso" ? "text-danger" : "text-muted-foreground"
                       )}>
                         {m.tipo === "Ingreso" ? "+" : m.tipo === "Egreso" ? "-" : "↔"}{fmt(m.monto, m.moneda)}
                       </td>
@@ -319,8 +319,8 @@ export default async function CuentaDetallePage({ params, searchParams }: Props)
                       </div>
                     </div>
                     <span className={cn(
-                      "font-semibold tabular-nums text-sm shrink-0",
-                      m.tipo === "Ingreso" ? "text-green-400" : m.tipo === "Egreso" ? "text-red-400" : "text-muted-foreground"
+                      "font-semibold tabular-nums font-mono text-sm shrink-0",
+                      m.tipo === "Ingreso" ? "text-success" : m.tipo === "Egreso" ? "text-danger" : "text-muted-foreground"
                     )}>
                       {m.tipo === "Ingreso" ? "+" : m.tipo === "Egreso" ? "-" : "↔"}{fmt(m.monto, m.moneda)}
                     </span>

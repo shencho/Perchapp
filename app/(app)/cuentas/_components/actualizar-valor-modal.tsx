@@ -80,7 +80,7 @@ export function ActualizarValorModal({ cuentaId, cuentaNombre, saldoActual, mone
         <div className="flex flex-col gap-4">
           <div className="rounded-lg border border-border bg-surface/30 px-4 py-3 flex justify-between items-center">
             <span className="text-sm text-muted-foreground">Saldo actual</span>
-            <span className="font-semibold tabular-nums">{fmt(saldoActual, moneda)}</span>
+            <span className="font-semibold tabular-nums font-mono">{fmt(saldoActual, moneda)}</span>
           </div>
 
           <div className="flex flex-col gap-1.5">
@@ -96,8 +96,8 @@ export function ActualizarValorModal({ cuentaId, cuentaNombre, saldoActual, mone
             />
             {diferencia !== 0 && (
               <p className={cn(
-                "text-sm font-medium tabular-nums",
-                diferencia > 0 ? "text-green-400" : "text-red-400"
+                "text-sm font-medium tabular-nums font-mono",
+                diferencia > 0 ? "text-success" : "text-danger"
               )}>
                 {diferencia > 0 ? "+" : ""}{fmt(diferencia, moneda)}
               </p>
