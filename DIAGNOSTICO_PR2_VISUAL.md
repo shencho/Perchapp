@@ -226,3 +226,67 @@ Decisión tomada por Benja: **flip completo dark→light** (SPEC_PR2_VISUAL_V2.m
 - CLAUDE.md refs interconectadas → **1** línea. ❌ No.
 
 ✅ **PASO 0 V2 pasa. Se procede con los 15 bloques.**
+
+---
+
+# PASO 0 — HANDOFF REAL (ZIP `Branding Mango billetera.zip`) — nuevo spec conservador
+
+> ⚠️ **CHECKPOINT — PARADA OBLIGATORIA.** Este PASO 0 corresponde al spec conservador (reskin, asset-driven, con checkpoint). Se detecta un **conflicto grande con el trabajo ya commiteado** en esta misma rama. No se toca código productivo hasta luz verde.
+
+## 0. Estado de la rama y baseline
+- Rama `feat/pr2-visual` con **14 commits ya hechos** (el flip autónomo V2: `e1e7387`…`fc00ddb`).
+- Working tree: el founder **borró `brand/mango-branding.html`** (mi import previo) y agregó **`brand/Branding Mango billetera.zip`** (untracked).
+- **Build baseline:** falló primero por `.next/dev/types/routes.d.ts` corrupto (cache stale); tras `rm -rf .next` → **exit 0 verde**. El ZIP en `brand/` **no** rompe el build.
+
+## 1. Inventario de `brand/` (ZIP → extraído a scratchpad, `brand/` intacta)
+`design_handoff_mango/`:
+- `MANGO Branding.html` (717 KB) — tablero de marca (logo, wordmark "Ai", objetos mango/hoja, paleta, tipografías).
+- `MANGO Desktop.html` (334 KB) — rediseño desktop: Dashboard, Sheet MANGO AI, Movimientos, Login.
+- `README.md` (9.8 KB) — handoff hifi.
+
+**No hay** archivos de logo (SVG/PNG), ni fuentes, ni íconos PWA sueltos. El logo es **CSS-drawn** (mango + hoja con gradientes) y los íconos son **emojis placeholder** (→ reemplazar por Lucide). Fuentes = Google Fonts.
+
+## 2. Tokens extraíbles (del README, autoridad del handoff)
+- **Navy** `#1E3A5F` (claro `#2C5480`, oscuro `#152A44`) · **Crema** `#E8D9B4` (solo sobre navy) · **Oro** `#C98A2B` (claro `#F0B74D`/`#FFDF94`).
+- **Semánticos:** ingreso `#10B981`, egreso `#EF4444`, alerta `#F59E0B`, info `#3B82F6`. Chips balance: ingreso `#5FD699`, egreso `#F79B9B`. Hoja `#284F33`→`#4A7A56`.
+- **Superficies:** app `#FFFFFF`, card `#F9FAFB`, **sidebar `#FBFAF7`**, borde `#E5E7EB`/`#F3F4F6`.
+- **Texto:** primary `#111827`, secondary `#6B7280`, muted `#9CA3AF`.
+- **Tipografía (README):** **Manrope 400-800** (UI **y wordmark 800**) + **Space Grotesk 500-700** (cifras). Dinero ARS `$ 1.234.567,89`.
+- **Radios:** chips/inputs 11-12px · cards **22px** · sheet **26px** · logo 11-14px · pills 20px.
+- **Sombras:** card `0 8px 20px rgba(30,58,95,.06)` · elevada `0 10px 22px rgba(30,58,95,.28)` · sheet `0 40px 90px rgba(0,0,0,.4)`.
+
+## 3. Mapa token-handoff → app
+| Handoff | Var app (globals.css) | Estado actual en la rama |
+|---|---|---|
+| navy `#1E3A5F` | `--navy` / `--primary` | ✅ ya seteado |
+| crema `#E8D9B4` | `--cream` | ✅ |
+| oro `#C98A2B` | `--gold` | ✅ |
+| success/danger/warning/info | `--success/-danger/-warning/-info` | ✅ ya (hex idénticos) |
+| sidebar `#FBFAF7` | `--sidebar` | ⚠️ mío usa `#F9FAFB` (leve diff) |
+| card 22px / sheet 26px | radios | ❌ no aplicado (radios shadcn default) |
+| Manrope wordmark 800 | `--font-*` | ❌ **mío usa Poppins para wordmark** |
+
+## 🚨 CONFLICTO — el handoff real vs. el flip ya commiteado (14 commits)
+
+Mi flip V2 (hecho **antes** de que llegara este handoff) **diverge** del handoff en varios puntos concretos:
+
+| # | Handoff (README = verdad) | Lo que hay en la rama | Acción needed |
+|---|---|---|---|
+| 1 | Wordmark **Manrope 800** | Cargué **Poppins** (+ `font-display`) | Quitar Poppins, wordmark en Manrope |
+| 2 | Logo = **mango + hoja** ("nunca sin hoja"), CSS-drawn | `<MangoLogo>` = **"M" en cuadrado** (placeholder) | Rehacer MangoMark con mango+hoja |
+| 3 | Cards ricas: Balance navy gradient + blob mango, botón MANGO AI con mango, **Sheet** rediseñado | Solo re-tokenicé el markup existente | Construir componentes nuevos (fuera del scope "solo tokens") |
+| 4 | Íconos = **Lucide** (emojis son placeholder) | Sin tocar (siguen emojis) | Reemplazo de íconos (scope nuevo) |
+| 5 | Sidebar `#FBFAF7` 250px | `#F9FAFB`, ancho existente | Ajuste menor |
+
+**Además:** inconsistencia interna del handoff → el README dice Manrope+Space Grotesk, pero los HTML del bundle cargan **Poppins + DM Serif + Space Grotesk**. Tomo el **README como autoridad** (Manrope+Space Grotesk), pero conviene que lo confirmes.
+
+**Lo que SÍ sirve del flip ya hecho:** el dark→light, la paleta hex (idéntica al handoff), el refactor de las 275 clases a `success/danger/warning/info`, Space Grotesk en cifras. Es base reutilizable.
+
+## Opciones (decisión del founder)
+- **A — Layer on top (recomendada):** conservar los 14 commits como base (flip + tokens correctos), y agregar bloques handoff-fieles: corregir fuentes (Manrope, sin Poppins), `<MangoMark>`/`<MangoWordmark>` reales con hoja, cards ricas (Balance/MANGO AI/Sheet), íconos Lucide.
+- **B — Reset & redo:** descartar los 14 commits y rehacer desde el handoff (más limpio si preferís empezar de cero con el diseño final).
+- **C — Flip como PR2, handoff como PR3:** mergear el flip tal cual (ya está) y hacer este reskin hifi en un PR aparte.
+
+**Recomiendo A.** Pero es tu llamada. Además necesito decidir qué hacer con `brand/` (el `.html` borrado + el `.zip` untracked: ¿commiteo la extracción del handoff a `brand/`, o dejo el zip?).
+
+**PARO acá (checkpoint del spec). No avanzo al Bloque 1 sin luz verde.**
