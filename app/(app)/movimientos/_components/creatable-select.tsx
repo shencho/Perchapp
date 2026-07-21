@@ -100,7 +100,7 @@ export function CreatableSelect({
           onClick={handleCreate}
           disabled={isLoading || !inputVal.trim()}
         >
-          <Check className="h-3.5 w-3.5 text-green-400" />
+          <Check className="h-3.5 w-3.5 text-success" />
         </Button>
         <Button type="button" size="icon-sm" variant="ghost" onClick={cancelCreate}>
           <XIcon className="h-3.5 w-3.5 text-muted-foreground" />
