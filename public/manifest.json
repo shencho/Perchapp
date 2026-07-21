@@ -1,11 +1,11 @@
 {
   "name": "MANGO",
   "short_name": "MANGO",
-  "description": "Tu app de gestión financiera personal y profesional",
+  "description": "Tus finanzas, en tus palabras.",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#0f172a",
-  "theme_color": "#0f172a",
+  "background_color": "#ffffff",
+  "theme_color": "#1e3a5f",
   "icons": [
     { "src": "/icons/favicon.svg", "sizes": "any", "type": "image/svg+xml" }
   ]
