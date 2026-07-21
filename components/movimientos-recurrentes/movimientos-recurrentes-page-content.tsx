@@ -221,8 +221,8 @@ export function MovimientosRecurrentesPageContent({ plantillas, cuentas, tarjeta
                       <span className={cn(
                         "text-xs px-1.5 py-0.5 rounded border font-medium shrink-0",
                         tipoPlantilla === "Ingreso"
-                          ? "bg-green-900/30 text-green-400 border-green-800/40"
-                          : "bg-red-900/30 text-red-400 border-red-800/40",
+                          ? "bg-success/10 text-success border-success/20"
+                          : "bg-danger/10 text-danger border-danger/20",
                       )}>
                         {tipoPlantilla}
                       </span>
@@ -238,7 +238,7 @@ export function MovimientosRecurrentesPageContent({ plantillas, cuentas, tarjeta
                       size="icon" variant="ghost"
                       title={p.activo ? "Desactivar" : "Activar"}
                       onClick={() => onToggleActivo(p)}
-                      className={p.activo ? "text-muted-foreground" : "text-yellow-500"}
+                      className={p.activo ? "text-muted-foreground" : "text-warning"}
                     >
                       <Power className="h-3.5 w-3.5" />
                     </Button>
