@@ -28,9 +28,9 @@ function formatMonto(n: number, moneda = "ARS") {
 }
 
 const TIPO_CONFIG = {
-  otorgado: { label: "Otorgado", icon: TrendingUp,  color: "bg-green-900/40 text-green-300 border-green-800/60" },
-  recibido: { label: "Recibido", icon: TrendingDown, color: "bg-orange-900/40 text-orange-300 border-orange-800/60" },
-  bancario: { label: "Bancario", icon: Building2,    color: "bg-blue-900/40 text-blue-300 border-blue-800/60" },
+  otorgado: { label: "Otorgado", icon: TrendingUp,  color: "bg-success/10 text-success border-success/20" },
+  recibido: { label: "Recibido", icon: TrendingDown, color: "bg-warning/10 text-warning border-warning/20" },
+  bancario: { label: "Bancario", icon: Building2,    color: "bg-info/10 text-info border-info/20" },
 } as const;
 
 // ── Componente principal ──────────────────────────────────────────────────────
@@ -160,13 +160,13 @@ export function PrestamosClient({ prestamos, personas }: Props) {
                 <div className="space-y-1.5">
                   <div className="flex items-center justify-between text-xs text-muted-foreground">
                     <span>Monto inicial</span>
-                    <span className="tabular-nums font-medium text-foreground">
+                    <span className="tabular-nums font-mono font-medium text-foreground">
                       {formatMonto(p.monto_inicial, p.moneda)}
                     </span>
                   </div>
                   <div className="flex items-center justify-between text-xs text-muted-foreground">
                     <span>Saldo pendiente</span>
-                    <span className={cn("tabular-nums font-semibold", saldoPendiente > 0 ? "text-amber-400" : "text-emerald-400")}>
+                    <span className={cn("tabular-nums font-mono font-semibold", saldoPendiente > 0 ? "text-warning" : "text-success")}>
                       {formatMonto(saldoPendiente, p.moneda)}
                     </span>
                   </div>
@@ -176,7 +176,7 @@ export function PrestamosClient({ prestamos, personas }: Props) {
                 <div className="space-y-1">
                   <div className="h-1.5 w-full rounded-full bg-surface overflow-hidden border border-border/40">
                     <div
-                      className="h-full bg-emerald-500 rounded-full transition-all"
+                      className="h-full bg-success rounded-full transition-all"
                       style={{ width: `${porcentajeCancelado}%` }}
                     />
                   </div>
