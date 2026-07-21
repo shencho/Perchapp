@@ -21,8 +21,7 @@ export function MangoAIButton({ asistenteNombre }: Props) {
   return (
     <Sheet open={open} onOpenChange={setOpen}>
       <SheetTrigger
-        className="w-full flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium transition-colors hover:opacity-90"
-        style={{ backgroundColor: "#1e3a5f" }}
+        className="w-full flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium bg-navy text-cream transition-colors hover:bg-navy-hover"
         aria-label={`Abrir ${asistenteNombre}`}
       >
         <span>🥭</span>

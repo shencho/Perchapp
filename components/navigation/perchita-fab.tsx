@@ -21,8 +21,7 @@ export function PerchitaFAB() {
   return (
     <Sheet open={open} onOpenChange={setOpen}>
       <SheetTrigger
-        className="md:hidden fixed bottom-6 left-1/2 -translate-x-1/2 w-14 h-14 rounded-full flex items-center justify-center text-2xl z-40 hover:opacity-90 transition-opacity"
-        style={{ backgroundColor: "#1e3a5f" }}
+        className="md:hidden fixed bottom-6 left-1/2 -translate-x-1/2 w-14 h-14 rounded-full flex items-center justify-center text-2xl z-40 bg-navy shadow-lg hover:bg-navy-hover transition-colors"
         aria-label="MANGO AI — Capturar movimiento"
       >
         🥭
