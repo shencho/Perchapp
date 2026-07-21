@@ -7,7 +7,7 @@ interface MangoLogoProps {
 }
 
 /**
- * Logo MANGO reusable: cuadrado navy con "M" crema en Poppins,
+ * Logo MANGO reusable: cuadrado navy con "M" crema (Manrope),
  * opcionalmente seguido del wordmark "MANGO" en navy.
  */
 export function MangoLogo({
