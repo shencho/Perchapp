@@ -464,24 +464,34 @@ function BloqueAnalisis({ analisis }: { analisis: DashboardData["analisis"] }) {
 
   return (
     <div className="space-y-4">
-      {/* Top categorías */}
+      {/* Gastos por categoría */}
       {topCategorias.length > 0 && (
-        <div className="space-y-2">
-          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Top categorías de gasto</p>
-          {topCategorias.map(cat => (
-            <div key={cat.id} className="space-y-1">
-              <div className="flex items-center justify-between text-sm">
-                <span className="font-medium truncate">{cat.nombre}</span>
-                <span className="tabular-nums font-mono text-muted-foreground ml-2 shrink-0">{fmt(cat.monto)} · {cat.porcentaje}%</span>
-              </div>
-              <div className="h-1.5 bg-surface rounded-full overflow-hidden">
+        <div className="space-y-3">
+          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Gastos por categoría</p>
+          {topCategorias.map(cat => {
+            const Icon = categoriaNombreToLucide(cat.nombre);
+            const maxMonto = topCategorias[0].monto || 1;
+            const barPct = Math.round((cat.monto / maxMonto) * 100);
+            return (
+              <div key={cat.id} className="flex items-center gap-3">
                 <div
-                  className="h-full bg-primary/70 rounded-full"
-                  style={{ width: `${cat.porcentaje}%` }}
-                />
+                  className="flex items-center justify-center rounded-[10px] shrink-0"
+                  style={{ width: 34, height: 34, background: "#f3ecdc" }}
+                >
+                  <Icon className="h-[17px] w-[17px]" style={{ color: "#1e3a5f" }} />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-sm font-medium truncate">{cat.nombre}</span>
+                    <span className="text-sm font-bold tabular-nums font-mono shrink-0">{fmt(cat.monto)}</span>
+                  </div>
+                  <div className="mt-1 h-[5px] bg-surface-2 rounded-full overflow-hidden">
+                    <div className="h-full bg-navy rounded-full" style={{ width: `${barPct}%` }} />
+                  </div>
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
 
