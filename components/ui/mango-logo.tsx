@@ -31,9 +31,9 @@ export function MangoMark({
         width: size,
         height: size,
         borderRadius: Math.round(size * 0.3),
-        background: onNavy ? "#ffffff" : "#1e3a5f",
-        // en onNavy el mango sobresale por el borde superior
-        overflow: onNavy ? "visible" : "hidden",
+        // onLight = chip navy; onNavy = sin chip, el mango va directo sobre navy
+        background: onNavy ? "transparent" : "#1e3a5f",
+        overflow: "hidden",
       }}
     >
       {/* cuerpo del mango */}
@@ -43,7 +43,7 @@ export function MangoMark({
           width: size * 0.62,
           height: size * 0.66,
           left: size * 0.2,
-          top: onNavy ? size * 0.14 : size * 0.22,
+          top: size * 0.22,
           borderRadius: "57% 63% 55% 60% / 63% 67% 54% 56%",
           transform: "rotate(-12deg)",
           background:
@@ -52,18 +52,18 @@ export function MangoMark({
             "inset -3px -4px 8px rgba(120,60,10,.45), inset 2px 3px 6px rgba(255,240,200,.5)",
         }}
       />
-      {/* hoja */}
+      {/* hoja — nunca sin hoja. En onNavy va un verde más claro para contrastar sobre #1e3a5f */}
       <div
         style={{
           position: "absolute",
           width: size * 0.3,
           height: size * 0.18,
           left: size * 0.5,
-          top: onNavy ? size * 0.0 : size * 0.1,
+          top: size * 0.1,
           borderRadius: "0 100% 0 100%",
           transform: "rotate(-32deg)",
           background: onNavy
-            ? "#e8d9b4"
+            ? "linear-gradient(135deg,#8fd0a0,#5aa374)"
             : "linear-gradient(135deg,#4a7a56,#284f33)",
         }}
       />

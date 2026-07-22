@@ -7,7 +7,9 @@ import {
   TrendingUp, TrendingDown, Minus, X, AlertTriangle,
   Clock, Landmark, Wallet, ChevronRight,
   CircleDollarSign, PieChart as PieChartIcon, BarChart3,
+  ArrowDownLeft, ArrowUpRight, PiggyBank, type LucideIcon,
 } from "lucide-react";
+import { categoriaNombreToLucide } from "@/lib/ui/category-icons";
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from "recharts";
 import { cn } from "@/lib/utils";
 import { GraficoEvolucion } from "./grafico-evolucion";
@@ -157,11 +159,38 @@ function DashBlock({
   );
 }
 
+// ── Stat card (chip de ícono + label + cifra) ─────────────────────────────────
+
+function StatCard({
+  icon: Icon, chipBg, iconColor, label, value, valueClass,
+}: {
+  icon: LucideIcon; chipBg: string; iconColor: string;
+  label: React.ReactNode; value: React.ReactNode; valueClass?: string;
+}) {
+  return (
+    <div className="border border-border rounded-[12px] p-4 bg-card">
+      <div
+        className="flex items-center justify-center rounded-[9px]"
+        style={{ width: 30, height: 30, background: chipBg }}
+      >
+        <Icon className="h-4 w-4" style={{ color: iconColor }} />
+      </div>
+      <p className="text-xs text-muted-foreground mt-2">{label}</p>
+      <p className={cn("text-[17px] font-bold tabular-nums font-mono mt-0.5", valueClass)}>
+        {value}
+      </p>
+    </div>
+  );
+}
+
 // ── Hero financiero ───────────────────────────────────────────────────────────
 
 function HeroFinanciero({ hero, perfil }: { hero: DashboardData["hero"]; perfil: DashboardData["perfil"] }) {
   const delta = hero.balanceMesAnterior !== 0
     ? Math.round((hero.balanceDelMes - hero.balanceMesAnterior) / Math.abs(hero.balanceMesAnterior) * 100)
+    : null;
+  const ahorroPct = hero.ingresosDelMes > 0
+    ? Math.round(((hero.ingresosDelMes - hero.egresosDelMes) / hero.ingresosDelMes) * 100)
     : null;
 
   return (
@@ -184,76 +213,45 @@ function HeroFinanciero({ hero, perfil }: { hero: DashboardData["hero"]; perfil:
         </Link>
       </div>
 
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
-        {/* Patrimonio ARS */}
-        <div className="border border-border rounded-lg p-4 bg-card col-span-2 sm:col-span-1">
-          <p className="text-xs text-muted-foreground">Patrimonio ARS</p>
-          <p className={cn(
-            "text-xl font-bold tabular-nums font-mono mt-1",
-            hero.totalARS >= 0 ? "text-success" : "text-danger"
-          )}>
+      {/* Hero navy — Balance total (absorbe Patrimonio + Balance del mes) */}
+      <div className="relative overflow-hidden rounded-[16px] bg-navy p-6 text-white">
+        <div className="pointer-events-none absolute rounded-full" style={{ width: 220, height: 220, right: -60, top: -80, background: "#27476f" }} />
+        <div className="pointer-events-none absolute rounded-full" style={{ width: 160, height: 160, right: 90, bottom: -80, background: "#24426a" }} />
+        <div className="relative">
+          <p className="text-[13px] font-medium text-cream">Balance total</p>
+          <p className="mt-1 font-mono font-bold tracking-tight" style={{ fontSize: 34, lineHeight: 1.1 }}>
             {fmt(hero.totalARS)}
           </p>
-          {hero.totalUSD !== 0 && (
-            <p className="text-xs text-muted-foreground mt-0.5 tabular-nums font-mono">
-              + {fmt(hero.totalUSD, "USD")} USD
-            </p>
-          )}
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            {delta !== null && (
+              <span className="inline-flex items-center gap-1 rounded-full bg-cream px-2.5 py-1 text-xs font-semibold text-navy">
+                {delta > 0 ? <TrendingUp className="h-3.5 w-3.5" /> : delta < 0 ? <TrendingDown className="h-3.5 w-3.5" /> : <Minus className="h-3.5 w-3.5" />}
+                {delta > 0 ? "+" : ""}{delta}% vs mes anterior
+              </span>
+            )}
+            {hero.totalUSD !== 0 && (
+              <span className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold text-white" style={{ background: "rgba(255,255,255,0.12)" }}>
+                {fmt(hero.totalUSD, "USD")} USD
+              </span>
+            )}
+          </div>
         </div>
+      </div>
 
-        {/* Ingresos del mes */}
-        <div className="border border-border rounded-lg p-4 bg-card">
-          <p className="text-xs text-muted-foreground">Ingresos del mes</p>
-          <p className="text-xl font-bold tabular-nums font-mono mt-1 text-success">
-            {fmt(hero.ingresosDelMes)}
-          </p>
-        </div>
-
-        {/* Egresos del mes */}
-        <div className="border border-border rounded-lg p-4 bg-card">
-          <p className="text-xs text-muted-foreground">Egresos del mes</p>
-          <p className="text-xl font-bold tabular-nums font-mono mt-1 text-danger">
-            {fmt(hero.egresosDelMes)}
-          </p>
-        </div>
-
-        {/* Balance del mes */}
-        <div className="border border-border rounded-lg p-4 bg-card">
-          <p className="text-xs text-muted-foreground">Balance del mes</p>
-          <p className={cn(
-            "text-xl font-bold tabular-nums font-mono mt-1",
-            hero.balanceDelMes >= 0 ? "text-success" : "text-danger"
-          )}>
-            {hero.balanceDelMes >= 0 ? "+" : ""}{fmt(hero.balanceDelMes)}
-          </p>
-          {delta !== null && (
-            <div className={cn(
-              "flex items-center gap-0.5 text-xs mt-0.5",
-              delta > 0 ? "text-success" : delta < 0 ? "text-danger" : "text-muted-foreground"
-            )}>
-              {delta > 0 ? <TrendingUp className="h-3 w-3" /> : delta < 0 ? <TrendingDown className="h-3 w-3" /> : <Minus className="h-3 w-3" />}
-              <span>{delta > 0 ? "+" : ""}{delta}% vs mes anterior</span>
-            </div>
-          )}
-        </div>
-
-        {/* Ahorro (saldo si > 0) / Déficit */}
-        <div className="border border-border rounded-lg p-4 bg-card">
-          <p className="text-xs text-muted-foreground">
-            {hero.ingresosDelMes > 0
-              ? `Ahorro ${hero.egresosDelMes > 0 ? Math.round(((hero.ingresosDelMes - hero.egresosDelMes) / hero.ingresosDelMes) * 100) : 100}%`
-              : "Sin ingresos"}
-          </p>
-          <p className={cn(
-            "text-xl font-bold tabular-nums font-mono mt-1",
-            hero.ingresosDelMes >= hero.egresosDelMes ? "text-success" : "text-danger"
-          )}>
-            {hero.ingresosDelMes > 0
-              ? `${Math.round(((hero.ingresosDelMes - hero.egresosDelMes) / hero.ingresosDelMes) * 100)}%`
-              : "—"}
-          </p>
-          <p className="text-xs text-muted-foreground mt-0.5">del ingreso</p>
-        </div>
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+        <StatCard
+          icon={ArrowDownLeft} chipBg="#e6f6ef" iconColor="#0b7a52"
+          label="Ingresos del mes" value={fmt(hero.ingresosDelMes)} valueClass="text-success"
+        />
+        <StatCard
+          icon={ArrowUpRight} chipBg="#fdeaea" iconColor="#c0362f"
+          label="Gastos del mes" value={fmt(hero.egresosDelMes)} valueClass="text-danger"
+        />
+        <StatCard
+          icon={PiggyBank} chipBg="#f3ecdc" iconColor="#1e3a5f"
+          label={ahorroPct !== null ? "Ahorro del mes" : "Sin ingresos"}
+          value={ahorroPct !== null ? `${ahorroPct}%` : "—"}
+        />
       </div>
     </div>
   );
@@ -466,24 +464,34 @@ function BloqueAnalisis({ analisis }: { analisis: DashboardData["analisis"] }) {
 
   return (
     <div className="space-y-4">
-      {/* Top categorías */}
+      {/* Gastos por categoría */}
       {topCategorias.length > 0 && (
-        <div className="space-y-2">
-          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Top categorías de gasto</p>
-          {topCategorias.map(cat => (
-            <div key={cat.id} className="space-y-1">
-              <div className="flex items-center justify-between text-sm">
-                <span className="font-medium truncate">{cat.nombre}</span>
-                <span className="tabular-nums font-mono text-muted-foreground ml-2 shrink-0">{fmt(cat.monto)} · {cat.porcentaje}%</span>
-              </div>
-              <div className="h-1.5 bg-surface rounded-full overflow-hidden">
+        <div className="space-y-3">
+          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Gastos por categoría</p>
+          {topCategorias.map(cat => {
+            const Icon = categoriaNombreToLucide(cat.nombre);
+            const maxMonto = topCategorias[0].monto || 1;
+            const barPct = Math.round((cat.monto / maxMonto) * 100);
+            return (
+              <div key={cat.id} className="flex items-center gap-3">
                 <div
-                  className="h-full bg-primary/70 rounded-full"
-                  style={{ width: `${cat.porcentaje}%` }}
-                />
+                  className="flex items-center justify-center rounded-[10px] shrink-0"
+                  style={{ width: 34, height: 34, background: "#f3ecdc" }}
+                >
+                  <Icon className="h-[17px] w-[17px]" style={{ color: "#1e3a5f" }} />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-sm font-medium truncate">{cat.nombre}</span>
+                    <span className="text-sm font-bold tabular-nums font-mono shrink-0">{fmt(cat.monto)}</span>
+                  </div>
+                  <div className="mt-1 h-[5px] bg-surface-2 rounded-full overflow-hidden">
+                    <div className="h-full bg-navy rounded-full" style={{ width: `${barPct}%` }} />
+                  </div>
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
 
