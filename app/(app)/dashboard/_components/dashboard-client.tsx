@@ -184,23 +184,32 @@ function HeroFinanciero({ hero, perfil }: { hero: DashboardData["hero"]; perfil:
         </Link>
       </div>
 
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
-        {/* Patrimonio ARS */}
-        <div className="border border-border rounded-lg p-4 bg-card col-span-2 sm:col-span-1">
-          <p className="text-xs text-muted-foreground">Patrimonio ARS</p>
-          <p className={cn(
-            "text-xl font-bold tabular-nums font-mono mt-1",
-            hero.totalARS >= 0 ? "text-success" : "text-danger"
-          )}>
+      {/* Hero navy — Balance total (absorbe Patrimonio + Balance del mes) */}
+      <div className="relative overflow-hidden rounded-[16px] bg-navy p-6 text-white">
+        <div className="pointer-events-none absolute rounded-full" style={{ width: 220, height: 220, right: -60, top: -80, background: "#27476f" }} />
+        <div className="pointer-events-none absolute rounded-full" style={{ width: 160, height: 160, right: 90, bottom: -80, background: "#24426a" }} />
+        <div className="relative">
+          <p className="text-[13px] font-medium text-cream">Balance total</p>
+          <p className="mt-1 font-mono font-bold tracking-tight" style={{ fontSize: 34, lineHeight: 1.1 }}>
             {fmt(hero.totalARS)}
           </p>
-          {hero.totalUSD !== 0 && (
-            <p className="text-xs text-muted-foreground mt-0.5 tabular-nums font-mono">
-              + {fmt(hero.totalUSD, "USD")} USD
-            </p>
-          )}
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            {delta !== null && (
+              <span className="inline-flex items-center gap-1 rounded-full bg-cream px-2.5 py-1 text-xs font-semibold text-navy">
+                {delta > 0 ? <TrendingUp className="h-3.5 w-3.5" /> : delta < 0 ? <TrendingDown className="h-3.5 w-3.5" /> : <Minus className="h-3.5 w-3.5" />}
+                {delta > 0 ? "+" : ""}{delta}% vs mes anterior
+              </span>
+            )}
+            {hero.totalUSD !== 0 && (
+              <span className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold text-white" style={{ background: "rgba(255,255,255,0.12)" }}>
+                {fmt(hero.totalUSD, "USD")} USD
+              </span>
+            )}
+          </div>
         </div>
+      </div>
 
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
         {/* Ingresos del mes */}
         <div className="border border-border rounded-lg p-4 bg-card">
           <p className="text-xs text-muted-foreground">Ingresos del mes</p>
@@ -215,26 +224,6 @@ function HeroFinanciero({ hero, perfil }: { hero: DashboardData["hero"]; perfil:
           <p className="text-xl font-bold tabular-nums font-mono mt-1 text-danger">
             {fmt(hero.egresosDelMes)}
           </p>
-        </div>
-
-        {/* Balance del mes */}
-        <div className="border border-border rounded-lg p-4 bg-card">
-          <p className="text-xs text-muted-foreground">Balance del mes</p>
-          <p className={cn(
-            "text-xl font-bold tabular-nums font-mono mt-1",
-            hero.balanceDelMes >= 0 ? "text-success" : "text-danger"
-          )}>
-            {hero.balanceDelMes >= 0 ? "+" : ""}{fmt(hero.balanceDelMes)}
-          </p>
-          {delta !== null && (
-            <div className={cn(
-              "flex items-center gap-0.5 text-xs mt-0.5",
-              delta > 0 ? "text-success" : delta < 0 ? "text-danger" : "text-muted-foreground"
-            )}>
-              {delta > 0 ? <TrendingUp className="h-3 w-3" /> : delta < 0 ? <TrendingDown className="h-3 w-3" /> : <Minus className="h-3 w-3" />}
-              <span>{delta > 0 ? "+" : ""}{delta}% vs mes anterior</span>
-            </div>
-          )}
         </div>
 
         {/* Ahorro (saldo si > 0) / Déficit */}
