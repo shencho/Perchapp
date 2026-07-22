@@ -4,6 +4,7 @@ import { useState } from "react";
 import { usePathname } from "next/navigation";
 import { toast } from "sonner";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
+import { MangoMark } from "@/components/ui/mango-logo";
 import { CapturaSheetContent, type CapturaData } from "./captura-sheet-content";
 
 export function PerchitaFAB() {
@@ -21,11 +22,10 @@ export function PerchitaFAB() {
   return (
     <Sheet open={open} onOpenChange={setOpen}>
       <SheetTrigger
-        className="md:hidden fixed bottom-6 left-1/2 -translate-x-1/2 w-14 h-14 rounded-full flex items-center justify-center text-2xl z-40 hover:opacity-90 transition-opacity"
-        style={{ backgroundColor: "#1e3a5f" }}
+        className="md:hidden fixed bottom-6 left-1/2 -translate-x-1/2 w-14 h-14 rounded-full flex items-center justify-center z-40 bg-navy shadow-lg hover:bg-navy-hover transition-colors"
         aria-label="MANGO AI — Capturar movimiento"
       >
-        🥭
+        <MangoMark variant="onNavy" size={30} />
       </SheetTrigger>
       <SheetContent side="bottom" className="max-h-[90vh] overflow-y-auto">
         <CapturaSheetContent

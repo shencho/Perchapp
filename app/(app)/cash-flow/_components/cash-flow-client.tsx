@@ -48,7 +48,7 @@ function CustomTooltip({ active, payload, label, moneda }: {
     <div className="rounded-lg border border-border bg-card px-3 py-2 shadow-lg text-sm">
       <p className="font-medium mb-1">{label}</p>
       {payload.map(p => (
-        <p key={p.name} style={{ color: p.color }} className="tabular-nums">
+        <p key={p.name} style={{ color: p.color }} className="tabular-nums font-mono">
           {p.name}: {fmt(p.value, moneda)}
         </p>
       ))}
@@ -86,7 +86,7 @@ export function CashFlowClient({ saldoInicial, promedios, moneda }: Props) {
           Saldo proyectado en {periodoMeses} {periodoMeses === 1 ? "mes" : "meses"}
         </p>
         <p className={cn(
-          "text-3xl font-bold tabular-nums",
+          "text-3xl font-bold tabular-nums font-mono",
           saldoFinal >= 0 ? "text-success" : "text-destructive"
         )}>
           {fmt(saldoFinal, moneda)}
@@ -129,24 +129,24 @@ export function CashFlowClient({ saldoInicial, promedios, moneda }: Props) {
         <p className="text-xs font-medium text-muted-foreground mb-3">Saldo proyectado</p>
         <ResponsiveContainer width="100%" height={220}>
           <LineChart data={proyeccion} margin={{ top: 4, right: 4, bottom: 0, left: 0 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" vertical={false} />
+            <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" vertical={false} />
             <XAxis
               dataKey="label"
-              tick={{ fill: "#64748b", fontSize: 11 }}
+              tick={{ fill: "#6b7280", fontSize: 11 }}
               axisLine={false} tickLine={false}
             />
             <YAxis
               tickFormatter={fmtShort}
-              tick={{ fill: "#64748b", fontSize: 11 }}
+              tick={{ fill: "#6b7280", fontSize: 11 }}
               axisLine={false} tickLine={false}
               width={56}
             />
             <Tooltip content={<CustomTooltip moneda={moneda} />} />
-            <ReferenceLine y={0} stroke="#334155" strokeDasharray="4 4" />
+            <ReferenceLine y={0} stroke="#9ca3af" strokeDasharray="4 4" />
             <Line
               type="monotone" dataKey="saldo" name="Saldo"
-              stroke="#818cf8" strokeWidth={2}
-              dot={{ r: 4, fill: "#818cf8", strokeWidth: 0 }}
+              stroke="#3b82f6" strokeWidth={2}
+              dot={{ r: 4, fill: "#3b82f6", strokeWidth: 0 }}
               activeDot={{ r: 6 }}
             />
           </LineChart>
@@ -169,16 +169,16 @@ export function CashFlowClient({ saldoInicial, promedios, moneda }: Props) {
             {proyeccion.map((row, i) => (
               <tr key={i} className="hover:bg-surface/30 transition-colors">
                 <td className="px-4 py-2.5 font-medium">{row.label}</td>
-                <td className="px-4 py-2.5 text-right tabular-nums text-success">{fmt(row.ingresos, moneda)}</td>
-                <td className="px-4 py-2.5 text-right tabular-nums text-destructive">{fmt(row.egresos, moneda)}</td>
+                <td className="px-4 py-2.5 text-right tabular-nums font-mono text-success">{fmt(row.ingresos, moneda)}</td>
+                <td className="px-4 py-2.5 text-right tabular-nums font-mono text-destructive">{fmt(row.egresos, moneda)}</td>
                 <td className={cn(
-                  "px-4 py-2.5 text-right tabular-nums font-medium",
+                  "px-4 py-2.5 text-right tabular-nums font-mono font-medium",
                   row.neto >= 0 ? "text-success" : "text-destructive"
                 )}>
                   {row.neto >= 0 ? "+" : ""}{fmt(row.neto, moneda)}
                 </td>
                 <td className={cn(
-                  "px-4 py-2.5 text-right tabular-nums font-semibold",
+                  "px-4 py-2.5 text-right tabular-nums font-mono font-semibold",
                   row.saldo >= 0 ? "text-foreground" : "text-destructive"
                 )}>
                   {fmt(row.saldo, moneda)}

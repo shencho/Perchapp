@@ -326,7 +326,7 @@ export function ImportarTemplateModal({ open, onOpenChange, categorias, onDone }
 
         {step === "done" && results && (
           <div className="flex flex-col items-center gap-4 px-6 py-8">
-            <CheckCircle2 className="h-12 w-12 text-green-500" />
+            <CheckCircle2 className="h-12 w-12 text-success" />
             <div className="text-center">
               <p className="font-semibold text-lg">¡Listo!</p>
               <p className="text-sm text-muted-foreground mt-1">

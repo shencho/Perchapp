@@ -80,7 +80,7 @@ export default async function TarjetaDetallePage({ params }: Props) {
   return (
     <div className="flex flex-col gap-6">
       {/* Back */}
-      <Link href="/cuentas" className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors w-fit">
+      <Link href="/cuentas" className="flex items-center gap-1 text-sm text-muted-foreground hover:text-gold transition-colors w-fit">
         <ChevronLeft className="h-4 w-4" />
         Patrimonio
       </Link>
@@ -99,7 +99,7 @@ export default async function TarjetaDetallePage({ params }: Props) {
       <div className="grid grid-cols-2 gap-3">
         <div className="border border-border rounded-lg p-3 bg-card">
           <p className="text-xs text-muted-foreground">Consumo del período</p>
-          <p className="text-xl font-bold tabular-nums text-red-400 mt-0.5">{fmt(consumoTotal)}</p>
+          <p className="text-xl font-bold tabular-nums font-mono text-danger mt-0.5">{fmt(consumoTotal)}</p>
           <p className="text-xs text-muted-foreground mt-1">{fmtFecha(inicio)} — {fmtFecha(fin)}</p>
         </div>
         <div className="border border-border rounded-lg p-3 bg-card">
@@ -139,7 +139,7 @@ export default async function TarjetaDetallePage({ params }: Props) {
                     <td className="px-4 py-3 text-muted-foreground text-xs">
                       {m.clasificacion === "Cuotas" ? `${m.cuotas} cuotas` : (m.clasificacion ?? "—")}
                     </td>
-                    <td className="px-4 py-3 text-right font-semibold tabular-nums text-red-400">
+                    <td className="px-4 py-3 text-right font-semibold tabular-nums font-mono text-danger">
                       {fmt(m.monto, m.moneda)}
                     </td>
                   </tr>
@@ -169,7 +169,7 @@ export default async function TarjetaDetallePage({ params }: Props) {
                   <tr key={m.id} className="border-b border-border last:border-0">
                     <td className="px-4 py-3 font-medium truncate max-w-[200px]">{m.concepto || "—"}</td>
                     <td className="px-4 py-3 text-muted-foreground text-xs">{m.cuotas ?? "—"} cuotas</td>
-                    <td className="px-4 py-3 text-right tabular-nums">{fmt(m.monto / (m.cuotas ?? 1), m.moneda)}</td>
+                    <td className="px-4 py-3 text-right tabular-nums font-mono">{fmt(m.monto / (m.cuotas ?? 1), m.moneda)}</td>
                     <td className="px-4 py-3 text-right text-muted-foreground text-xs">
                       {m.fecha_vencimiento ? fmtFecha(m.fecha_vencimiento) : "—"}
                     </td>

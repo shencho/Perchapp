@@ -5,6 +5,7 @@ import { createProfile, type OnboardingData } from "@/lib/supabase/actions/creat
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { MangoLogo } from "@/components/ui/mango-logo";
 
 const TOTAL_STEPS = 2;
 
@@ -50,10 +51,7 @@ export default function OnboardingPage() {
       <div className="w-full max-w-md">
         {/* Header */}
         <div className="flex flex-col items-center gap-2 mb-8 text-center">
-          {/* TODO: reemplazar placeholder por <img src="/icons/mango-square-transparent.png" /> cuando el usuario suba los íconos finales */}
-          <div className="w-10 h-10 rounded-xl bg-[#1e3a5f] flex items-center justify-center">
-            <span className="text-[#e8d9b4] font-bold text-lg">M</span>
-          </div>
+          <MangoLogo size={40} />
           <h1 className="text-xl font-semibold">Configurá tu cuenta</h1>
           <p className="text-sm text-muted-foreground">Paso {step} de {TOTAL_STEPS}</p>
         </div>
@@ -72,7 +70,7 @@ export default function OnboardingPage() {
           {step === 1 && (
             <div className="flex flex-col gap-4">
               <div className="flex flex-col items-center gap-1 text-center mb-2">
-                <p className="text-3xl font-bold tracking-tight">MANGO</p>
+                <p className="text-3xl font-display font-extrabold tracking-tight text-navy">MANGO</p>
               </div>
               <div className="flex flex-col gap-1.5">
                 <h2 className="text-2xl font-semibold tracking-tight">¿Cómo te llamás?</h2>

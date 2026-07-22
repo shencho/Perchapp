@@ -88,17 +88,17 @@ const SUBTIPO_LABELS: Record<string, string> = {
 };
 
 const SUBTIPO_COLORS: Record<string, string> = {
-  plazo_fijo: "bg-amber-500/15 text-amber-400 border-amber-500/30",
-  cripto:     "bg-purple-500/15 text-purple-400 border-purple-500/30",
-  fci:        "bg-blue-500/15 text-blue-400 border-blue-500/30",
-  acciones:   "bg-indigo-500/15 text-indigo-400 border-indigo-500/30",
-  usd_fisico: "bg-green-500/15 text-green-400 border-green-500/30",
-  balanz:     "bg-sky-500/15 text-sky-400 border-sky-500/30",
+  plazo_fijo: "bg-warning/10 text-warning border-warning/20",
+  cripto:     "bg-info/10 text-info border-info/20",
+  fci:        "bg-info/10 text-info border-info/20",
+  acciones:   "bg-info/10 text-info border-info/20",
+  usd_fisico: "bg-success/10 text-success border-success/20",
+  balanz:     "bg-info/10 text-info border-info/20",
   otros:      "bg-muted/50 text-muted-foreground border-border",
 };
 
 const NECESIDAD_CHART_COLORS: Record<number, string> = {
-  1: "#ef4444", 2: "#f97316", 3: "#eab308", 4: "#22c55e", 5: "#10b981",
+  1: "#ef4444", 2: "#f97316", 3: "#eab308", 4: "#10b981", 5: "#10b981",
 };
 
 const BLOQUE_LABELS: Record<string, string> = {
@@ -145,7 +145,7 @@ function DashBlock({
         <h2 className="text-base font-semibold">{title}</h2>
         <button
           onClick={() => onToggle(id)}
-          className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+          className="flex items-center gap-1 text-xs text-muted-foreground hover:text-gold transition-colors"
           title="Ocultar bloque"
         >
           <X className="h-3 w-3" />
@@ -189,13 +189,13 @@ function HeroFinanciero({ hero, perfil }: { hero: DashboardData["hero"]; perfil:
         <div className="border border-border rounded-lg p-4 bg-card col-span-2 sm:col-span-1">
           <p className="text-xs text-muted-foreground">Patrimonio ARS</p>
           <p className={cn(
-            "text-xl font-bold tabular-nums mt-1",
-            hero.totalARS >= 0 ? "text-green-400" : "text-red-400"
+            "text-xl font-bold tabular-nums font-mono mt-1",
+            hero.totalARS >= 0 ? "text-success" : "text-danger"
           )}>
             {fmt(hero.totalARS)}
           </p>
           {hero.totalUSD !== 0 && (
-            <p className="text-xs text-muted-foreground mt-0.5 tabular-nums">
+            <p className="text-xs text-muted-foreground mt-0.5 tabular-nums font-mono">
               + {fmt(hero.totalUSD, "USD")} USD
             </p>
           )}
@@ -204,7 +204,7 @@ function HeroFinanciero({ hero, perfil }: { hero: DashboardData["hero"]; perfil:
         {/* Ingresos del mes */}
         <div className="border border-border rounded-lg p-4 bg-card">
           <p className="text-xs text-muted-foreground">Ingresos del mes</p>
-          <p className="text-xl font-bold tabular-nums mt-1 text-green-400">
+          <p className="text-xl font-bold tabular-nums font-mono mt-1 text-success">
             {fmt(hero.ingresosDelMes)}
           </p>
         </div>
@@ -212,7 +212,7 @@ function HeroFinanciero({ hero, perfil }: { hero: DashboardData["hero"]; perfil:
         {/* Egresos del mes */}
         <div className="border border-border rounded-lg p-4 bg-card">
           <p className="text-xs text-muted-foreground">Egresos del mes</p>
-          <p className="text-xl font-bold tabular-nums mt-1 text-red-400">
+          <p className="text-xl font-bold tabular-nums font-mono mt-1 text-danger">
             {fmt(hero.egresosDelMes)}
           </p>
         </div>
@@ -221,15 +221,15 @@ function HeroFinanciero({ hero, perfil }: { hero: DashboardData["hero"]; perfil:
         <div className="border border-border rounded-lg p-4 bg-card">
           <p className="text-xs text-muted-foreground">Balance del mes</p>
           <p className={cn(
-            "text-xl font-bold tabular-nums mt-1",
-            hero.balanceDelMes >= 0 ? "text-green-400" : "text-red-400"
+            "text-xl font-bold tabular-nums font-mono mt-1",
+            hero.balanceDelMes >= 0 ? "text-success" : "text-danger"
           )}>
             {hero.balanceDelMes >= 0 ? "+" : ""}{fmt(hero.balanceDelMes)}
           </p>
           {delta !== null && (
             <div className={cn(
               "flex items-center gap-0.5 text-xs mt-0.5",
-              delta > 0 ? "text-green-400" : delta < 0 ? "text-red-400" : "text-muted-foreground"
+              delta > 0 ? "text-success" : delta < 0 ? "text-danger" : "text-muted-foreground"
             )}>
               {delta > 0 ? <TrendingUp className="h-3 w-3" /> : delta < 0 ? <TrendingDown className="h-3 w-3" /> : <Minus className="h-3 w-3" />}
               <span>{delta > 0 ? "+" : ""}{delta}% vs mes anterior</span>
@@ -245,8 +245,8 @@ function HeroFinanciero({ hero, perfil }: { hero: DashboardData["hero"]; perfil:
               : "Sin ingresos"}
           </p>
           <p className={cn(
-            "text-xl font-bold tabular-nums mt-1",
-            hero.ingresosDelMes >= hero.egresosDelMes ? "text-green-400" : "text-red-400"
+            "text-xl font-bold tabular-nums font-mono mt-1",
+            hero.ingresosDelMes >= hero.egresosDelMes ? "text-success" : "text-danger"
           )}>
             {hero.ingresosDelMes > 0
               ? `${Math.round(((hero.ingresosDelMes - hero.egresosDelMes) / hero.ingresosDelMes) * 100)}%`
@@ -275,7 +275,7 @@ function BloqueCuentas({ cuentas, tarjetas }: { cuentas: CuentaConSaldo[]; tarje
                 <p className="text-sm font-medium">{c.nombre}</p>
                 <p className="text-xs text-muted-foreground">{c.tipo} · {c.moneda}</p>
               </div>
-              <span className={cn("font-semibold tabular-nums text-sm", c.saldo >= 0 ? "text-green-400" : "text-red-400")}>
+              <span className={cn("font-semibold tabular-nums font-mono text-sm", c.saldo >= 0 ? "text-success" : "text-danger")}>
                 {fmt(c.saldo, c.moneda)}
               </span>
             </Link>
@@ -296,7 +296,7 @@ function BloqueCuentas({ cuentas, tarjetas }: { cuentas: CuentaConSaldo[]; tarje
                   {t.proximoVto ? ` · vto ${fmtDate(t.proximoVto)}` : ""}
                 </p>
               </div>
-              <span className={cn("font-semibold tabular-nums text-sm", t.consumo > 0 ? "text-red-400" : "text-muted-foreground")}>
+              <span className={cn("font-semibold tabular-nums font-mono text-sm", t.consumo > 0 ? "text-danger" : "text-muted-foreground")}>
                 {t.consumo > 0 ? fmt(t.consumo) : "$0"}
               </span>
             </Link>
@@ -304,7 +304,7 @@ function BloqueCuentas({ cuentas, tarjetas }: { cuentas: CuentaConSaldo[]; tarje
         </div>
       )}
 
-      <Link href="/cuentas" className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors">
+      <Link href="/cuentas" className="flex items-center gap-1 text-xs text-muted-foreground hover:text-gold transition-colors">
         Ver patrimonio completo <ChevronRight className="h-3 w-3" />
       </Link>
     </div>
@@ -319,7 +319,7 @@ function BloqueCompartidos({ datos }: { datos: DashboardData["compartidos"] }) {
       <div className="border border-border rounded-lg p-4 bg-card flex items-center justify-between">
         <div>
           <p className="text-xs text-muted-foreground">Te deben en total</p>
-          <p className="text-xl font-bold tabular-nums mt-0.5 text-green-400">{fmt(datos.totalPendiente)}</p>
+          <p className="text-xl font-bold tabular-nums font-mono mt-0.5 text-success">{fmt(datos.totalPendiente)}</p>
         </div>
         <CircleDollarSign className="h-8 w-8 text-muted-foreground/30" />
       </div>
@@ -329,13 +329,13 @@ function BloqueCompartidos({ datos }: { datos: DashboardData["compartidos"] }) {
           {datos.porPersona.map(p => (
             <div key={p.nombre} className="flex items-center justify-between px-4 py-3">
               <span className="text-sm font-medium">{p.nombre}</span>
-              <span className="text-sm font-semibold tabular-nums text-green-400">{fmt(p.total)}</span>
+              <span className="text-sm font-semibold tabular-nums font-mono text-success">{fmt(p.total)}</span>
             </div>
           ))}
         </div>
       )}
 
-      <Link href="/movimientos?compartido=true" className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors">
+      <Link href="/movimientos?compartido=true" className="flex items-center gap-1 text-xs text-muted-foreground hover:text-gold transition-colors">
         Ver movimientos compartidos <ChevronRight className="h-3 w-3" />
       </Link>
     </div>
@@ -355,11 +355,11 @@ function BloquePrestamos({ prestamos }: { prestamos: PrestamoResumen[] }) {
       <div className="grid grid-cols-2 gap-3">
         <div className="border border-border rounded-lg p-3 bg-card">
           <p className="text-xs text-muted-foreground">Te deben</p>
-          <p className="text-lg font-bold tabular-nums mt-0.5 text-green-400">{fmt(totalTeDeban)}</p>
+          <p className="text-lg font-bold tabular-nums font-mono mt-0.5 text-success">{fmt(totalTeDeban)}</p>
         </div>
         <div className="border border-border rounded-lg p-3 bg-card">
           <p className="text-xs text-muted-foreground">Debés</p>
-          <p className="text-lg font-bold tabular-nums mt-0.5 text-red-400">{fmt(totalDebas)}</p>
+          <p className="text-lg font-bold tabular-nums font-mono mt-0.5 text-danger">{fmt(totalDebas)}</p>
         </div>
       </div>
 
@@ -376,8 +376,8 @@ function BloquePrestamos({ prestamos }: { prestamos: PrestamoResumen[] }) {
                 </div>
               </div>
               <span className={cn(
-                "text-sm font-semibold tabular-nums shrink-0 ml-2",
-                p.tipo === "otorgado" ? "text-green-400" : "text-red-400"
+                "text-sm font-semibold tabular-nums font-mono shrink-0 ml-2",
+                p.tipo === "otorgado" ? "text-success" : "text-danger"
               )}>
                 {fmt(p.saldoPendiente, p.moneda)}
               </span>
@@ -386,7 +386,7 @@ function BloquePrestamos({ prestamos }: { prestamos: PrestamoResumen[] }) {
         </div>
       )}
 
-      <Link href="/prestamos" className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors">
+      <Link href="/prestamos" className="flex items-center gap-1 text-xs text-muted-foreground hover:text-gold transition-colors">
         Ver préstamos <ChevronRight className="h-3 w-3" />
       </Link>
     </div>
@@ -405,13 +405,13 @@ function BloqueInversiones({ inversiones }: { inversiones: CuentaConSaldo[] }) {
         {totalARS > 0 && (
           <div className="border border-border rounded-lg p-3 bg-card">
             <p className="text-xs text-muted-foreground">Total invertido ARS</p>
-            <p className="text-lg font-bold tabular-nums mt-0.5 text-green-400">{fmt(totalARS)}</p>
+            <p className="text-lg font-bold tabular-nums font-mono mt-0.5 text-success">{fmt(totalARS)}</p>
           </div>
         )}
         {totalUSD > 0 && (
           <div className="border border-border rounded-lg p-3 bg-card">
             <p className="text-xs text-muted-foreground">Total invertido USD</p>
-            <p className="text-lg font-bold tabular-nums mt-0.5 text-green-400">{fmt(totalUSD, "USD")}</p>
+            <p className="text-lg font-bold tabular-nums font-mono mt-0.5 text-success">{fmt(totalUSD, "USD")}</p>
           </div>
         )}
       </div>
@@ -434,7 +434,7 @@ function BloqueInversiones({ inversiones }: { inversiones: CuentaConSaldo[] }) {
                       {SUBTIPO_LABELS[subtipo] ?? subtipo}
                     </span>
                     {vencida && (
-                      <span className="inline-flex items-center px-1.5 py-0 rounded-full text-xs font-semibold bg-red-500/15 text-red-400 border border-red-500/30">
+                      <span className="inline-flex items-center px-1.5 py-0 rounded-full text-xs font-semibold bg-danger/10 text-danger border border-danger/20">
                         Vencido
                       </span>
                     )}
@@ -444,7 +444,7 @@ function BloqueInversiones({ inversiones }: { inversiones: CuentaConSaldo[] }) {
                   </div>
                 </div>
               </div>
-              <span className="text-sm font-semibold tabular-nums shrink-0 ml-2 text-green-400">
+              <span className="text-sm font-semibold tabular-nums font-mono shrink-0 ml-2 text-success">
                 {fmt(inv.saldo, inv.moneda)}
               </span>
             </Link>
@@ -452,7 +452,7 @@ function BloqueInversiones({ inversiones }: { inversiones: CuentaConSaldo[] }) {
         })}
       </div>
 
-      <Link href="/cuentas" className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors">
+      <Link href="/cuentas" className="flex items-center gap-1 text-xs text-muted-foreground hover:text-gold transition-colors">
         Ver cuentas <ChevronRight className="h-3 w-3" />
       </Link>
     </div>
@@ -474,7 +474,7 @@ function BloqueAnalisis({ analisis }: { analisis: DashboardData["analisis"] }) {
             <div key={cat.id} className="space-y-1">
               <div className="flex items-center justify-between text-sm">
                 <span className="font-medium truncate">{cat.nombre}</span>
-                <span className="tabular-nums text-muted-foreground ml-2 shrink-0">{fmt(cat.monto)} · {cat.porcentaje}%</span>
+                <span className="tabular-nums font-mono text-muted-foreground ml-2 shrink-0">{fmt(cat.monto)} · {cat.porcentaje}%</span>
               </div>
               <div className="h-1.5 bg-surface rounded-full overflow-hidden">
                 <div
@@ -511,7 +511,7 @@ function BloqueAnalisis({ analisis }: { analisis: DashboardData["analisis"] }) {
                   <div key={n.nivel} className="flex items-center gap-1.5 text-xs">
                     <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: NECESIDAD_CHART_COLORS[n.nivel] ?? "#6b7280" }} />
                     <span className="text-muted-foreground">N{n.nivel}</span>
-                    <span className="font-medium tabular-nums">{fmt(n.monto)}</span>
+                    <span className="font-medium tabular-nums font-mono">{fmt(n.monto)}</span>
                   </div>
                 ))}
               </div>
@@ -542,13 +542,13 @@ function BloqueAlertas({
           <div key={a.id} className={cn(
             "flex items-center rounded-lg border",
             a.urgencia === "alta"
-              ? "border-red-500/30 bg-red-500/5"
-              : "border-amber-500/30 bg-amber-500/5",
+              ? "border-danger/20 bg-danger/10"
+              : "border-warning/20 bg-warning/10",
           )}>
             <Link href={a.href} className="flex flex-1 items-start gap-3 p-3 transition-colors hover:bg-surface/50 min-w-0">
               <AlertTriangle className={cn(
                 "h-4 w-4 mt-0.5 shrink-0",
-                a.urgencia === "alta" ? "text-red-400" : "text-amber-400",
+                a.urgencia === "alta" ? "text-danger" : "text-warning",
               )} />
               <div className="min-w-0">
                 <p className="text-sm font-medium">{a.titulo}</p>
@@ -558,7 +558,7 @@ function BloqueAlertas({
             </Link>
             {puedeSilenciar && (
               <button
-                className="px-3 py-3 text-muted-foreground hover:text-foreground transition-colors shrink-0"
+                className="px-3 py-3 text-muted-foreground hover:text-gold transition-colors shrink-0"
                 title="Silenciar esta alerta"
                 onClick={() => onSilenciar(a)}
               >
@@ -628,7 +628,7 @@ export function DashboardClient({ data }: { data: DashboardData }) {
             <h2 className="text-base font-semibold">Alertas</h2>
             <button
               onClick={() => toggleBlock("alertas")}
-              className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+              className="flex items-center gap-1 text-xs text-muted-foreground hover:text-gold transition-colors"
             >
               <X className="h-3 w-3" />
               Ocultar

@@ -5,7 +5,7 @@ import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useRouter } from "next/navigation";
-import { X, Plus, Trash2, Users, AlertTriangle, Lock, Unlock, RefreshCw } from "lucide-react";
+import { X, Plus, Trash2, Users, AlertTriangle, Lock, Unlock, RefreshCw, CreditCard } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -112,11 +112,11 @@ const NECESIDAD_LABELS: Record<number, string> = {
 };
 
 const NECESIDAD_COLORS: Record<number, string> = {
-  1: "bg-red-900 border-red-700 text-red-200",
-  2: "bg-orange-900 border-orange-700 text-orange-200",
-  3: "bg-yellow-900 border-yellow-700 text-yellow-200",
-  4: "bg-green-900 border-green-700 text-green-200",
-  5: "bg-emerald-900 border-emerald-700 text-emerald-200",
+  1: "bg-danger border-danger/20 text-danger",
+  2: "bg-warning border-warning/20 text-warning",
+  3: "bg-warning border-warning/20 text-warning",
+  4: "bg-success border-success/20 text-success",
+  5: "bg-success border-success/20 text-success",
 };
 
 function formatMonto(n: number | string, moneda = "ARS") {
@@ -761,7 +761,7 @@ export function MovimientoEditor({ open, onClose, onSaved, editing, cuentas, tar
                 </div>
                 {cuotas > 1 && monto > 0 && (
                   <div className="inline-flex items-center gap-1.5 bg-surface border border-border rounded-full px-3 py-1 text-sm text-muted-foreground">
-                    <span>💳</span>
+                    <CreditCard className="h-3.5 w-3.5" />
                     <span>
                       {cuotas} cuotas de {formatMonto(unitario, moneda)} · {formatMonto(total, moneda)} total
                     </span>
@@ -986,7 +986,7 @@ export function MovimientoEditor({ open, onClose, onSaved, editing, cuentas, tar
                         const delta = sumPag - monto;
                         if (Math.abs(delta) > 0.01 && monto > 0) {
                           return (
-                            <div className="flex items-start gap-2 rounded-md border border-amber-800/40 bg-amber-950/20 px-3 py-2 text-xs text-amber-300">
+                            <div className="flex items-start gap-2 rounded-md border border-warning/20 bg-warning/10 px-3 py-2 text-xs text-warning">
                               <AlertTriangle className="h-3.5 w-3.5 mt-0.5 shrink-0" />
                               <span>
                                 Suma de pagadores ({formatMonto(sumPag, moneda)}) ≠ total ({formatMonto(monto, moneda)}). Delta: {delta > 0 ? "+" : ""}{formatMonto(delta, moneda)}.
@@ -1083,7 +1083,7 @@ export function MovimientoEditor({ open, onClose, onSaved, editing, cuentas, tar
                           className={cn(
                             "flex items-center gap-1 px-2 py-1.5 rounded-md border text-xs transition-colors",
                             gcMiParteModo === "fijo"
-                              ? "bg-amber-900/30 border-amber-700/50 text-amber-300"
+                              ? "bg-warning/10 border-warning/20 text-warning"
                               : "border-border text-muted-foreground hover:border-foreground/40"
                           )}
                           onClick={() => setGcMiParteModo((m) => m === "fijo" ? "a_repartir" : "fijo")}
@@ -1188,7 +1188,7 @@ export function MovimientoEditor({ open, onClose, onSaved, editing, cuentas, tar
                                   <span className="text-xs text-muted-foreground">
                                     {formatMonto(p.monto, moneda)}
                                   </span>
-                                  <span className="text-xs px-1.5 py-0.5 rounded-full bg-emerald-900/40 text-emerald-400 border border-emerald-800/40">
+                                  <span className="text-xs px-1.5 py-0.5 rounded-full bg-success/10 text-success border border-success/20">
                                     Cobrado
                                   </span>
                                 </>
@@ -1200,7 +1200,7 @@ export function MovimientoEditor({ open, onClose, onSaved, editing, cuentas, tar
                                     className={cn(
                                       "flex items-center px-1.5 py-1 rounded border text-xs transition-colors shrink-0",
                                       p.modo === "fijo"
-                                        ? "bg-amber-900/30 border-amber-700/50 text-amber-300"
+                                        ? "bg-warning/10 border-warning/20 text-warning"
                                         : "border-border text-muted-foreground hover:border-foreground/40"
                                     )}
                                     onClick={() =>
@@ -1319,7 +1319,7 @@ export function MovimientoEditor({ open, onClose, onSaved, editing, cuentas, tar
                       const delta = Math.abs(sumPartes - monto);
                       if (delta > 0.01 && monto > 0) {
                         return (
-                          <div className="flex items-start gap-2 rounded-md border border-amber-800/40 bg-amber-950/20 px-3 py-2 text-xs text-amber-300">
+                          <div className="flex items-start gap-2 rounded-md border border-warning/20 bg-warning/10 px-3 py-2 text-xs text-warning">
                             <AlertTriangle className="h-3.5 w-3.5 mt-0.5 shrink-0" />
                             <span>
                               La suma de partes ({formatMonto(sumPartes, moneda)}) difiere del

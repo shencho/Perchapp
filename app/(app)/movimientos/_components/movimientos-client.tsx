@@ -51,11 +51,11 @@ interface Props {
 // ── Constantes ────────────────────────────────────────────────────────────────
 
 const NECESIDAD_COLORS: Record<number, string> = {
-  1: "bg-red-900/50 text-red-300 border-red-800",
-  2: "bg-orange-900/50 text-orange-300 border-orange-800",
-  3: "bg-yellow-900/50 text-yellow-300 border-yellow-800",
-  4: "bg-green-900/50 text-green-300 border-green-800",
-  5: "bg-emerald-900/50 text-emerald-300 border-emerald-800",
+  1: "bg-danger/10 text-danger border-danger/20",
+  2: "bg-warning/10 text-warning border-warning/20",
+  3: "bg-warning/10 text-warning border-warning/20",
+  4: "bg-success/10 text-success border-success/20",
+  5: "bg-success/10 text-success border-success/20",
 };
 
 function formatMonto(n: number, moneda = "ARS") {
@@ -228,12 +228,12 @@ function CompartidoPanel({
               <div key={p.id} className="space-y-2">
                 <div className="flex items-center gap-2">
                   <span className="flex-1 text-sm">{p.persona_nombre}</span>
-                  <span className="text-sm tabular-nums text-muted-foreground">
+                  <span className="text-sm tabular-nums font-mono text-muted-foreground">
                     {formatMonto(p.monto, moneda)}
                   </span>
                   {p.estado === "cobrado" ? (
                     <div className="flex items-center gap-1.5">
-                      <span className="text-xs px-1.5 py-0.5 rounded-full bg-emerald-900/40 text-emerald-400 border border-emerald-800/40">
+                      <span className="text-xs px-1.5 py-0.5 rounded-full bg-success/10 text-success border border-success/20">
                         Cobrado
                       </span>
                       <Button
@@ -347,15 +347,15 @@ function CompartidoPanel({
                             <span className="ml-1 text-muted-foreground font-normal">(vos)</span>
                           )}
                         </td>
-                        <td className="px-3 py-2 text-right tabular-nums text-muted-foreground">
+                        <td className="px-3 py-2 text-right tabular-nums font-mono text-muted-foreground">
                           {p.pagado > 0 ? formatMonto(p.pagado, moneda) : "—"}
                         </td>
-                        <td className="px-3 py-2 text-right tabular-nums text-muted-foreground">
+                        <td className="px-3 py-2 text-right tabular-nums font-mono text-muted-foreground">
                           {p.consumido > 0 ? formatMonto(p.consumido, moneda) : "—"}
                         </td>
                         <td className={cn(
-                          "px-3 py-2 text-right tabular-nums font-semibold",
-                          p.neto > 0 ? "text-green-400" : p.neto < 0 ? "text-red-400" : "text-muted-foreground"
+                          "px-3 py-2 text-right tabular-nums font-mono font-semibold",
+                          p.neto > 0 ? "text-success" : p.neto < 0 ? "text-danger" : "text-muted-foreground"
                         )}>
                           {p.neto > 0 ? "+" : ""}{formatMonto(p.neto, moneda)}
                         </td>
@@ -375,7 +375,7 @@ function CompartidoPanel({
                         <span className="font-medium truncate">{t.deudorNombre}</span>
                         <ArrowRight className="h-3 w-3 shrink-0 text-muted-foreground" />
                         <span className="truncate">{t.acreedorNombre}</span>
-                        <span className="tabular-nums text-muted-foreground ml-1 shrink-0">
+                        <span className="tabular-nums font-mono text-muted-foreground ml-1 shrink-0">
                           {formatMonto(t.monto, moneda)}
                         </span>
                       </div>
@@ -395,7 +395,7 @@ function CompartidoPanel({
               )}
 
               {balance.hayDesbalance && (
-                <p className="text-xs text-amber-400 bg-amber-900/20 border border-amber-800/40 rounded px-2 py-1">
+                <p className="text-xs text-warning bg-warning/10 border border-warning/20 rounded px-2 py-1">
                   ⚠ Total pagado ≠ total consumido. Puede haber pagadores fuera de este gasto.
                 </p>
               )}
@@ -652,7 +652,7 @@ export function MovimientosClient({ movimientos, total, cuentas, tarjetas, categ
                               return (
                                 <div className="space-y-0.5">
                                   <div className="h-1.5 w-full rounded-full bg-surface overflow-hidden border border-border/40">
-                                    <div className="h-full bg-emerald-500 rounded-full transition-all" style={{ width: `${pct}%` }} />
+                                    <div className="h-full bg-success rounded-full transition-all" style={{ width: `${pct}%` }} />
                                   </div>
                                   <div className="text-xs text-muted-foreground">
                                     {formatMonto(cobradoMonto, m.moneda ?? "ARS")} cobrado de {formatMonto(totalMonto, m.moneda ?? "ARS")}
@@ -666,7 +666,7 @@ export function MovimientosClient({ movimientos, total, cuentas, tarjetas, categ
                           <a
                             href={`/prestamos/${m.prestamos.id}`}
                             onClick={(e) => { e.stopPropagation(); }}
-                            className="inline-flex items-center gap-1 mt-0.5 text-xs text-violet-300 bg-violet-900/20 border border-violet-800/40 px-1.5 py-0.5 rounded hover:bg-violet-900/40 transition-colors"
+                            className="inline-flex items-center gap-1 mt-0.5 text-xs text-info bg-info/10 border border-info/20 px-1.5 py-0.5 rounded hover:bg-info/10 transition-colors"
                           >
                             <Landmark className="h-3 w-3" />
                             {nombrePrestamo(m)}
@@ -678,8 +678,8 @@ export function MovimientosClient({ movimientos, total, cuentas, tarjetas, categ
                         {m.tarjetas && <span className="ml-1">· {m.tarjetas.nombre}</span>}
                       </td>
                       <td className={cn(
-                        "px-4 py-3 text-right font-semibold tabular-nums",
-                        m.tipo === "Ingreso" ? "text-green-400" : m.tipo === "Egreso" ? "text-red-400" : "text-muted-foreground"
+                        "px-4 py-3 text-right font-semibold tabular-nums font-mono",
+                        m.tipo === "Ingreso" ? "text-success" : m.tipo === "Egreso" ? "text-danger" : "text-muted-foreground"
                       )}>
                         {m.tipo === "Ingreso" ? "+" : m.tipo === "Egreso" ? "-" : "↔"}
                         {formatMonto(m.monto, m.moneda)}
@@ -752,8 +752,8 @@ export function MovimientosClient({ movimientos, total, cuentas, tarjetas, categ
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2">
                           <span className={cn(
-                            "font-semibold tabular-nums",
-                            m.tipo === "Ingreso" ? "text-green-400" : m.tipo === "Egreso" ? "text-red-400" : "text-muted-foreground"
+                            "font-semibold tabular-nums font-mono",
+                            m.tipo === "Ingreso" ? "text-success" : m.tipo === "Egreso" ? "text-danger" : "text-muted-foreground"
                           )}>
                             {m.tipo === "Ingreso" ? "+" : m.tipo === "Egreso" ? "-" : "↔"}
                             {formatMonto(m.monto, m.moneda)}
@@ -789,7 +789,7 @@ export function MovimientosClient({ movimientos, total, cuentas, tarjetas, categ
                               return (
                                 <div className="space-y-0.5">
                                   <div className="h-1.5 w-full rounded-full bg-surface overflow-hidden border border-border/40">
-                                    <div className="h-full bg-emerald-500 rounded-full transition-all" style={{ width: `${pct}%` }} />
+                                    <div className="h-full bg-success rounded-full transition-all" style={{ width: `${pct}%` }} />
                                   </div>
                                   <div className="text-xs text-muted-foreground">
                                     {formatMonto(cobradoMonto, m.moneda ?? "ARS")} cobrado de {formatMonto(totalMonto, m.moneda ?? "ARS")}
@@ -803,7 +803,7 @@ export function MovimientosClient({ movimientos, total, cuentas, tarjetas, categ
                           <a
                             href={`/prestamos/${m.prestamos.id}`}
                             onClick={(e) => e.stopPropagation()}
-                            className="inline-flex items-center gap-1 mt-1 text-xs text-violet-300 bg-violet-900/20 border border-violet-800/40 px-1.5 py-0.5 rounded hover:bg-violet-900/40 transition-colors"
+                            className="inline-flex items-center gap-1 mt-1 text-xs text-info bg-info/10 border border-info/20 px-1.5 py-0.5 rounded hover:bg-info/10 transition-colors"
                           >
                             <Landmark className="h-3 w-3" />
                             {nombrePrestamo(m)}

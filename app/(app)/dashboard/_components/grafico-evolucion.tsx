@@ -157,28 +157,28 @@ export function GraficoEvolucion({ movimientos, cuentas, ajusteInversionIds }: P
           onClick={handleChartClick}
           margin={{ top: 4, right: 4, bottom: 0, left: 0 }}
         >
-          <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" vertical={false} />
+          <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" vertical={false} />
           <XAxis
             dataKey="label"
-            tick={{ fill: "#64748b", fontSize: 11 }}
+            tick={{ fill: "#6b7280", fontSize: 11 }}
             axisLine={false} tickLine={false}
           />
           <YAxis
             tickFormatter={fmtShort}
-            tick={{ fill: "#64748b", fontSize: 11 }}
+            tick={{ fill: "#6b7280", fontSize: 11 }}
             axisLine={false} tickLine={false}
             width={52}
           />
           <Tooltip
             content={<CustomTooltip moneda={moneda} />}
-            cursor={{ fill: "#1e293b", opacity: 0.8 }}
+            cursor={{ fill: "#e5e7eb", opacity: 0.8 }}
           />
           <Legend
             wrapperStyle={{ fontSize: "12px", paddingTop: "8px" }}
-            formatter={(value) => <span style={{ color: "#64748b" }}>{value}</span>}
+            formatter={(value) => <span style={{ color: "#6b7280" }}>{value}</span>}
           />
           <Bar
-            dataKey="ingresos" name="Ingresos" fill="#22c55e" opacity={0.85}
+            dataKey="ingresos" name="Ingresos" fill="#10b981" opacity={0.85}
             radius={[3, 3, 0, 0]} style={{ cursor: "pointer" }}
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             onClick={(data: any) => data?.mes && router.push(`/movimientos?mes=${data.mes}`)}
@@ -191,8 +191,8 @@ export function GraficoEvolucion({ movimientos, cuentas, ajusteInversionIds }: P
           />
           <Line
             type="monotone" dataKey="balance" name="Balance"
-            stroke="#818cf8" strokeWidth={2}
-            dot={{ r: 3, fill: "#818cf8", strokeWidth: 0 }}
+            stroke="#3b82f6" strokeWidth={2}
+            dot={{ r: 3, fill: "#3b82f6", strokeWidth: 0 }}
             activeDot={{ r: 5 }}
           />
         </ComposedChart>

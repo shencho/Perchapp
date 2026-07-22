@@ -44,9 +44,9 @@ function calcularProximaFecha(fechaInicio: string, cuotasPagadas: number, diaVen
 }
 
 const TIPO_CONFIG = {
-  otorgado: { label: "Otorgado", icon: TrendingUp,  color: "bg-green-900/40 text-green-300 border-green-800/60" },
-  recibido: { label: "Recibido", icon: TrendingDown, color: "bg-orange-900/40 text-orange-300 border-orange-800/60" },
-  bancario: { label: "Bancario", icon: Building2,    color: "bg-blue-900/40 text-blue-300 border-blue-800/60" },
+  otorgado: { label: "Otorgado", icon: TrendingUp,  color: "bg-success/10 text-success border-success/20" },
+  recibido: { label: "Recibido", icon: TrendingDown, color: "bg-warning/10 text-warning border-warning/20" },
+  bancario: { label: "Bancario", icon: Building2,    color: "bg-info/10 text-info border-info/20" },
 } as const;
 
 // ── Componente ────────────────────────────────────────────────────────────────
@@ -142,7 +142,7 @@ export function PrestamoDetalleClient({ prestamo, pagos, cuentas, personas }: Pr
             <span className={cn(
               "text-xs px-1.5 py-0.5 rounded-full border",
               prestamo.estado === "activo"
-                ? "bg-emerald-900/40 text-emerald-300 border-emerald-800/60"
+                ? "bg-success/10 text-success border-success/20"
                 : "bg-surface text-muted-foreground border-border"
             )}>
               {prestamo.estado === "activo" ? "Activo" : "Cancelado"}
@@ -173,28 +173,28 @@ export function PrestamoDetalleClient({ prestamo, pagos, cuentas, personas }: Pr
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <div className="bg-card border border-border rounded-lg p-3">
           <p className="text-xs text-muted-foreground">Monto inicial</p>
-          <p className="text-base font-semibold tabular-nums mt-0.5">
+          <p className="text-base font-semibold tabular-nums font-mono mt-0.5">
             {formatMonto(prestamo.monto_inicial, prestamo.moneda)}
           </p>
         </div>
         <div className="bg-card border border-border rounded-lg p-3">
           <p className="text-xs text-muted-foreground">Total pagado</p>
-          <p className="text-base font-semibold tabular-nums mt-0.5 text-emerald-400">
+          <p className="text-base font-semibold tabular-nums font-mono mt-0.5 text-success">
             {formatMonto(totalPagado, prestamo.moneda)}
           </p>
         </div>
         <div className="bg-card border border-border rounded-lg p-3">
           <p className="text-xs text-muted-foreground">Saldo pendiente</p>
-          <p className={cn("text-base font-semibold tabular-nums mt-0.5", saldoPendiente > 0 ? "text-amber-400" : "text-emerald-400")}>
+          <p className={cn("text-base font-semibold tabular-nums font-mono mt-0.5", saldoPendiente > 0 ? "text-warning" : "text-success")}>
             {formatMonto(saldoPendiente, prestamo.moneda)}
           </p>
         </div>
         <div className="bg-card border border-border rounded-lg p-3">
           <p className="text-xs text-muted-foreground mb-1">Cancelado</p>
           <div className="h-1.5 w-full rounded-full bg-surface overflow-hidden border border-border/40">
-            <div className="h-full bg-emerald-500 rounded-full" style={{ width: `${porcentajeCancelado}%` }} />
+            <div className="h-full bg-success rounded-full" style={{ width: `${porcentajeCancelado}%` }} />
           </div>
-          <p className="text-xs tabular-nums mt-1 font-medium">{porcentajeCancelado}%</p>
+          <p className="text-xs tabular-nums font-mono mt-1 font-medium">{porcentajeCancelado}%</p>
         </div>
       </div>
 
@@ -204,7 +204,7 @@ export function PrestamoDetalleClient({ prestamo, pagos, cuentas, personas }: Pr
           {prestamo.cuota_mensual && (
             <div className="bg-card border border-border rounded-lg p-3">
               <p className="text-xs text-muted-foreground">Cuota mensual</p>
-              <p className="text-sm font-semibold tabular-nums mt-0.5">
+              <p className="text-sm font-semibold tabular-nums font-mono mt-0.5">
                 {formatMonto(prestamo.cuota_mensual, prestamo.moneda)}
               </p>
             </div>
@@ -212,7 +212,7 @@ export function PrestamoDetalleClient({ prestamo, pagos, cuentas, personas }: Pr
           {prestamo.cantidad_cuotas && (
             <div className="bg-card border border-border rounded-lg p-3">
               <p className="text-xs text-muted-foreground">Cuotas</p>
-              <p className="text-sm font-semibold tabular-nums mt-0.5">
+              <p className="text-sm font-semibold tabular-nums font-mono mt-0.5">
                 {pagos.length} / {prestamo.cantidad_cuotas}
               </p>
             </div>
@@ -263,7 +263,7 @@ export function PrestamoDetalleClient({ prestamo, pagos, cuentas, personas }: Pr
               >
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
-                    <span className="text-sm font-medium tabular-nums">
+                    <span className="text-sm font-medium tabular-nums font-mono">
                       {formatMonto(pago.monto, prestamo.moneda)}
                     </span>
                     {pago.cuota_numero && (

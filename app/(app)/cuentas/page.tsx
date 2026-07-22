@@ -26,12 +26,12 @@ const SUBTIPO_LABELS: Record<string, string> = {
 };
 
 const SUBTIPO_COLORS: Record<string, string> = {
-  plazo_fijo: "bg-amber-500/15 text-amber-400 border-amber-500/30",
-  cripto:     "bg-purple-500/15 text-purple-400 border-purple-500/30",
-  fci:        "bg-blue-500/15 text-blue-400 border-blue-500/30",
-  acciones:   "bg-indigo-500/15 text-indigo-400 border-indigo-500/30",
-  usd_fisico: "bg-green-500/15 text-green-400 border-green-500/30",
-  balanz:     "bg-sky-500/15 text-sky-400 border-sky-500/30",
+  plazo_fijo: "bg-warning/10 text-warning border-warning/20",
+  cripto:     "bg-info/10 text-info border-info/20",
+  fci:        "bg-info/10 text-info border-info/20",
+  acciones:   "bg-info/10 text-info border-info/20",
+  usd_fisico: "bg-success/10 text-success border-success/20",
+  balanz:     "bg-info/10 text-info border-info/20",
   otros:      "bg-muted/50 text-muted-foreground border-border",
 };
 
@@ -120,8 +120,8 @@ export default async function CuentasPage() {
                       <td className="px-4 py-3 text-muted-foreground text-xs">{cuenta.tipo}</td>
                       <td className="px-4 py-3 text-muted-foreground text-xs">{cuenta.moneda}</td>
                       <td className={cn(
-                        "px-4 py-3 text-right font-semibold tabular-nums",
-                        saldo >= 0 ? "text-green-400" : "text-red-400"
+                        "px-4 py-3 text-right font-semibold tabular-nums font-mono",
+                        saldo >= 0 ? "text-success" : "text-danger"
                       )}>
                         {fmt(saldo, cuenta.moneda)}
                       </td>
@@ -130,8 +130,8 @@ export default async function CuentasPage() {
                   <tr className="border-t border-border bg-surface/50">
                     <td colSpan={3} className="px-4 py-2.5 text-sm font-medium text-muted-foreground">Total</td>
                     <td className="px-4 py-2.5 text-right">
-                      <div className="text-sm font-semibold tabular-nums">{fmt(totalARS, "ARS")}</div>
-                      {totalUSD !== 0 && <div className="text-xs text-muted-foreground tabular-nums">{fmt(totalUSD, "USD")}</div>}
+                      <div className="text-sm font-semibold tabular-nums font-mono">{fmt(totalARS, "ARS")}</div>
+                      {totalUSD !== 0 && <div className="text-xs text-muted-foreground tabular-nums font-mono">{fmt(totalUSD, "USD")}</div>}
                     </td>
                   </tr>
                 </tbody>
@@ -147,7 +147,7 @@ export default async function CuentasPage() {
                       <p className="font-medium">{cuenta.nombre}</p>
                       <p className="text-xs text-muted-foreground mt-0.5">{cuenta.tipo} · {cuenta.moneda}</p>
                     </div>
-                    <span className={cn("font-semibold tabular-nums", saldo >= 0 ? "text-green-400" : "text-red-400")}>
+                    <span className={cn("font-semibold tabular-nums font-mono", saldo >= 0 ? "text-success" : "text-danger")}>
                       {fmt(saldo, cuenta.moneda)}
                     </span>
                   </div>
@@ -156,7 +156,7 @@ export default async function CuentasPage() {
               <div className="border border-border rounded-lg p-3 bg-surface/30 flex justify-between items-center">
                 <span className="text-sm text-muted-foreground">Total</span>
                 <div className="text-right">
-                  <div className="font-semibold tabular-nums text-sm">{fmt(totalARS, "ARS")}</div>
+                  <div className="font-semibold tabular-nums font-mono text-sm">{fmt(totalARS, "ARS")}</div>
                   {totalUSD !== 0 && <div className="text-xs text-muted-foreground">{fmt(totalUSD, "USD")}</div>}
                 </div>
               </div>
@@ -208,7 +208,7 @@ export default async function CuentasPage() {
                             )}
                             {diasRestantes !== null && (
                               vencida ? (
-                                <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-semibold bg-red-500/15 text-red-400 border border-red-500/30">
+                                <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-semibold bg-danger/10 text-danger border border-danger/20">
                                   Vencido
                                 </span>
                               ) : (
@@ -219,8 +219,8 @@ export default async function CuentasPage() {
                         )}
                       </td>
                       <td className={cn(
-                        "px-4 py-3 text-right font-semibold tabular-nums",
-                        saldo >= 0 ? "text-green-400" : "text-red-400"
+                        "px-4 py-3 text-right font-semibold tabular-nums font-mono",
+                        saldo >= 0 ? "text-success" : "text-danger"
                       )}>
                         {fmt(saldo, cuenta.moneda)}
                       </td>
@@ -250,7 +250,7 @@ export default async function CuentasPage() {
                         </span>
                         {cuenta.inv_subtipo === "plazo_fijo" && diasRestantes !== null && (
                           vencida ? (
-                            <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-semibold bg-red-500/15 text-red-400 border border-red-500/30">
+                            <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-semibold bg-danger/10 text-danger border border-danger/20">
                               Vencido
                             </span>
                           ) : (
@@ -262,7 +262,7 @@ export default async function CuentasPage() {
                         )}
                       </div>
                     </div>
-                    <span className={cn("font-semibold tabular-nums ml-2 shrink-0", saldo >= 0 ? "text-green-400" : "text-red-400")}>
+                    <span className={cn("font-semibold tabular-nums font-mono ml-2 shrink-0", saldo >= 0 ? "text-success" : "text-danger")}>
                       {fmt(saldo, cuenta.moneda)}
                     </span>
                   </div>

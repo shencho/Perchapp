@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { NavItemComponent } from "@/components/navigation/nav-item";
 import { NavigationDrawer } from "@/components/navigation/navigation-drawer";
 import { MangoAIButton } from "@/components/navigation/mango-ai-button";
+import { MangoLogo } from "@/components/ui/mango-logo";
 import { getNavItems } from "@/lib/navigation/get-nav-items";
 
 interface Props {
@@ -18,9 +19,8 @@ export function DesktopSidebar({ asistenteNombre, userEmail }: Props) {
 
   return (
     <aside className="hidden md:flex flex-col w-60 border-r border-border h-screen sticky top-0 bg-card shrink-0">
-      <div className="px-4 py-5 flex items-center gap-2">
-        <span className="text-xl">🥭</span>
-        <span className="font-semibold text-sm tracking-wide">MANGO</span>
+      <div className="px-4 py-5">
+        <MangoLogo size={28} showWordmark />
       </div>
 
       <div className="px-2 pb-2">

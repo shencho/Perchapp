@@ -108,7 +108,7 @@ export function RegistrarPagoPrestamoModal({
           <div>
             <h2 className="text-lg font-semibold">Registrar pago</h2>
             <p className="text-xs text-muted-foreground mt-0.5">
-              Saldo pendiente: <span className="tabular-nums">{formatMonto(saldoPendiente, prestamo.moneda)}</span>
+              Saldo pendiente: <span className="tabular-nums font-mono">{formatMonto(saldoPendiente, prestamo.moneda)}</span>
             </p>
           </div>
 
@@ -137,7 +137,7 @@ export function RegistrarPagoPrestamoModal({
 
             {/* Warning de sobrepago */}
             {sobrepago && (
-              <div className="rounded-md border border-amber-800/60 bg-amber-900/20 px-3 py-2 text-xs text-amber-300">
+              <div className="rounded-md border border-warning/20 bg-warning/10 px-3 py-2 text-xs text-warning">
                 ⚠ Este pago ({formatMonto(parseFloat(monto) || 0, prestamo.moneda)}) excede el saldo pendiente ({formatMonto(saldoPendiente, prestamo.moneda)}).
                 ¿Es un sobrepago intencional (interés informal, redondeo)?
                 Podés guardarlo igual.

@@ -122,14 +122,14 @@ export function GenerarPendientesModal({
                         <span className={cn(
                           "text-xs px-1.5 py-0.5 rounded border font-medium shrink-0",
                           p.tipo === "Ingreso"
-                            ? "bg-green-900/30 text-green-400 border-green-800/40"
-                            : "bg-red-900/30 text-red-400 border-red-800/40"
+                            ? "bg-success/10 text-success border-success/20"
+                            : "bg-danger/10 text-danger border-danger/20"
                         )}>
                           {p.tipo ?? "Egreso"}
                         </span>
                       </div>
                       {atrasada ? (
-                        <div className="flex items-center gap-1 text-xs text-orange-400 mt-0.5">
+                        <div className="flex items-center gap-1 text-xs text-warning mt-0.5">
                           <AlertTriangle className="h-3 w-3" />
                           Atrasada {Math.abs(diasRestantes)}d · {fmtFecha(fechaEsperada)}
                         </div>
@@ -150,7 +150,7 @@ export function GenerarPendientesModal({
                         step="0.01"
                         value={montos[p.id] ?? p.monto_estimado}
                         onChange={e => setMontos(prev => ({ ...prev, [p.id]: e.target.valueAsNumber }))}
-                        className="w-28 text-right tabular-nums h-8"
+                        className="w-28 text-right tabular-nums font-mono h-8"
                         disabled={!checked[p.id]}
                       />
                     </td>

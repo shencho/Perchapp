@@ -183,7 +183,7 @@ export function BalancesClient({ balances, cuentas, nombreUsuario: _nombreUsuari
 
             <p className="text-sm text-muted-foreground">
               Se creará un ingreso de{" "}
-              <span className="font-semibold text-green-400">
+              <span className="font-semibold text-success">
                 {fmt(saldarModal.monto, saldarModal.moneda)}
               </span>{" "}
               y todos los cobros pendientes de {saldarModal.nombre} quedarán marcados como cobrados.
@@ -257,7 +257,7 @@ export function BalancesClient({ balances, cuentas, nombreUsuario: _nombreUsuari
           {totalTeDebenARS > 0 && (
             <div className="rounded-lg border border-border bg-card px-4 py-3">
               <p className="text-xs text-muted-foreground">Te deben ARS</p>
-              <p className="text-xl font-bold text-green-400 mt-0.5 tabular-nums">
+              <p className="text-xl font-bold text-success mt-0.5 tabular-nums font-mono">
                 {fmt(totalTeDebenARS)}
               </p>
             </div>
@@ -265,15 +265,15 @@ export function BalancesClient({ balances, cuentas, nombreUsuario: _nombreUsuari
           {totalTeDebenUSD > 0 && (
             <div className="rounded-lg border border-border bg-card px-4 py-3">
               <p className="text-xs text-muted-foreground">Te deben USD</p>
-              <p className="text-xl font-bold text-green-400 mt-0.5 tabular-nums">
+              <p className="text-xl font-bold text-success mt-0.5 tabular-nums font-mono">
                 {fmt(totalTeDebenUSD, "USD")}
               </p>
             </div>
           )}
           {todasSaldadas && (
-            <div className="rounded-lg border border-emerald-800/40 bg-emerald-900/10 px-4 py-3 flex items-center gap-2">
-              <Check className="h-4 w-4 text-emerald-400" />
-              <p className="text-sm font-medium text-emerald-400">Todo saldado</p>
+            <div className="rounded-lg border border-success/20 bg-success/10 px-4 py-3 flex items-center gap-2">
+              <Check className="h-4 w-4 text-success" />
+              <p className="text-sm font-medium text-success">Todo saldado</p>
             </div>
           )}
         </div>
@@ -281,8 +281,8 @@ export function BalancesClient({ balances, cuentas, nombreUsuario: _nombreUsuari
         {/* All-saldado state */}
         {todasSaldadas && (
           <div className="flex flex-col items-center justify-center py-10 text-center gap-2">
-            <Check className="h-8 w-8 text-emerald-400" />
-            <p className="text-sm font-medium text-emerald-400">Todo saldado ✓</p>
+            <Check className="h-8 w-8 text-success" />
+            <p className="text-sm font-medium text-success">Todo saldado ✓</p>
             <p className="text-xs text-muted-foreground">
               No hay cobros pendientes. Historial disponible abajo.
             </p>
@@ -311,17 +311,17 @@ export function BalancesClient({ balances, cuentas, nombreUsuario: _nombreUsuari
                       <div className="flex items-center gap-2 flex-wrap">
                         <span className="font-semibold">{persona.nombre}</span>
                         {hasPendARS && (
-                          <span className="text-sm font-bold text-green-400 tabular-nums">
+                          <span className="text-sm font-bold text-success tabular-nums font-mono">
                             +{fmt(persona.pendienteARS)}
                           </span>
                         )}
                         {hasPendUSD && (
-                          <span className="text-sm font-bold text-green-400 tabular-nums">
+                          <span className="text-sm font-bold text-success tabular-nums font-mono">
                             +{fmt(persona.pendienteUSD, "USD")}
                           </span>
                         )}
                         {!hasPend && (
-                          <span className="text-xs text-emerald-400 flex items-center gap-1">
+                          <span className="text-xs text-success flex items-center gap-1">
                             <Check className="h-3 w-3" />
                             Saldado
                           </span>
@@ -380,9 +380,9 @@ export function BalancesClient({ balances, cuentas, nombreUsuario: _nombreUsuari
                       .map((g) => (
                         <div key={g.participanteId} className="flex items-center gap-2 text-xs">
                           {g.estado === "cobrado" ? (
-                            <Check className="h-3 w-3 text-emerald-400 shrink-0" />
+                            <Check className="h-3 w-3 text-success shrink-0" />
                           ) : (
-                            <Clock className="h-3 w-3 text-amber-400 shrink-0" />
+                            <Clock className="h-3 w-3 text-warning shrink-0" />
                           )}
                           <span className="flex-1 truncate text-muted-foreground">
                             {g.concepto || "Sin concepto"}
@@ -392,7 +392,7 @@ export function BalancesClient({ balances, cuentas, nombreUsuario: _nombreUsuari
                           </span>
                           <span
                             className={cn(
-                              "tabular-nums font-medium shrink-0",
+                              "tabular-nums font-mono font-medium shrink-0",
                               g.estado === "cobrado"
                                 ? "text-muted-foreground/60 line-through"
                                 : "text-foreground"
