@@ -7,7 +7,9 @@ import {
   TrendingUp, TrendingDown, Minus, X, AlertTriangle,
   Clock, Landmark, Wallet, ChevronRight,
   CircleDollarSign, PieChart as PieChartIcon, BarChart3,
+  ArrowDownLeft, ArrowUpRight, PiggyBank, type LucideIcon,
 } from "lucide-react";
+import { categoriaNombreToLucide } from "@/lib/ui/category-icons";
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from "recharts";
 import { cn } from "@/lib/utils";
 import { GraficoEvolucion } from "./grafico-evolucion";
@@ -157,11 +159,38 @@ function DashBlock({
   );
 }
 
+// ── Stat card (chip de ícono + label + cifra) ─────────────────────────────────
+
+function StatCard({
+  icon: Icon, chipBg, iconColor, label, value, valueClass,
+}: {
+  icon: LucideIcon; chipBg: string; iconColor: string;
+  label: React.ReactNode; value: React.ReactNode; valueClass?: string;
+}) {
+  return (
+    <div className="border border-border rounded-[12px] p-4 bg-card">
+      <div
+        className="flex items-center justify-center rounded-[9px]"
+        style={{ width: 30, height: 30, background: chipBg }}
+      >
+        <Icon className="h-4 w-4" style={{ color: iconColor }} />
+      </div>
+      <p className="text-xs text-muted-foreground mt-2">{label}</p>
+      <p className={cn("text-[17px] font-bold tabular-nums font-mono mt-0.5", valueClass)}>
+        {value}
+      </p>
+    </div>
+  );
+}
+
 // ── Hero financiero ───────────────────────────────────────────────────────────
 
 function HeroFinanciero({ hero, perfil }: { hero: DashboardData["hero"]; perfil: DashboardData["perfil"] }) {
   const delta = hero.balanceMesAnterior !== 0
     ? Math.round((hero.balanceDelMes - hero.balanceMesAnterior) / Math.abs(hero.balanceMesAnterior) * 100)
+    : null;
+  const ahorroPct = hero.ingresosDelMes > 0
+    ? Math.round(((hero.ingresosDelMes - hero.egresosDelMes) / hero.ingresosDelMes) * 100)
     : null;
 
   return (
@@ -210,39 +239,19 @@ function HeroFinanciero({ hero, perfil }: { hero: DashboardData["hero"]; perfil:
       </div>
 
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-        {/* Ingresos del mes */}
-        <div className="border border-border rounded-lg p-4 bg-card">
-          <p className="text-xs text-muted-foreground">Ingresos del mes</p>
-          <p className="text-xl font-bold tabular-nums font-mono mt-1 text-success">
-            {fmt(hero.ingresosDelMes)}
-          </p>
-        </div>
-
-        {/* Egresos del mes */}
-        <div className="border border-border rounded-lg p-4 bg-card">
-          <p className="text-xs text-muted-foreground">Egresos del mes</p>
-          <p className="text-xl font-bold tabular-nums font-mono mt-1 text-danger">
-            {fmt(hero.egresosDelMes)}
-          </p>
-        </div>
-
-        {/* Ahorro (saldo si > 0) / Déficit */}
-        <div className="border border-border rounded-lg p-4 bg-card">
-          <p className="text-xs text-muted-foreground">
-            {hero.ingresosDelMes > 0
-              ? `Ahorro ${hero.egresosDelMes > 0 ? Math.round(((hero.ingresosDelMes - hero.egresosDelMes) / hero.ingresosDelMes) * 100) : 100}%`
-              : "Sin ingresos"}
-          </p>
-          <p className={cn(
-            "text-xl font-bold tabular-nums font-mono mt-1",
-            hero.ingresosDelMes >= hero.egresosDelMes ? "text-success" : "text-danger"
-          )}>
-            {hero.ingresosDelMes > 0
-              ? `${Math.round(((hero.ingresosDelMes - hero.egresosDelMes) / hero.ingresosDelMes) * 100)}%`
-              : "—"}
-          </p>
-          <p className="text-xs text-muted-foreground mt-0.5">del ingreso</p>
-        </div>
+        <StatCard
+          icon={ArrowDownLeft} chipBg="#e6f6ef" iconColor="#0b7a52"
+          label="Ingresos del mes" value={fmt(hero.ingresosDelMes)} valueClass="text-success"
+        />
+        <StatCard
+          icon={ArrowUpRight} chipBg="#fdeaea" iconColor="#c0362f"
+          label="Gastos del mes" value={fmt(hero.egresosDelMes)} valueClass="text-danger"
+        />
+        <StatCard
+          icon={PiggyBank} chipBg="#f3ecdc" iconColor="#1e3a5f"
+          label={ahorroPct !== null ? "Ahorro del mes" : "Sin ingresos"}
+          value={ahorroPct !== null ? `${ahorroPct}%` : "—"}
+        />
       </div>
     </div>
   );
