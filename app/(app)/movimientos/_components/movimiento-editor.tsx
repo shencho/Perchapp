@@ -444,6 +444,19 @@ export function MovimientoEditor({ open, onClose, onSaved, editing, cuentas, tar
     setIsSubmitting(true);
     setError(null);
     try {
+      // Gasto compartido: absorber diferencia de redondeo (≤ $1) en la parte del
+      // usuario (gc_mi_parte) para que las partes cierren exactas contra el total.
+      let gcMiParteFinal = gcMiParte;
+      if (esCompartido) {
+        const sumParticipantesPend = participantes
+          .filter((p) => p.estado === "pendiente")
+          .reduce((acc, p) => acc + p.monto, 0);
+        const delta = values.monto - (gcMiParte + sumParticipantesPend);
+        if (Math.abs(delta) <= 1) {
+          gcMiParteFinal = Math.round((gcMiParte + delta) * 100) / 100;
+        }
+      }
+
       const payload: MovimientoInput = {
         ...values,
         tipo_cambio:       values.tipo_cambio ?? null,
@@ -460,7 +473,7 @@ export function MovimientoEditor({ open, onClose, onSaved, editing, cuentas, tar
         observaciones:     values.observaciones ?? null,
         unitario:          clasificacion === "Cuotas" ? unitario : values.monto,
         es_compartido:     esCompartido,
-        gc_mi_parte:       esCompartido ? gcMiParte : null,
+        gc_mi_parte:       esCompartido ? gcMiParteFinal : null,
       };
 
       // Preparar participantes para upsert: resolver "guardar en agenda" primero
@@ -1002,7 +1015,7 @@ export function MovimientoEditor({ open, onClose, onSaved, editing, cuentas, tar
                       {(() => {
                         const sumPag = pagadores.reduce((acc, p) => acc + p.montoPagado, 0);
                         const delta = sumPag - monto;
-                        if (Math.abs(delta) > 0.01 && monto > 0) {
+                        if (Math.abs(delta) > 1 && monto > 0) {
                           return (
                             <div className="flex items-start gap-2 rounded-md border border-warning/20 bg-warning/10 px-3 py-2 text-xs text-warning">
                               <AlertTriangle className="h-3.5 w-3.5 mt-0.5 shrink-0" />
@@ -1335,7 +1348,7 @@ export function MovimientoEditor({ open, onClose, onSaved, editing, cuentas, tar
                           .filter((p) => p.estado === "pendiente")
                           .reduce((acc, p) => acc + p.monto, 0);
                       const delta = Math.abs(sumPartes - monto);
-                      if (delta > 0.01 && monto > 0) {
+                      if (delta > 1 && monto > 0) {
                         return (
                           <div className="flex items-start gap-2 rounded-md border border-warning/20 bg-warning/10 px-3 py-2 text-xs text-warning">
                             <AlertTriangle className="h-3.5 w-3.5 mt-0.5 shrink-0" />
