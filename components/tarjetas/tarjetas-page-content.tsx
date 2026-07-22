@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useForm, Controller } from "react-hook-form";
+import { useForm, Controller, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useRouter } from "next/navigation";
@@ -58,6 +58,8 @@ export function TarjetasPageContent({ tarjetas, cuentas }: Props) {
   const { register, handleSubmit, control, reset, formState: { errors } } =
     useForm<FormData>({ resolver: zodResolver(schema) });
 
+  const esCredito = useWatch({ control, name: "tipo" }) === "Crédito";
+
   function openCreate() {
     setEditing(null);
     reset(EMPTY);
@@ -85,7 +87,9 @@ export function TarjetasPageContent({ tarjetas, cuentas }: Props) {
       const payload = {
         nombre: data.nombre, tipo: data.tipo,
         banco_emisor: data.banco_emisor || null, ultimos_cuatro: data.ultimos_cuatro || null,
-        cierre_dia: data.cierre_dia || null, vencimiento_dia: data.vencimiento_dia || null,
+        // Cierre/vencimiento son solo de crédito: en débito se fuerzan a null
+        cierre_dia: data.tipo === "Crédito" ? (data.cierre_dia || null) : null,
+        vencimiento_dia: data.tipo === "Crédito" ? (data.vencimiento_dia || null) : null,
         limite_ars: data.limite_ars || null, limite_usd: data.limite_usd || null,
         cuenta_pago_default: data.cuenta_pago_default || null,
       };
@@ -207,16 +211,20 @@ export function TarjetasPageContent({ tarjetas, cuentas }: Props) {
                 <Input id="t-ultimos" placeholder="1234" maxLength={4} {...register("ultimos_cuatro")} />
                 {errors.ultimos_cuatro && <p className="text-xs text-destructive">{errors.ultimos_cuatro.message}</p>}
               </div>
-              <div className="flex flex-col gap-1.5 flex-1">
-                <Label htmlFor="t-cierre">Día cierre</Label>
-                <Input id="t-cierre" type="number" min={1} max={31} placeholder="20"
-                  {...register("cierre_dia", { setValueAs: (v) => v === "" || v === null ? null : parseInt(v) || null })} />
-              </div>
-              <div className="flex flex-col gap-1.5 flex-1">
-                <Label htmlFor="t-vto">Día vto.</Label>
-                <Input id="t-vto" type="number" min={1} max={31} placeholder="10"
-                  {...register("vencimiento_dia", { setValueAs: (v) => v === "" || v === null ? null : parseInt(v) || null })} />
-              </div>
+              {esCredito && (
+                <>
+                  <div className="flex flex-col gap-1.5 flex-1">
+                    <Label htmlFor="t-cierre">Día cierre</Label>
+                    <Input id="t-cierre" type="number" min={1} max={31} placeholder="20"
+                      {...register("cierre_dia", { setValueAs: (v) => v === "" || v === null ? null : parseInt(v) || null })} />
+                  </div>
+                  <div className="flex flex-col gap-1.5 flex-1">
+                    <Label htmlFor="t-vto">Día vto.</Label>
+                    <Input id="t-vto" type="number" min={1} max={31} placeholder="10"
+                      {...register("vencimiento_dia", { setValueAs: (v) => v === "" || v === null ? null : parseInt(v) || null })} />
+                  </div>
+                </>
+              )}
             </div>
 
             <div className="flex gap-3">
