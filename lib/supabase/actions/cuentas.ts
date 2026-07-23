@@ -48,7 +48,7 @@ export async function createCuenta(data: CuentaData) {
   revalidatePath("/cuentas");
 }
 
-export async function updateCuenta(id: string, data: Omit<CuentaData, "saldo">) {
+export async function updateCuenta(id: string, data: CuentaData) {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/login");
@@ -59,7 +59,8 @@ export async function updateCuenta(id: string, data: Omit<CuentaData, "saldo">) 
       nombre: data.nombre,
       tipo: data.tipo,
       moneda: data.moneda,
-      ...invFields({ ...data, saldo: 0 }),
+      saldo: data.saldo,
+      ...invFields(data),
     })
     .eq("id", id)
     .eq("user_id", user.id);

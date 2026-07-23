@@ -65,6 +65,28 @@ export async function createMovimiento(input: MovimientoInput): Promise<{ id: st
   const { supabase, userId } = await getAuthedUser();
   const parsed = movimientoSchema.parse(input);
 
+  // Evitar FK 500: si el intérprete devuelve un UUID de cuenta/tarjeta inexistente
+  // o ajeno, se rechaza con mensaje claro (el usuario selecciona manualmente).
+  const cuentaRefs = [
+    parsed.cuenta_id ?? null,
+    parsed.tipo === "Transferencia" ? (parsed.cuenta_destino_id ?? null) : null,
+  ].filter((x): x is string => !!x);
+  if (cuentaRefs.length > 0) {
+    const { data: cuentasOk } = await supabase
+      .from("cuentas").select("id").eq("user_id", userId).in("id", cuentaRefs);
+    const ok = new Set((cuentasOk ?? []).map((c) => c.id));
+    if (cuentaRefs.some((id) => !ok.has(id))) {
+      throw new Error("No reconocí la cuenta indicada. Seleccionala manualmente y guardá de nuevo.");
+    }
+  }
+  if (parsed.tarjeta_id) {
+    const { data: tarjetaOk } = await supabase
+      .from("tarjetas").select("id").eq("user_id", userId).eq("id", parsed.tarjeta_id).maybeSingle();
+    if (!tarjetaOk) {
+      throw new Error("No reconocí la tarjeta indicada. Seleccionala manualmente y guardá de nuevo.");
+    }
+  }
+
   const row = {
     user_id:           userId,
     tipo:              parsed.tipo,

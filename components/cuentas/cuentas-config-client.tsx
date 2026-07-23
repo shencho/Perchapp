@@ -94,7 +94,7 @@ function CuentasSection({ cuentas }: { cuentas: Cuenta[] }) {
     try {
       if (editing) {
         await updateCuenta(editing.id, {
-          nombre: data.nombre, tipo: data.tipo, moneda: data.moneda,
+          nombre: data.nombre, tipo: data.tipo, moneda: data.moneda, saldo: data.saldo,
           inv_subtipo: data.inv_subtipo as InvSubtipo | null | undefined,
           inv_fecha_vencimiento: data.inv_fecha_vencimiento,
           inv_notas: data.inv_notas, inv_tasa_anual: data.inv_tasa_anual,
@@ -215,13 +215,14 @@ function CuentasSection({ cuentas }: { cuentas: Cuenta[] }) {
                 />
               )} />
             </div>
-            {!editing && (
-              <div className="flex flex-col gap-1.5 flex-1">
-                <Label htmlFor="c-saldo">Saldo inicial</Label>
-                <Input id="c-saldo" type="number" placeholder="0" {...register("saldo", { valueAsNumber: true })} />
-                {errors.saldo && <p className="text-xs text-destructive">{errors.saldo.message}</p>}
-              </div>
-            )}
+            <div className="flex flex-col gap-1.5 flex-1">
+              <Label htmlFor="c-saldo">Saldo inicial</Label>
+              <Input id="c-saldo" type="number" placeholder="0" {...register("saldo", { valueAsNumber: true })} />
+              {editing && (
+                <p className="text-xs text-muted-foreground">Editar el saldo inicial recalcula el balance actual.</p>
+              )}
+              {errors.saldo && <p className="text-xs text-destructive">{errors.saldo.message}</p>}
+            </div>
           </div>
 
           {esInversion && (

@@ -6,6 +6,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useRouter } from "next/navigation";
 import { X, Plus, Trash2, Users, AlertTriangle, Lock, Unlock, RefreshCw, CreditCard } from "lucide-react";
+import { getCicloDelProximoVencimiento, getProximoVencimiento } from "@/lib/domain/calcularConsumoTarjeta";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -343,6 +344,23 @@ export function MovimientoEditor({ open, onClose, onSaved, editing, cuentas, tar
   const showTipoCambio = moneda === "USD";
   const showCuentaDestino = tipo === "Transferencia";
 
+  // Autocalcular fecha_vencimiento al elegir una tarjeta (si está vacía) —
+  // reutiliza la lógica de ciclo/vencimiento. Evita el 500 por date vacío.
+  const tarjetaIdSel = watch("tarjeta_id");
+  useEffect(() => {
+    if (!showTarjeta || !tarjetaIdSel) return;
+    if (getValues("fecha_vencimiento")) return; // no pisar un valor existente/editado
+    const t = tarjetas.find((x) => x.id === tarjetaIdSel);
+    if (!t) return;
+    const fv =
+      t.cierre_dia && t.vencimiento_dia
+        ? getCicloDelProximoVencimiento(t.cierre_dia, t.vencimiento_dia).fechaVencimiento
+        : t.vencimiento_dia
+          ? getProximoVencimiento(t.vencimiento_dia)
+          : null;
+    if (fv) setValue("fecha_vencimiento", fv);
+  }, [tarjetaIdSel, showTarjeta, tarjetas, getValues, setValue]);
+
   // Chip de cuotas en vivo
   const unitario = monto && cuotas ? (monto / (cuotas || 1)) : 0;
   const total    = cantidad && monto ? cantidad * monto : monto;
@@ -426,6 +444,19 @@ export function MovimientoEditor({ open, onClose, onSaved, editing, cuentas, tar
     setIsSubmitting(true);
     setError(null);
     try {
+      // Gasto compartido: absorber diferencia de redondeo (≤ $1) en la parte del
+      // usuario (gc_mi_parte) para que las partes cierren exactas contra el total.
+      let gcMiParteFinal = gcMiParte;
+      if (esCompartido) {
+        const sumParticipantesPend = participantes
+          .filter((p) => p.estado === "pendiente")
+          .reduce((acc, p) => acc + p.monto, 0);
+        const delta = values.monto - (gcMiParte + sumParticipantesPend);
+        if (Math.abs(delta) <= 1) {
+          gcMiParteFinal = Math.round((gcMiParte + delta) * 100) / 100;
+        }
+      }
+
       const payload: MovimientoInput = {
         ...values,
         tipo_cambio:       values.tipo_cambio ?? null,
@@ -436,13 +467,13 @@ export function MovimientoEditor({ open, onClose, onSaved, editing, cuentas, tar
         metodo:            values.metodo ?? null,
         cuenta_id:         values.cuenta_id ?? null,
         tarjeta_id:        showTarjeta ? (values.tarjeta_id ?? null) : null,
-        fecha_vencimiento: showFechaVto ? (values.fecha_vencimiento ?? null) : null,
+        fecha_vencimiento: showFechaVto ? (values.fecha_vencimiento || null) : null,
         debita_de:         showDebitaDe ? (values.debita_de ?? null) : null,
         cuenta_destino_id: showCuentaDestino ? (values.cuenta_destino_id ?? null) : null,
         observaciones:     values.observaciones ?? null,
         unitario:          clasificacion === "Cuotas" ? unitario : values.monto,
         es_compartido:     esCompartido,
-        gc_mi_parte:       esCompartido ? gcMiParte : null,
+        gc_mi_parte:       esCompartido ? gcMiParteFinal : null,
       };
 
       // Preparar participantes para upsert: resolver "guardar en agenda" primero
@@ -984,7 +1015,7 @@ export function MovimientoEditor({ open, onClose, onSaved, editing, cuentas, tar
                       {(() => {
                         const sumPag = pagadores.reduce((acc, p) => acc + p.montoPagado, 0);
                         const delta = sumPag - monto;
-                        if (Math.abs(delta) > 0.01 && monto > 0) {
+                        if (Math.abs(delta) > 1 && monto > 0) {
                           return (
                             <div className="flex items-start gap-2 rounded-md border border-warning/20 bg-warning/10 px-3 py-2 text-xs text-warning">
                               <AlertTriangle className="h-3.5 w-3.5 mt-0.5 shrink-0" />
@@ -1317,7 +1348,7 @@ export function MovimientoEditor({ open, onClose, onSaved, editing, cuentas, tar
                           .filter((p) => p.estado === "pendiente")
                           .reduce((acc, p) => acc + p.monto, 0);
                       const delta = Math.abs(sumPartes - monto);
-                      if (delta > 0.01 && monto > 0) {
+                      if (delta > 1 && monto > 0) {
                         return (
                           <div className="flex items-start gap-2 rounded-md border border-warning/20 bg-warning/10 px-3 py-2 text-xs text-warning">
                             <AlertTriangle className="h-3.5 w-3.5 mt-0.5 shrink-0" />
