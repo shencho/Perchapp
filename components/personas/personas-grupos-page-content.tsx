@@ -20,22 +20,38 @@ import {
 } from "@/lib/supabase/actions/grupos";
 import type { Persona } from "@/types/supabase";
 import type { GrupoConMiembros } from "@/lib/supabase/actions/grupos-types";
+import type { ConexionVista } from "@/lib/supabase/actions/conexiones-types";
+import { ConexionesSection } from "@/components/personas/conexiones-section";
 
 interface Props {
   personas: Persona[];
   grupos: GrupoConMiembros[];
+  conexiones: ConexionVista[];
+  invitacionesRecibidas: ConexionVista[];
+  invitacionesEnviadas: ConexionVista[];
 }
 
-export function PersonasGruposPageContent({ personas, grupos }: Props) {
+export function PersonasGruposPageContent({
+  personas,
+  grupos,
+  conexiones,
+  invitacionesRecibidas,
+  invitacionesEnviadas,
+}: Props) {
   return (
     <div className="flex flex-col gap-6">
       <div>
         <h1 className="text-2xl font-semibold">Personas y grupos</h1>
         <p className="text-sm text-muted-foreground mt-1">
-          Agenda personal para gastos compartidos.
+          Agenda personal y conexiones para gastos compartidos.
         </p>
       </div>
       <div className="flex flex-col gap-10">
+        <ConexionesSection
+          conexiones={conexiones}
+          recibidas={invitacionesRecibidas}
+          enviadas={invitacionesEnviadas}
+        />
         <PersonasSection personas={personas} />
         <GruposSection grupos={grupos} personas={personas} />
       </div>

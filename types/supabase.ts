@@ -686,6 +686,76 @@ export interface Database {
           persona_id?: string
         }
       }
+      conexiones: {
+        Row: {
+          id: string
+          solicitante_id: string
+          receptor_id: string
+          solicitante_nombre: string | null
+          receptor_nombre: string | null
+          estado: string
+          mensaje: string | null
+          created_at: string
+          updated_at: string
+          responded_at: string | null
+        }
+        Insert: {
+          id?: string
+          solicitante_id: string
+          receptor_id: string
+          solicitante_nombre?: string | null
+          receptor_nombre?: string | null
+          estado?: string
+          mensaje?: string | null
+          created_at?: string
+          updated_at?: string
+          responded_at?: string | null
+        }
+        Update: {
+          id?: string
+          solicitante_id?: string
+          receptor_id?: string
+          solicitante_nombre?: string | null
+          receptor_nombre?: string | null
+          estado?: string
+          mensaje?: string | null
+          created_at?: string
+          updated_at?: string
+          responded_at?: string | null
+        }
+      }
+      notificaciones: {
+        Row: {
+          id: string
+          user_id: string
+          tipo: string
+          titulo: string
+          cuerpo: string | null
+          ref_id: string | null
+          leida: boolean
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          tipo: string
+          titulo: string
+          cuerpo?: string | null
+          ref_id?: string | null
+          leida?: boolean
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          tipo?: string
+          titulo?: string
+          cuerpo?: string | null
+          ref_id?: string | null
+          leida?: boolean
+          created_at?: string
+        }
+      }
       gastos_compartidos_participantes: {
         Row: {
           id: string
@@ -949,7 +1019,12 @@ export interface Database {
       }
     }
     Views: Record<string, never>
-    Functions: Record<string, never>
+    Functions: {
+      buscar_usuario_por_email: {
+        Args: { p_email: string }
+        Returns: { id: string; nombre: string | null }[]
+      }
+    }
     Enums: Record<string, never>
   }
 }
@@ -972,3 +1047,5 @@ export type PrestamoPago = Database["public"]["Tables"]["prestamos_pagos"]["Row"
 export type GastoGrupalPagador = Database["public"]["Tables"]["gastos_grupales_pagadores"]["Row"]
 export type PlantillaRecurrente = Database["public"]["Tables"]["plantillas_recurrentes"]["Row"]
 export type AlertaSilenciada = Database["public"]["Tables"]["alertas_silenciadas"]["Row"]
+export type Conexion = Database["public"]["Tables"]["conexiones"]["Row"]
+export type Notificacion = Database["public"]["Tables"]["notificaciones"]["Row"]
