@@ -68,24 +68,31 @@ export async function upsertParticipantes(
       .eq("user_id", user.id);
   }
 
-  if (participantes.length === 0) return;
+  if (participantes.length > 0) {
+    const { error } = await supabase
+      .from("gastos_compartidos_participantes")
+      .insert(
+        participantes.map((p) => ({
+          user_id:          user.id,
+          movimiento_id:    movimientoId,
+          persona_nombre:   p.persona_nombre,
+          persona_id:       p.persona_id ?? null,
+          monto:            p.monto,
+          estado:           "pendiente" as const,
+          modo:             p.modo ?? "a_repartir",
+          cuenta_destino_id: p.cuenta_destino_id ?? null,
+        })),
+      );
 
-  const { error } = await supabase
-    .from("gastos_compartidos_participantes")
-    .insert(
-      participantes.map((p) => ({
-        user_id:          user.id,
-        movimiento_id:    movimientoId,
-        persona_nombre:   p.persona_nombre,
-        persona_id:       p.persona_id ?? null,
-        monto:            p.monto,
-        estado:           "pendiente" as const,
-        modo:             p.modo ?? "a_repartir",
-        cuenta_destino_id: p.cuenta_destino_id ?? null,
-      })),
-    );
+    if (error) throw new Error(error.message);
+  }
 
-  if (error) throw new Error(error.message);
+  // Deuda bilateral: materializa/actualiza deudas para participantes que son
+  // usuarios conectados (persona.usuario_vinculado_id). Idempotente.
+  const { error: syncErr } = await supabase.rpc("sincronizar_deudas_gasto", {
+    p_movimiento_id: movimientoId,
+  });
+  if (syncErr) throw new Error(syncErr.message);
 }
 
 /**

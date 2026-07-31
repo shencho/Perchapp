@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Plus, Pencil, Trash2, Users, Check } from "lucide-react";
+import { Plus, Pencil, Trash2, Users, Check, Link2, FolderKanban } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -18,6 +18,7 @@ import {
   updateGrupo,
   deleteGrupo,
 } from "@/lib/supabase/actions/grupos";
+import { crearProyectoDesdeGrupo } from "@/lib/supabase/actions/proyectos";
 import type { Persona } from "@/types/supabase";
 import type { GrupoConMiembros } from "@/lib/supabase/actions/grupos-types";
 import type { ConexionVista } from "@/lib/supabase/actions/conexiones-types";
@@ -186,7 +187,15 @@ function PersonasSection({ personas }: { personas: Persona[] }) {
           {personas.map((p) => (
             <div key={p.id} className="flex items-center justify-between px-4 py-3 gap-3">
               <div className="flex flex-col gap-0.5 min-w-0">
-                <span className="text-sm font-medium">{p.nombre}</span>
+                <span className="text-sm font-medium flex items-center gap-1.5">
+                  {p.nombre}
+                  {p.usuario_vinculado_id && (
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-success/10 text-[11px] text-success border border-success/20">
+                      <Link2 className="h-3 w-3" />
+                      Conectado
+                    </span>
+                  )}
+                </span>
                 {p.notas && (
                   <span className="text-xs text-muted-foreground truncate">{p.notas}</span>
                 )}
@@ -238,6 +247,17 @@ function GruposSection({
   const [error, setError] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<GrupoConMiembros | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [creandoProyecto, setCreandoProyecto] = useState<string | null>(null);
+
+  async function handleCrearProyecto(g: GrupoConMiembros) {
+    setCreandoProyecto(g.id);
+    try {
+      const { id } = await crearProyectoDesdeGrupo(g.id, { nombre: g.nombre });
+      router.push(`/proyectos/${id}`);
+    } catch {
+      setCreandoProyecto(null);
+    }
+  }
 
   function openCreate() {
     setEditing(null);
@@ -416,6 +436,15 @@ function GruposSection({
                 )}
               </div>
               <div className="flex items-center gap-1 flex-shrink-0 mt-0.5">
+                <Button
+                  size="icon-sm"
+                  variant="ghost"
+                  onClick={() => handleCrearProyecto(g)}
+                  disabled={creandoProyecto === g.id}
+                  title="Crear proyecto desde este grupo"
+                >
+                  <FolderKanban className="h-3.5 w-3.5" />
+                </Button>
                 <Button size="icon-sm" variant="ghost" onClick={() => openEdit(g)} title="Editar">
                   <Pencil className="h-3.5 w-3.5" />
                 </Button>

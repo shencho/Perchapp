@@ -2,11 +2,20 @@ import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import { BalancesClient } from "./_components/balances-client";
 import type { PersonaBalanceRow } from "./_components/balances-client";
+import { DeudasBilateralesSection } from "@/components/balances/deudas-bilaterales-section";
+import { getDeudasComoDeudor, getDeudasComoAcreedor } from "@/lib/supabase/actions/deudas";
 
 export default async function BalancesPage() {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/login");
+
+  // Deudas bilaterales (usuarios de Perchapp). Defensivo si 026 aún no corrió.
+  const debo = await getDeudasComoDeudor().catch(() => []);
+  const meDeben = await getDeudasComoAcreedor().catch(() => []);
+  const hayBilaterales =
+    debo.some((d) => d.estado === "pendiente" || d.estado === "pago_marcado") ||
+    meDeben.some((d) => d.estado === "pendiente" || d.estado === "pago_marcado");
 
   const [perfilRes, cuentasRes, gastosRes] = await Promise.all([
     supabase.from("profiles").select("nombre").eq("id", user.id).single(),
@@ -25,7 +34,17 @@ export default async function BalancesPage() {
   const gastoIds = gastos.map((g) => g.id);
 
   if (gastoIds.length === 0) {
-    return <BalancesClient balances={[]} cuentas={cuentas} nombreUsuario={nombreUsuario} />;
+    return (
+      <div className="flex flex-col gap-6">
+        <DeudasBilateralesSection debo={debo} meDeben={meDeben} cuentas={cuentas} />
+        <BalancesClient
+          balances={[]}
+          cuentas={cuentas}
+          nombreUsuario={nombreUsuario}
+          hideEmptyState={hayBilaterales}
+        />
+      </div>
+    );
   }
 
   const { data: participantesData } = await supabase
@@ -85,5 +104,10 @@ export default async function BalancesPage() {
     return absB - absA;
   });
 
-  return <BalancesClient balances={balances} cuentas={cuentas} nombreUsuario={nombreUsuario} />;
+  return (
+    <div className="flex flex-col gap-6">
+      <DeudasBilateralesSection debo={debo} meDeben={meDeben} cuentas={cuentas} />
+      <BalancesClient balances={balances} cuentas={cuentas} nombreUsuario={nombreUsuario} />
+    </div>
+  );
 }

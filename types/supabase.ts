@@ -630,6 +630,7 @@ export interface Database {
           nombre: string
           notas: string | null
           archivado: boolean
+          usuario_vinculado_id: string | null
           created_at: string
         }
         Insert: {
@@ -638,6 +639,7 @@ export interface Database {
           nombre: string
           notas?: string | null
           archivado?: boolean
+          usuario_vinculado_id?: string | null
           created_at?: string
         }
         Update: {
@@ -646,6 +648,7 @@ export interface Database {
           nombre?: string
           notas?: string | null
           archivado?: boolean
+          usuario_vinculado_id?: string | null
           created_at?: string
         }
       }
@@ -755,6 +758,192 @@ export interface Database {
           leida?: boolean
           created_at?: string
         }
+      }
+      deudas_compartidas: {
+        Row: {
+          id: string
+          acreedor_id: string
+          deudor_id: string
+          acreedor_nombre: string | null
+          deudor_nombre: string | null
+          conexion_id: string | null
+          monto: number
+          moneda: string
+          concepto: string | null
+          movimiento_origen_id: string | null
+          participante_id: string | null
+          proyecto_id: string | null
+          origen: string
+          estado: string
+          deudor_cuenta_id: string | null
+          acreedor_cuenta_id: string | null
+          mov_ingreso_acreedor_id: string | null
+          mov_egreso_deudor_id: string | null
+          created_at: string
+          updated_at: string
+          responded_at: string | null
+        }
+        Insert: {
+          id?: string
+          acreedor_id: string
+          deudor_id: string
+          acreedor_nombre?: string | null
+          deudor_nombre?: string | null
+          conexion_id?: string | null
+          monto: number
+          moneda?: string
+          concepto?: string | null
+          movimiento_origen_id?: string | null
+          participante_id?: string | null
+          proyecto_id?: string | null
+          origen?: string
+          estado?: string
+          deudor_cuenta_id?: string | null
+          acreedor_cuenta_id?: string | null
+          mov_ingreso_acreedor_id?: string | null
+          mov_egreso_deudor_id?: string | null
+          created_at?: string
+          updated_at?: string
+          responded_at?: string | null
+        }
+        Update: {
+          id?: string
+          acreedor_id?: string
+          deudor_id?: string
+          acreedor_nombre?: string | null
+          deudor_nombre?: string | null
+          conexion_id?: string | null
+          monto?: number
+          moneda?: string
+          concepto?: string | null
+          movimiento_origen_id?: string | null
+          participante_id?: string | null
+          proyecto_id?: string | null
+          origen?: string
+          estado?: string
+          deudor_cuenta_id?: string | null
+          acreedor_cuenta_id?: string | null
+          mov_ingreso_acreedor_id?: string | null
+          mov_egreso_deudor_id?: string | null
+          created_at?: string
+          updated_at?: string
+          responded_at?: string | null
+        }
+      }
+      proyectos: {
+        Row: {
+          id: string
+          created_by: string
+          nombre: string
+          tipo: string
+          fecha_inicio: string | null
+          fecha_fin: string | null
+          moneda_default: string
+          grupo_origen_id: string | null
+          archivado: boolean
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          created_by: string
+          nombre: string
+          tipo?: string
+          fecha_inicio?: string | null
+          fecha_fin?: string | null
+          moneda_default?: string
+          grupo_origen_id?: string | null
+          archivado?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          created_by?: string
+          nombre?: string
+          tipo?: string
+          fecha_inicio?: string | null
+          fecha_fin?: string | null
+          moneda_default?: string
+          grupo_origen_id?: string | null
+          archivado?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+      }
+      proyecto_miembros: {
+        Row: {
+          id: string
+          proyecto_id: string
+          usuario_id: string | null
+          persona_id: string | null
+          nombre: string
+          rol: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          proyecto_id: string
+          usuario_id?: string | null
+          persona_id?: string | null
+          nombre: string
+          rol?: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          proyecto_id?: string
+          usuario_id?: string | null
+          persona_id?: string | null
+          nombre?: string
+          rol?: string
+          created_at?: string
+        }
+      }
+      proyecto_gastos: {
+        Row: {
+          id: string
+          proyecto_id: string
+          creado_por: string
+          concepto: string | null
+          monto_total: number
+          moneda: string
+          fecha: string
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          proyecto_id: string
+          creado_por: string
+          concepto?: string | null
+          monto_total: number
+          moneda?: string
+          fecha: string
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          proyecto_id?: string
+          creado_por?: string
+          concepto?: string | null
+          monto_total?: number
+          moneda?: string
+          fecha?: string
+          created_at?: string
+          updated_at?: string
+        }
+      }
+      proyecto_gasto_pagadores: {
+        Row: { id: string; gasto_id: string; miembro_id: string; monto_pagado: number }
+        Insert: { id?: string; gasto_id: string; miembro_id: string; monto_pagado: number }
+        Update: { id?: string; gasto_id?: string; miembro_id?: string; monto_pagado?: number }
+      }
+      proyecto_gasto_splits: {
+        Row: { id: string; gasto_id: string; miembro_id: string; monto_consumido: number; modo: string }
+        Insert: { id?: string; gasto_id: string; miembro_id: string; monto_consumido: number; modo?: string }
+        Update: { id?: string; gasto_id?: string; miembro_id?: string; monto_consumido?: number; modo?: string }
       }
       gastos_compartidos_participantes: {
         Row: {
@@ -1024,6 +1213,38 @@ export interface Database {
         Args: { p_email: string }
         Returns: { id: string; nombre: string | null }[]
       }
+      sincronizar_deudas_gasto: {
+        Args: { p_movimiento_id: string }
+        Returns: undefined
+      }
+      conciliar_deuda: {
+        Args: {
+          p_deuda_id: string
+          p_acreedor_cuenta_id: string | null
+          p_fecha: string
+          p_observacion?: string | null
+        }
+        Returns: undefined
+      }
+      revertir_conciliacion: {
+        Args: { p_deuda_id: string }
+        Returns: undefined
+      }
+      puede_ver_proyecto: {
+        Args: { p_proyecto_id: string }
+        Returns: boolean
+      }
+      crear_deuda_proyecto: {
+        Args: {
+          p_proyecto_id: string
+          p_deudor_id: string
+          p_acreedor_id: string
+          p_monto: number
+          p_moneda: string
+          p_concepto: string | null
+        }
+        Returns: string | null
+      }
     }
     Enums: Record<string, never>
   }
@@ -1049,3 +1270,9 @@ export type PlantillaRecurrente = Database["public"]["Tables"]["plantillas_recur
 export type AlertaSilenciada = Database["public"]["Tables"]["alertas_silenciadas"]["Row"]
 export type Conexion = Database["public"]["Tables"]["conexiones"]["Row"]
 export type Notificacion = Database["public"]["Tables"]["notificaciones"]["Row"]
+export type DeudaCompartida = Database["public"]["Tables"]["deudas_compartidas"]["Row"]
+export type Proyecto = Database["public"]["Tables"]["proyectos"]["Row"]
+export type ProyectoMiembro = Database["public"]["Tables"]["proyecto_miembros"]["Row"]
+export type ProyectoGasto = Database["public"]["Tables"]["proyecto_gastos"]["Row"]
+export type ProyectoGastoPagador = Database["public"]["Tables"]["proyecto_gasto_pagadores"]["Row"]
+export type ProyectoGastoSplit = Database["public"]["Tables"]["proyecto_gasto_splits"]["Row"]
