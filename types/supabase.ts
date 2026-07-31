@@ -630,6 +630,7 @@ export interface Database {
           nombre: string
           notas: string | null
           archivado: boolean
+          usuario_vinculado_id: string | null
           created_at: string
         }
         Insert: {
@@ -638,6 +639,7 @@ export interface Database {
           nombre: string
           notas?: string | null
           archivado?: boolean
+          usuario_vinculado_id?: string | null
           created_at?: string
         }
         Update: {
@@ -646,6 +648,7 @@ export interface Database {
           nombre?: string
           notas?: string | null
           archivado?: boolean
+          usuario_vinculado_id?: string | null
           created_at?: string
         }
       }
