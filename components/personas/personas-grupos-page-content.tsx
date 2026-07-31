@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Plus, Pencil, Trash2, Users, Check, Link2 } from "lucide-react";
+import { Plus, Pencil, Trash2, Users, Check, Link2, FolderKanban } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -18,6 +18,7 @@ import {
   updateGrupo,
   deleteGrupo,
 } from "@/lib/supabase/actions/grupos";
+import { crearProyectoDesdeGrupo } from "@/lib/supabase/actions/proyectos";
 import type { Persona } from "@/types/supabase";
 import type { GrupoConMiembros } from "@/lib/supabase/actions/grupos-types";
 import type { ConexionVista } from "@/lib/supabase/actions/conexiones-types";
@@ -246,6 +247,17 @@ function GruposSection({
   const [error, setError] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<GrupoConMiembros | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [creandoProyecto, setCreandoProyecto] = useState<string | null>(null);
+
+  async function handleCrearProyecto(g: GrupoConMiembros) {
+    setCreandoProyecto(g.id);
+    try {
+      const { id } = await crearProyectoDesdeGrupo(g.id, { nombre: g.nombre });
+      router.push(`/proyectos/${id}`);
+    } catch {
+      setCreandoProyecto(null);
+    }
+  }
 
   function openCreate() {
     setEditing(null);
@@ -424,6 +436,15 @@ function GruposSection({
                 )}
               </div>
               <div className="flex items-center gap-1 flex-shrink-0 mt-0.5">
+                <Button
+                  size="icon-sm"
+                  variant="ghost"
+                  onClick={() => handleCrearProyecto(g)}
+                  disabled={creandoProyecto === g.id}
+                  title="Crear proyecto desde este grupo"
+                >
+                  <FolderKanban className="h-3.5 w-3.5" />
+                </Button>
                 <Button size="icon-sm" variant="ghost" onClick={() => openEdit(g)} title="Editar">
                   <Pencil className="h-3.5 w-3.5" />
                 </Button>

@@ -7,6 +7,7 @@ import {
   Wallet,
   CreditCard,
   Users,
+  Users2,
   Tag,
   RefreshCw,
   Settings,
@@ -32,6 +33,7 @@ export function getNavItems(): NavItem[] {
   ];
 
   const drawer: NavItem[] = [
+    { href: "/gastos-compartidos",      label: "Compartido",             labelShort: "Comp.", icon: Users2, drawerOnly: true },
     { href: "/cuentas",                 label: "Cuentas",                icon: Wallet,    drawerOnly: true },
     { href: "/tarjetas",                label: "Tarjetas",               icon: CreditCard, drawerOnly: true },
     { href: "/personas",                label: "Personas y grupos",      icon: Users,     drawerOnly: true },

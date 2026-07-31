@@ -830,6 +830,121 @@ export interface Database {
           responded_at?: string | null
         }
       }
+      proyectos: {
+        Row: {
+          id: string
+          created_by: string
+          nombre: string
+          tipo: string
+          fecha_inicio: string | null
+          fecha_fin: string | null
+          moneda_default: string
+          grupo_origen_id: string | null
+          archivado: boolean
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          created_by: string
+          nombre: string
+          tipo?: string
+          fecha_inicio?: string | null
+          fecha_fin?: string | null
+          moneda_default?: string
+          grupo_origen_id?: string | null
+          archivado?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          created_by?: string
+          nombre?: string
+          tipo?: string
+          fecha_inicio?: string | null
+          fecha_fin?: string | null
+          moneda_default?: string
+          grupo_origen_id?: string | null
+          archivado?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+      }
+      proyecto_miembros: {
+        Row: {
+          id: string
+          proyecto_id: string
+          usuario_id: string | null
+          persona_id: string | null
+          nombre: string
+          rol: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          proyecto_id: string
+          usuario_id?: string | null
+          persona_id?: string | null
+          nombre: string
+          rol?: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          proyecto_id?: string
+          usuario_id?: string | null
+          persona_id?: string | null
+          nombre?: string
+          rol?: string
+          created_at?: string
+        }
+      }
+      proyecto_gastos: {
+        Row: {
+          id: string
+          proyecto_id: string
+          creado_por: string
+          concepto: string | null
+          monto_total: number
+          moneda: string
+          fecha: string
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          proyecto_id: string
+          creado_por: string
+          concepto?: string | null
+          monto_total: number
+          moneda?: string
+          fecha: string
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          proyecto_id?: string
+          creado_por?: string
+          concepto?: string | null
+          monto_total?: number
+          moneda?: string
+          fecha?: string
+          created_at?: string
+          updated_at?: string
+        }
+      }
+      proyecto_gasto_pagadores: {
+        Row: { id: string; gasto_id: string; miembro_id: string; monto_pagado: number }
+        Insert: { id?: string; gasto_id: string; miembro_id: string; monto_pagado: number }
+        Update: { id?: string; gasto_id?: string; miembro_id?: string; monto_pagado?: number }
+      }
+      proyecto_gasto_splits: {
+        Row: { id: string; gasto_id: string; miembro_id: string; monto_consumido: number; modo: string }
+        Insert: { id?: string; gasto_id: string; miembro_id: string; monto_consumido: number; modo?: string }
+        Update: { id?: string; gasto_id?: string; miembro_id?: string; monto_consumido?: number; modo?: string }
+      }
       gastos_compartidos_participantes: {
         Row: {
           id: string
@@ -1115,6 +1230,21 @@ export interface Database {
         Args: { p_deuda_id: string }
         Returns: undefined
       }
+      puede_ver_proyecto: {
+        Args: { p_proyecto_id: string }
+        Returns: boolean
+      }
+      crear_deuda_proyecto: {
+        Args: {
+          p_proyecto_id: string
+          p_deudor_id: string
+          p_acreedor_id: string
+          p_monto: number
+          p_moneda: string
+          p_concepto: string | null
+        }
+        Returns: string | null
+      }
     }
     Enums: Record<string, never>
   }
@@ -1141,3 +1271,8 @@ export type AlertaSilenciada = Database["public"]["Tables"]["alertas_silenciadas
 export type Conexion = Database["public"]["Tables"]["conexiones"]["Row"]
 export type Notificacion = Database["public"]["Tables"]["notificaciones"]["Row"]
 export type DeudaCompartida = Database["public"]["Tables"]["deudas_compartidas"]["Row"]
+export type Proyecto = Database["public"]["Tables"]["proyectos"]["Row"]
+export type ProyectoMiembro = Database["public"]["Tables"]["proyecto_miembros"]["Row"]
+export type ProyectoGasto = Database["public"]["Tables"]["proyecto_gastos"]["Row"]
+export type ProyectoGastoPagador = Database["public"]["Tables"]["proyecto_gasto_pagadores"]["Row"]
+export type ProyectoGastoSplit = Database["public"]["Tables"]["proyecto_gasto_splits"]["Row"]
