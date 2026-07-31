@@ -7,6 +7,7 @@ import { PerchitaFAB } from "@/components/navigation/perchita-fab";
 import { NotificationsBell } from "@/components/notificaciones/notifications-bell";
 import { NotificationsToast } from "@/components/notificaciones/notifications-toast";
 import { getNotificaciones } from "@/lib/supabase/actions/notificaciones";
+import { MangoLogo } from "@/components/ui/mango-logo";
 
 export default async function AppLayout({
   children,
@@ -50,11 +51,12 @@ export default async function AppLayout({
         userEmail={user.email}
         notificaciones={notificaciones}
       />
-      {/* Campana flotante solo en mobile (desktop la tiene en el sidebar) */}
-      <NotificationsBell
-        notificaciones={notificaciones}
-        className="md:hidden fixed top-3 right-3 z-40 bg-background border border-border shadow-sm"
-      />
+      {/* Barra superior solo en mobile (desktop tiene la campana en el sidebar).
+          Sticky + en el flujo → el contenido de la página va debajo, sin superposición. */}
+      <div className="md:hidden sticky top-0 z-30 flex items-center justify-between h-12 px-4 border-b border-border bg-background">
+        <MangoLogo size={24} showWordmark />
+        <NotificationsBell notificaciones={notificaciones} />
+      </div>
       <main className="flex-1 p-4 md:p-6 pb-20 md:pb-0">{children}</main>
       <MobileBottomNav userEmail={user.email} />
       <PerchitaFAB />

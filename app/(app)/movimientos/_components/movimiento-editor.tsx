@@ -586,12 +586,12 @@ export function MovimientoEditor({ open, onClose, onSaved, editing, cuentas, tar
   return (
     <>
     {open && (
-    <div className="fixed inset-0 z-50 flex items-start justify-center p-4 pt-10 sm:items-center sm:pt-4">
+    <div className="fixed inset-0 z-50 flex items-start justify-center p-4 sm:items-center">
       {/* Backdrop */}
       <div className="absolute inset-0 bg-black/60" onClick={onClose} />
 
       {/* Modal */}
-      <div className="relative z-10 w-full max-w-2xl bg-card border border-border rounded-xl shadow-2xl max-h-[90vh] flex flex-col">
+      <div className="relative z-10 w-full max-w-2xl bg-card border border-border rounded-xl shadow-2xl max-h-[calc(100dvh-2rem)] flex flex-col">
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-border flex-shrink-0">
           <h2 className="font-semibold text-base">
@@ -602,9 +602,9 @@ export function MovimientoEditor({ open, onClose, onSaved, editing, cuentas, tar
           </Button>
         </div>
 
-        {/* Form body — scrollable */}
-        <form onSubmit={handleSubmit(onSubmit)} className="overflow-y-auto flex-1">
-          <div className="px-5 py-4 space-y-4">
+        {/* Form — el cuerpo scrollea, el footer queda fijo abajo */}
+        <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col flex-1 min-h-0">
+          <div className="px-5 py-4 space-y-4 overflow-y-auto flex-1 min-h-0">
 
             {/* TIPO */}
             <div className="space-y-1.5">
@@ -932,15 +932,15 @@ export function MovimientoEditor({ open, onClose, onSaved, editing, cuentas, tar
               )}
             </div>
 
-            {/* FECHA CONSUMO + CANTIDAD */}
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1.5">
-                <Label>Fecha consumo</Label>
-                <Input type="date" {...register("fecha")} />
+            {/* FECHA DEL REGISTRO + CANTIDAD */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="space-y-1.5 min-w-0">
+                <Label>Fecha del registro</Label>
+                <Input type="date" className="w-full" {...register("fecha")} />
               </div>
-              <div className="space-y-1.5">
+              <div className="space-y-1.5 min-w-0">
                 <Label>Cantidad</Label>
-                <Input type="number" min={1} step={1} {...register("cantidad", { valueAsNumber: true })} />
+                <Input type="number" min={1} step={1} className="w-full" {...register("cantidad", { valueAsNumber: true })} />
               </div>
             </div>
 
