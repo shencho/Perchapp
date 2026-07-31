@@ -43,6 +43,7 @@ interface Props {
   balances:      PersonaBalanceRow[];
   cuentas:       { id: string; nombre: string }[];
   nombreUsuario: string;
+  hideEmptyState?: boolean;
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -70,7 +71,7 @@ function todayStr() {
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
-export function BalancesClient({ balances, cuentas, nombreUsuario: _nombreUsuario }: Props) {
+export function BalancesClient({ balances, cuentas, nombreUsuario: _nombreUsuario, hideEmptyState }: Props) {
   const router = useRouter();
   const [, startTransition] = useTransition();
 
@@ -127,6 +128,8 @@ export function BalancesClient({ balances, cuentas, nombreUsuario: _nombreUsuari
   // ── Empty state ──────────────────────────────────────────────────────────────
 
   if (balances.length === 0) {
+    // Si ya hay deudas bilaterales mostradas arriba, no duplicamos el empty state.
+    if (hideEmptyState) return null;
     return (
       <div className="flex flex-col gap-4">
         <div>

@@ -759,6 +759,77 @@ export interface Database {
           created_at?: string
         }
       }
+      deudas_compartidas: {
+        Row: {
+          id: string
+          acreedor_id: string
+          deudor_id: string
+          acreedor_nombre: string | null
+          deudor_nombre: string | null
+          conexion_id: string | null
+          monto: number
+          moneda: string
+          concepto: string | null
+          movimiento_origen_id: string | null
+          participante_id: string | null
+          proyecto_id: string | null
+          origen: string
+          estado: string
+          deudor_cuenta_id: string | null
+          acreedor_cuenta_id: string | null
+          mov_ingreso_acreedor_id: string | null
+          mov_egreso_deudor_id: string | null
+          created_at: string
+          updated_at: string
+          responded_at: string | null
+        }
+        Insert: {
+          id?: string
+          acreedor_id: string
+          deudor_id: string
+          acreedor_nombre?: string | null
+          deudor_nombre?: string | null
+          conexion_id?: string | null
+          monto: number
+          moneda?: string
+          concepto?: string | null
+          movimiento_origen_id?: string | null
+          participante_id?: string | null
+          proyecto_id?: string | null
+          origen?: string
+          estado?: string
+          deudor_cuenta_id?: string | null
+          acreedor_cuenta_id?: string | null
+          mov_ingreso_acreedor_id?: string | null
+          mov_egreso_deudor_id?: string | null
+          created_at?: string
+          updated_at?: string
+          responded_at?: string | null
+        }
+        Update: {
+          id?: string
+          acreedor_id?: string
+          deudor_id?: string
+          acreedor_nombre?: string | null
+          deudor_nombre?: string | null
+          conexion_id?: string | null
+          monto?: number
+          moneda?: string
+          concepto?: string | null
+          movimiento_origen_id?: string | null
+          participante_id?: string | null
+          proyecto_id?: string | null
+          origen?: string
+          estado?: string
+          deudor_cuenta_id?: string | null
+          acreedor_cuenta_id?: string | null
+          mov_ingreso_acreedor_id?: string | null
+          mov_egreso_deudor_id?: string | null
+          created_at?: string
+          updated_at?: string
+          responded_at?: string | null
+        }
+      }
       gastos_compartidos_participantes: {
         Row: {
           id: string
@@ -1027,6 +1098,23 @@ export interface Database {
         Args: { p_email: string }
         Returns: { id: string; nombre: string | null }[]
       }
+      sincronizar_deudas_gasto: {
+        Args: { p_movimiento_id: string }
+        Returns: undefined
+      }
+      conciliar_deuda: {
+        Args: {
+          p_deuda_id: string
+          p_acreedor_cuenta_id: string | null
+          p_fecha: string
+          p_observacion?: string | null
+        }
+        Returns: undefined
+      }
+      revertir_conciliacion: {
+        Args: { p_deuda_id: string }
+        Returns: undefined
+      }
     }
     Enums: Record<string, never>
   }
@@ -1052,3 +1140,4 @@ export type PlantillaRecurrente = Database["public"]["Tables"]["plantillas_recur
 export type AlertaSilenciada = Database["public"]["Tables"]["alertas_silenciadas"]["Row"]
 export type Conexion = Database["public"]["Tables"]["conexiones"]["Row"]
 export type Notificacion = Database["public"]["Tables"]["notificaciones"]["Row"]
+export type DeudaCompartida = Database["public"]["Tables"]["deudas_compartidas"]["Row"]
