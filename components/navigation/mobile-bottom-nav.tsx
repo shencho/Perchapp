@@ -7,9 +7,10 @@ import { getNavItems } from "@/lib/navigation/get-nav-items";
 
 interface Props {
   userEmail?: string;
+  esAdmin?: boolean;
 }
 
-export function MobileBottomNav({ userEmail }: Props) {
+export function MobileBottomNav({ userEmail, esAdmin = false }: Props) {
   const allItems = getNavItems();
 
   const inicio = allItems.find((i) => i.href === "/dashboard")!;
@@ -35,6 +36,7 @@ export function MobileBottomNav({ userEmail }: Props) {
             </button>
           }
           userEmail={userEmail}
+          esAdmin={esAdmin}
         />
       </div>
     </nav>

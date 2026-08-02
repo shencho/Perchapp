@@ -15,9 +15,10 @@ interface Props {
   asistenteNombre: string;
   userEmail?: string;
   notificaciones?: Notificacion[];
+  esAdmin?: boolean;
 }
 
-export function DesktopSidebar({ asistenteNombre, userEmail, notificaciones = [] }: Props) {
+export function DesktopSidebar({ asistenteNombre, userEmail, notificaciones = [], esAdmin = false }: Props) {
   const sidebarItems = getNavItems().filter((item) => !item.drawerOnly);
 
   return (
@@ -50,6 +51,7 @@ export function DesktopSidebar({ asistenteNombre, userEmail, notificaciones = []
             </Button>
           }
           userEmail={userEmail}
+          esAdmin={esAdmin}
         />
       </div>
     </aside>

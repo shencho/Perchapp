@@ -10,14 +10,15 @@ import { getNavItems } from "@/lib/navigation/get-nav-items";
 interface Props {
   trigger: ReactElement;
   userEmail?: string;
+  esAdmin?: boolean;
 }
 
-export function NavigationDrawer({ trigger, userEmail }: Props) {
+export function NavigationDrawer({ trigger, userEmail, esAdmin = false }: Props) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
 
   const drawerItems = getNavItems().filter(
-    (item) => item.drawerOnly || item.desktopOnly
+    (item) => (item.drawerOnly || item.desktopOnly) && (!item.adminOnly || esAdmin)
   );
 
   // Cerrar el drawer al navegar (cambia el pathname).
