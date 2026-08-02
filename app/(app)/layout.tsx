@@ -25,7 +25,7 @@ export default async function AppLayout({
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("onboarding_completado, asistente_nombre, es_admin")
+    .select("onboarding_completado, asistente_nombre")
     .eq("id", user.id)
     .single();
 
@@ -34,7 +34,17 @@ export default async function AppLayout({
   }
 
   const asistenteNombre = profile.asistente_nombre ?? "MANGO AI";
-  const esAdmin = profile.es_admin ?? false;
+
+  // Defensivo: es_admin en query aparte porque la columna la crea la migración 028;
+  // si aún no corrió, no rompemos el gate de toda la app (solo no hay /control).
+  let esAdmin = false;
+  try {
+    const { data: adminRow } = await supabase
+      .from("profiles").select("es_admin").eq("id", user.id).single();
+    esAdmin = adminRow?.es_admin ?? false;
+  } catch {
+    esAdmin = false;
+  }
 
   // Defensivo: si la migración 024 (notificaciones) aún no se corrió, no rompemos
   // toda la app — simplemente no hay notificaciones.
