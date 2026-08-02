@@ -16,8 +16,11 @@ export default async function CashFlowPage() {
 
   const fechaDesde3m = new Date(anio, mes - 3, 1).toISOString().slice(0, 10);
   const finMesActual = new Date(anio, mes + 1, 0).toISOString().slice(0, 10);
+  // Ventana de futuros: desde el mes que viene hasta +12 meses (cuotas, no corrientes).
+  const futuroDesde = new Date(anio, mes + 1, 1).toISOString().slice(0, 10);
+  const futuroHasta = new Date(anio, mes + 13, 0).toISOString().slice(0, 10);
 
-  const [cuentasRes, movimientosRes, categoriasRes] = await Promise.all([
+  const [cuentasRes, movimientosRes, categoriasRes, futurosRes] = await Promise.all([
     supabase.from("cuentas")
       .select("id, tipo, moneda, saldo")
       .eq("user_id", user.id).eq("archivada", false),
@@ -29,11 +32,18 @@ export default async function CashFlowPage() {
     supabase.from("categorias")
       .select("id, nombre")
       .eq("user_id", user.id).eq("archivada", false),
+    supabase.from("movimientos")
+      .select("tipo, monto, moneda, fecha, categoria_id")
+      .eq("user_id", user.id)
+      .eq("moneda", "ARS")
+      .gte("fecha", futuroDesde)
+      .lte("fecha", futuroHasta),
   ]);
 
   const cuentas     = cuentasRes.data ?? [];
   const movimientos = movimientosRes.data ?? [];
   const categorias  = categoriasRes.data ?? [];
+  const futuros     = futurosRes.data ?? [];
 
   const ajusteInversionIds = categorias
     .filter(c => c.nombre === "Ajuste de inversión")
@@ -76,6 +86,17 @@ export default async function CashFlowPage() {
     egNoCorriente:  0,
   };
 
+  // Movimientos reales YA cargados en meses futuros (cuotas, no corrientes),
+  // agregados por mes YYYY-MM. Se suman a la proyección para reflejarlos.
+  const futurosPorMes: Record<string, { ing: number; eg: number }> = {};
+  for (const m of futuros) {
+    if (ajusteInversionIds.includes(m.categoria_id ?? "__")) continue;
+    const key = m.fecha.slice(0, 7);
+    if (!futurosPorMes[key]) futurosPorMes[key] = { ing: 0, eg: 0 };
+    if (m.tipo === "Ingreso") futurosPorMes[key].ing += m.monto;
+    else if (m.tipo === "Egreso") futurosPorMes[key].eg += m.monto;
+  }
+
   return (
     <div className="max-w-2xl mx-auto px-4 py-6 space-y-6">
       <div className="flex items-center gap-3">
@@ -91,6 +112,7 @@ export default async function CashFlowPage() {
       <CashFlowClient
         saldoInicial={saldoInicial}
         promedios={promedios}
+        futurosPorMes={futurosPorMes}
         moneda="ARS"
       />
     </div>
