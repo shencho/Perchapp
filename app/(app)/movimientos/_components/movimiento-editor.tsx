@@ -869,14 +869,15 @@ export function MovimientoEditor({ open, onClose, onSaved, editing, cuentas, tar
 
             {/* TARJETA + FECHA VENCIMIENTO */}
             {showTarjeta && (
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1.5">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="space-y-1.5 min-w-0">
                   <Label>Tarjeta</Label>
                   <Controller
                     name="tarjeta_id"
                     control={control}
                     render={({ field }) => (
                       <NamedSelect
+                        className="w-full"
                         options={tarjetas.map(t => ({ value: t.id, label: t.nombre }))}
                         value={field.value ?? ""}
                         onValueChange={(v) => field.onChange(v)}
@@ -886,9 +887,10 @@ export function MovimientoEditor({ open, onClose, onSaved, editing, cuentas, tar
                   />
                 </div>
                 {showFechaVto && (
-                  <div className="space-y-1.5">
-                    <Label>Fecha vencimiento</Label>
-                    <Input type="date" {...register("fecha_vencimiento")} />
+                  <div className="space-y-1.5 min-w-0">
+                    <Label>Vencimiento de la tarjeta</Label>
+                    <Input type="date" className="w-full" {...register("fecha_vencimiento")} />
+                    <p className="text-xs text-muted-foreground">Cuándo vence el resumen (se autocompleta).</p>
                   </div>
                 )}
               </div>
@@ -939,8 +941,9 @@ export function MovimientoEditor({ open, onClose, onSaved, editing, cuentas, tar
                 <Input type="date" className="w-full" {...register("fecha")} />
               </div>
               <div className="space-y-1.5 min-w-0">
-                <Label>Cantidad</Label>
+                <Label>Cantidad (unidades)</Label>
                 <Input type="number" min={1} step={1} className="w-full" {...register("cantidad", { valueAsNumber: true })} />
+                <p className="text-xs text-muted-foreground">Multiplica el monto (ej. 3 cafés).</p>
               </div>
             </div>
 

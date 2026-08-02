@@ -22,6 +22,7 @@ export interface Database {
           asistente_nombre: string | null
           onboarding_completado: boolean
           vto_day_default: number
+          es_admin: boolean
           created_at: string
           updated_at: string
         }
@@ -33,6 +34,7 @@ export interface Database {
           asistente_nombre?: string | null
           onboarding_completado?: boolean
           vto_day_default?: number
+          es_admin?: boolean
           created_at?: string
           updated_at?: string
         }
@@ -44,6 +46,54 @@ export interface Database {
           asistente_nombre?: string | null
           onboarding_completado?: boolean
           vto_day_default?: number
+          es_admin?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+      }
+      bug_reports: {
+        Row: {
+          id: string
+          sector: string
+          titulo: string
+          descripcion: string | null
+          diagnostico: string | null
+          fix_descripcion: string | null
+          estado: string
+          autor_id: string | null
+          autor_nombre: string | null
+          fecha_reporte: string
+          fecha_resolucion: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          sector: string
+          titulo: string
+          descripcion?: string | null
+          diagnostico?: string | null
+          fix_descripcion?: string | null
+          estado?: string
+          autor_id?: string | null
+          autor_nombre?: string | null
+          fecha_reporte?: string
+          fecha_resolucion?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          sector?: string
+          titulo?: string
+          descripcion?: string | null
+          diagnostico?: string | null
+          fix_descripcion?: string | null
+          estado?: string
+          autor_id?: string | null
+          autor_nombre?: string | null
+          fecha_reporte?: string
+          fecha_resolucion?: string | null
           created_at?: string
           updated_at?: string
         }
@@ -478,6 +528,8 @@ export interface Database {
           es_compartido: boolean
           gc_mi_parte: number | null
           es_reembolso: boolean
+          cuota_numero: number | null
+          cuota_grupo_id: string | null
           prestamo_id: string | null
           prestamo_pago_id: string | null
           plantilla_recurrente_id: string | null
@@ -513,6 +565,8 @@ export interface Database {
           es_compartido?: boolean
           gc_mi_parte?: number | null
           es_reembolso?: boolean
+          cuota_numero?: number | null
+          cuota_grupo_id?: string | null
           prestamo_id?: string | null
           prestamo_pago_id?: string | null
           plantilla_recurrente_id?: string | null
@@ -548,6 +602,8 @@ export interface Database {
           es_compartido?: boolean
           gc_mi_parte?: number | null
           es_reembolso?: boolean
+          cuota_numero?: number | null
+          cuota_grupo_id?: string | null
           prestamo_id?: string | null
           prestamo_pago_id?: string | null
           plantilla_recurrente_id?: string | null
@@ -1271,6 +1327,7 @@ export type AlertaSilenciada = Database["public"]["Tables"]["alertas_silenciadas
 export type Conexion = Database["public"]["Tables"]["conexiones"]["Row"]
 export type Notificacion = Database["public"]["Tables"]["notificaciones"]["Row"]
 export type DeudaCompartida = Database["public"]["Tables"]["deudas_compartidas"]["Row"]
+export type BugReport = Database["public"]["Tables"]["bug_reports"]["Row"]
 export type Proyecto = Database["public"]["Tables"]["proyectos"]["Row"]
 export type ProyectoMiembro = Database["public"]["Tables"]["proyecto_miembros"]["Row"]
 export type ProyectoGasto = Database["public"]["Tables"]["proyecto_gastos"]["Row"]

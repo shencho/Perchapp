@@ -11,6 +11,7 @@ import {
   Tag,
   RefreshCw,
   Settings,
+  ClipboardList,
   type LucideIcon,
 } from "lucide-react";
 
@@ -21,6 +22,7 @@ export type NavItem = {
   icon: LucideIcon;
   desktopOnly?: boolean;
   drawerOnly?: boolean;
+  adminOnly?: boolean;  // solo visible si profiles.es_admin
 };
 
 export function getNavItems(): NavItem[] {
@@ -39,6 +41,7 @@ export function getNavItems(): NavItem[] {
     { href: "/personas",                label: "Personas y grupos",      icon: Users,     drawerOnly: true },
     { href: "/categorias",              label: "Categorías",             icon: Tag,       drawerOnly: true },
     { href: "/movimientos-recurrentes", label: "Movimientos recurrentes", icon: RefreshCw, drawerOnly: true },
+    { href: "/control",                 label: "Control",                icon: ClipboardList, drawerOnly: true, adminOnly: true },
     { href: "/ajustes",                 label: "Ajustes",                icon: Settings,  drawerOnly: true },
   ];
 

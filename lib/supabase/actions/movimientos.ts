@@ -79,13 +79,17 @@ export async function createMovimiento(input: MovimientoInput): Promise<{ id: st
       throw new Error("No reconocí la cuenta indicada. Seleccionala manualmente y guardá de nuevo.");
     }
   }
+  let tarjetaCiclo: { cierre_dia: number | null; vencimiento_dia: number | null } | null = null;
   if (parsed.tarjeta_id) {
     const { data: tarjetaOk } = await supabase
-      .from("tarjetas").select("id").eq("user_id", userId).eq("id", parsed.tarjeta_id).maybeSingle();
+      .from("tarjetas").select("id, cierre_dia, vencimiento_dia").eq("user_id", userId).eq("id", parsed.tarjeta_id).maybeSingle();
     if (!tarjetaOk) {
       throw new Error("No reconocí la tarjeta indicada. Seleccionala manualmente y guardá de nuevo.");
     }
+    tarjetaCiclo = { cierre_dia: tarjetaOk.cierre_dia, vencimiento_dia: tarjetaOk.vencimiento_dia };
   }
+
+  const baseFecha = parsed.fecha ?? new Date().toISOString().slice(0, 10);
 
   const row = {
     user_id:           userId,
@@ -109,10 +113,40 @@ export async function createMovimiento(input: MovimientoInput): Promise<{ id: st
     cantidad:          parsed.cantidad,
     unitario:          parsed.unitario ?? null,
     observaciones:     parsed.observaciones ?? null,
-    fecha:             parsed.fecha ?? new Date().toISOString().slice(0, 10),
+    fecha:             baseFecha,
     es_compartido:     parsed.es_compartido ?? false,
     gc_mi_parte:       parsed.gc_mi_parte ?? null,
   };
+
+  // Gasto en cuotas (>1): generar UN movimiento por cuota, prorrateado y
+  // fechado al ciclo de la tarjeta. Cada uno "concepto (cuota i/N)".
+  if (parsed.clasificacion === "Cuotas" && parsed.cuotas > 1) {
+    const { generarCuotas } = await import("@/lib/domain/cuotas");
+    const grupoId = crypto.randomUUID();
+    const baseConcepto = parsed.concepto?.trim() || "Gasto";
+    const cuotasGen = generarCuotas({
+      montoTotal: parsed.monto,
+      cuotas: parsed.cuotas,
+      fechaRegistro: baseFecha,
+      tarjeta: tarjetaCiclo,
+    });
+
+    const rows = cuotasGen.map((c) => ({
+      ...row,
+      monto:             c.monto,
+      unitario:          c.monto,
+      fecha:             c.fecha,
+      fecha_vencimiento: c.fecha_vencimiento ?? parsed.fecha_vencimiento ?? null,
+      concepto:          `${baseConcepto} (cuota ${c.cuota_numero}/${parsed.cuotas})`,
+      cuota_numero:      c.cuota_numero,
+      cuota_grupo_id:    grupoId,
+    }));
+
+    const { data, error } = await supabase.from("movimientos").insert(rows).select("id, cuota_numero");
+    if (error || !data || data.length === 0) throw new Error(error?.message ?? "Error al crear las cuotas");
+    const primera = data.find((d) => d.cuota_numero === 1) ?? data[0];
+    return { id: primera.id };
+  }
 
   const { data, error } = await supabase.from("movimientos").insert(row).select("id").single();
   if (error || !data) throw new Error(error?.message ?? "Error al crear movimiento");

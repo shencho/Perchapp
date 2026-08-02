@@ -17,6 +17,7 @@ interface Promedios {
 interface Props {
   saldoInicial: number;
   promedios: Promedios;
+  futurosPorMes?: Record<string, { ing: number; eg: number }>;
   moneda: "ARS" | "USD";
 }
 
@@ -56,22 +57,26 @@ function CustomTooltip({ active, payload, label, moneda }: {
   );
 }
 
-export function CashFlowClient({ saldoInicial, promedios, moneda }: Props) {
+export function CashFlowClient({ saldoInicial, promedios, futurosPorMes = {}, moneda }: Props) {
   const [periodoMeses, setPeriodoMeses] = useState<1 | 3 | 6 | 12>(3);
-  const [incluirNoCorrientes, setIncluirNoCorrientes] = useState(false);
+  const [incluirFuturos, setIncluirFuturos] = useState(true);
 
   const proyeccion = useMemo(() => {
     const now = new Date();
-    let saldo = saldoInicial;
-    return Array.from({ length: periodoMeses }, (_, i) => {
+    const base = Array.from({ length: periodoMeses }, (_, i) => {
       const fecha = new Date(now.getFullYear(), now.getMonth() + i + 1, 1);
-      const ing = promedios.ingCorriente + (incluirNoCorrientes ? promedios.ingNoCorriente : 0);
-      const eg = promedios.egCorriente + (incluirNoCorrientes ? promedios.egNoCorriente : 0);
-      const neto = ing - eg;
-      saldo += neto;
-      return { label: labelMes(fecha), ingresos: ing, egresos: eg, neto, saldo };
+      const key = `${fecha.getFullYear()}-${String(fecha.getMonth() + 1).padStart(2, "0")}`;
+      const fut = incluirFuturos ? (futurosPorMes[key] ?? { ing: 0, eg: 0 }) : { ing: 0, eg: 0 };
+      const ing = promedios.ingCorriente + fut.ing;
+      const eg = promedios.egCorriente + fut.eg;
+      return { label: labelMes(fecha), ingresos: ing, egresos: eg, neto: ing - eg };
     });
-  }, [saldoInicial, periodoMeses, incluirNoCorrientes, promedios]);
+    // saldo acumulado (prefix sum, sin mutación de variables del render)
+    return base.map((row, i) => ({
+      ...row,
+      saldo: saldoInicial + base.slice(0, i + 1).reduce((acc, r) => acc + r.neto, 0),
+    }));
+  }, [saldoInicial, periodoMeses, incluirFuturos, promedios, futurosPorMes]);
 
   const saldoFinal = proyeccion[proyeccion.length - 1]?.saldo ?? saldoInicial;
   const pillBase = "px-3 py-1 rounded-md text-xs font-medium border transition-colors";
@@ -116,11 +121,11 @@ export function CashFlowClient({ saldoInicial, promedios, moneda }: Props) {
         <label className="flex items-center gap-2 text-xs text-muted-foreground cursor-pointer select-none">
           <input
             type="checkbox"
-            checked={incluirNoCorrientes}
-            onChange={e => setIncluirNoCorrientes(e.target.checked)}
+            checked={incluirFuturos}
+            onChange={e => setIncluirFuturos(e.target.checked)}
             className="rounded border-border"
           />
-          Incluir no corrientes
+          Incluir cuotas y gastos futuros
         </label>
       </div>
 
@@ -190,7 +195,7 @@ export function CashFlowClient({ saldoInicial, promedios, moneda }: Props) {
       </div>
 
       <p className="text-xs text-muted-foreground text-center">
-        Proyección basada en el promedio de los últimos 3 meses. Solo {moneda}. Los valores son estimados.
+        Promedio de los últimos 3 meses + cuotas y gastos futuros ya cargados. Solo {moneda}. Estimado.
       </p>
     </div>
   );
