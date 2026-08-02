@@ -44,11 +44,11 @@ export function NamedSelect({
       disabled={disabled}
     >
       <SelectTrigger className={className}>
-        <span>{label ?? placeholder}</span>
+        <span className="truncate">{label ?? placeholder}</span>
       </SelectTrigger>
       <SelectContent>
         {options.map((o) => (
-          <SelectItem key={o.value} value={o.value}>
+          <SelectItem key={o.value} value={o.value} title={o.label}>
             {o.label}
           </SelectItem>
         ))}

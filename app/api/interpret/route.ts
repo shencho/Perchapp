@@ -78,15 +78,19 @@ export async function POST(req: NextRequest) {
       catalogoDinamico,
     });
 
-    // 5. Llamar a Claude
+    // 5. Llamar a Claude. Prefill de assistant con "{" fuerza salida JSON-only
+    //    (el modelo continúa el objeto en vez de agregar prosa/backticks).
     const message = await anthropic.messages.create({
       model:      ANTHROPIC_MODEL,
       max_tokens: 1024,
       system:     sys,
-      messages:   [{ role: "user", content: prompt }],
+      messages:   [
+        { role: "user", content: prompt },
+        { role: "assistant", content: "{" },
+      ],
     });
 
-    const responseText = message.content
+    const responseText = "{" + message.content
       .filter((b) => b.type === "text")
       .map((b) => (b as { type: "text"; text: string }).text)
       .join("\n");

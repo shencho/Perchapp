@@ -232,11 +232,40 @@ Devolvé SOLO este JSON (sin backticks, sin texto extra):
   return { sys, prompt };
 }
 
+/**
+ * Extrae el PRIMER objeto JSON balanceado del texto, contando llaves y
+ * respetando strings/escapes. Ignora cualquier texto o llaves que el modelo
+ * agregue después del objeto (causa del bug "Unexpected non-whitespace
+ * character after JSON"). El indexOf/lastIndexOf anterior fallaba ahí.
+ */
+function extractFirstBalancedObject(s: string): string | null {
+  const start = s.indexOf("{");
+  if (start < 0) return null;
+  let depth = 0;
+  let inStr = false;
+  let esc = false;
+  for (let i = start; i < s.length; i++) {
+    const c = s[i];
+    if (inStr) {
+      if (esc) esc = false;
+      else if (c === "\\") esc = true;
+      else if (c === '"') inStr = false;
+      continue;
+    }
+    if (c === '"') inStr = true;
+    else if (c === "{") depth++;
+    else if (c === "}") {
+      depth--;
+      if (depth === 0) return s.slice(start, i + 1);
+    }
+  }
+  return null; // objeto sin cerrar
+}
+
 export function extractJsonFromResponse(text: string): ParsedMovimiento {
-  let cleaned = text.trim();
-  cleaned = cleaned.replace(/^```json\s*/i, "").replace(/^```\s*/, "").replace(/\s*```$/, "");
-  const s = cleaned.indexOf("{");
-  const e = cleaned.lastIndexOf("}");
-  if (s < 0 || e < 0) throw new Error("No se encontró JSON en la respuesta del intérprete");
-  return JSON.parse(cleaned.slice(s, e + 1)) as ParsedMovimiento;
+  // Quitar fences markdown en cualquier posición, no solo en los extremos.
+  const cleaned = text.replace(/```json/gi, "").replace(/```/g, "").trim();
+  const obj = extractFirstBalancedObject(cleaned);
+  if (!obj) throw new Error("No se encontró JSON en la respuesta del intérprete");
+  return JSON.parse(obj) as ParsedMovimiento;
 }
