@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { NamedSelect } from "@/components/ui/named-select";
-import { deleteMovimiento, duplicateMovimiento } from "@/lib/supabase/actions/movimientos";
+import { deleteMovimiento, deleteGrupoCuotas, duplicateMovimiento } from "@/lib/supabase/actions/movimientos";
 import {
   getParticipantes,
   marcarCobrado,
@@ -76,6 +76,11 @@ function formatFecha(d: string) {
 
 function todayStr() {
   return new Date().toISOString().slice(0, 10);
+}
+
+// Muestra el concepto sin el sufijo "(cuota i/N)" (se ve como badge aparte).
+function conceptoBase(m: { concepto: string | null; descripcion: string | null }) {
+  return (m.concepto || m.descripcion || "—").replace(/\s*\(cuota\s*\d+\/\d+\)\s*$/i, "");
 }
 
 function nombrePrestamo(m: MovimientoConRelaciones): string | null {
@@ -477,6 +482,21 @@ export function MovimientosClient({ movimientos, total, cuentas, tarjetas, categ
   async function handleEliminar(m: MovimientoConRelaciones) {
     const prestamo = nombrePrestamo(m);
 
+    // Gasto en cuotas: ofrecer borrar todas las cuotas del grupo.
+    if (m.cuota_grupo_id) {
+      const total = m.cuotas ?? 0;
+      const borrarTodas = confirm(
+        `Este gasto tiene ${total} cuotas.\nAceptar = borrar TODAS las cuotas.\nCancelar = borrar solo esta cuota (${m.cuota_numero}/${total}).`
+      );
+      if (borrarTodas) {
+        await deleteGrupoCuotas(m.cuota_grupo_id);
+      } else {
+        await deleteMovimiento(m.id);
+      }
+      startTransition(() => router.refresh());
+      return;
+    }
+
     const msg = prestamo
       ? `⚠ Este movimiento está vinculado al préstamo "${prestamo}". Eliminarlo desvinculará el pago del préstamo. ¿Confirmás?`
       : "¿Eliminar este movimiento?";
@@ -632,8 +652,13 @@ export function MovimientosClient({ movimientos, total, cuentas, tarjetas, categ
                         {formatFecha(m.fecha)}
                       </td>
                       <td className="px-4 py-3">
-                        <div className="font-medium truncate max-w-[200px]">
-                          {m.concepto || m.descripcion || "—"}
+                        <div className="font-medium max-w-[220px] flex items-center gap-1.5">
+                          <span className="truncate">{conceptoBase(m)}</span>
+                          {m.cuota_numero && (
+                            <span className="shrink-0 inline-flex items-center px-1.5 py-0.5 rounded-full bg-info/10 text-info border border-info/20 text-[10px] font-medium">
+                              {m.cuota_numero}/{m.cuotas}
+                            </span>
+                          )}
                         </div>
                         {m.categorias && (
                           <div className="text-xs text-muted-foreground">{m.categorias.nombre}</div>
@@ -767,8 +792,13 @@ export function MovimientosClient({ movimientos, total, cuentas, tarjetas, categ
                             </span>
                           )}
                         </div>
-                        <p className="text-sm font-medium mt-0.5 truncate">
-                          {m.concepto || m.descripcion || "—"}
+                        <p className="text-sm font-medium mt-0.5 flex items-center gap-1.5">
+                          <span className="truncate">{conceptoBase(m)}</span>
+                          {m.cuota_numero && (
+                            <span className="shrink-0 inline-flex items-center px-1.5 py-0.5 rounded-full bg-info/10 text-info border border-info/20 text-[10px] font-medium">
+                              {m.cuota_numero}/{m.cuotas}
+                            </span>
+                          )}
                         </p>
                         <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground">
                           <span>{formatFecha(m.fecha)}</span>

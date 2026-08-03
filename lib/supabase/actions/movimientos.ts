@@ -186,6 +186,19 @@ export async function deleteMovimiento(id: string) {
   if (error) throw new Error(error.message);
 }
 
+/** Borra TODAS las cuotas de una compra (mismo cuota_grupo_id). */
+export async function deleteGrupoCuotas(cuotaGrupoId: string) {
+  const { supabase, userId } = await getAuthedUser();
+
+  const { error } = await supabase
+    .from("movimientos")
+    .delete()
+    .eq("cuota_grupo_id", cuotaGrupoId)
+    .eq("user_id", userId);
+
+  if (error) throw new Error(error.message);
+}
+
 export async function duplicateMovimiento(id: string) {
   const { supabase, userId } = await getAuthedUser();
 

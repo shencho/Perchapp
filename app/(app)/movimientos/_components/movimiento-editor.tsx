@@ -444,10 +444,13 @@ export function MovimientoEditor({ open, onClose, onSaved, editing, cuentas, tar
     setIsSubmitting(true);
     setError(null);
     try {
+      // Cuotas (>1) y gasto compartido no se combinan: forzamos no-compartido.
+      const compartir = esCompartido && !(clasificacion === "Cuotas" && (cuotas ?? 1) > 1);
+
       // Gasto compartido: absorber diferencia de redondeo (≤ $1) en la parte del
       // usuario (gc_mi_parte) para que las partes cierren exactas contra el total.
       let gcMiParteFinal = gcMiParte;
-      if (esCompartido) {
+      if (compartir) {
         const sumParticipantesPend = participantes
           .filter((p) => p.estado === "pendiente")
           .reduce((acc, p) => acc + p.monto, 0);
@@ -472,13 +475,13 @@ export function MovimientoEditor({ open, onClose, onSaved, editing, cuentas, tar
         cuenta_destino_id: showCuentaDestino ? (values.cuenta_destino_id ?? null) : null,
         observaciones:     values.observaciones ?? null,
         unitario:          clasificacion === "Cuotas" ? unitario : values.monto,
-        es_compartido:     esCompartido,
-        gc_mi_parte:       esCompartido ? gcMiParteFinal : null,
+        es_compartido:     compartir,
+        gc_mi_parte:       compartir ? gcMiParteFinal : null,
       };
 
       // Preparar participantes para upsert: resolver "guardar en agenda" primero
       const participantesInput: ParticipanteInput[] = [];
-      if (esCompartido) {
+      if (compartir) {
         // Consumo propio del usuario (persona_id = null) — para balance grupal
         if (gcMiParte > 0) {
           participantesInput.push({
@@ -506,7 +509,7 @@ export function MovimientoEditor({ open, onClose, onSaved, editing, cuentas, tar
 
       if (editing) {
         await updateMovimiento(editing.id, payload);
-        if (esCompartido) {
+        if (compartir) {
           await Promise.all([
             upsertParticipantes(editing.id, participantesInput),
             upsertPagadores(editing.id, pagadores),
@@ -535,7 +538,7 @@ export function MovimientoEditor({ open, onClose, onSaved, editing, cuentas, tar
         // ── Crear movimiento ───────────────────────────────
         const { id: nuevoId } = await createMovimiento(payload);
 
-        if (esCompartido) {
+        if (compartir) {
           await Promise.all([
             upsertParticipantes(nuevoId, participantesInput),
             upsertPagadores(nuevoId, pagadores),
@@ -953,8 +956,15 @@ export function MovimientoEditor({ open, onClose, onSaved, editing, cuentas, tar
               <Input placeholder="Notas adicionales" {...register("observaciones")} />
             </div>
 
+            {/* Cuotas + gasto compartido no se combinan (fuera de alcance): aviso. */}
+            {tipo === "Egreso" && clasificacion === "Cuotas" && (cuotas ?? 1) > 1 && (
+              <p className="text-xs text-muted-foreground border-t border-border pt-3">
+                Un gasto en cuotas no se puede marcar como compartido por ahora.
+              </p>
+            )}
+
             {/* ── GASTO COMPARTIDO ─────────────────────────────────────── */}
-            {tipo === "Egreso" && (
+            {tipo === "Egreso" && !(clasificacion === "Cuotas" && (cuotas ?? 1) > 1) && (
               <>
                 <hr className="border-border" />
 
