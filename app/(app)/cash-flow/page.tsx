@@ -25,7 +25,7 @@ export default async function CashFlowPage() {
       .select("id, tipo, moneda, saldo")
       .eq("user_id", user.id).eq("archivada", false),
     supabase.from("movimientos")
-      .select("tipo, monto, moneda, fecha, cuenta_id, cuenta_destino_id, categoria_id")
+      .select("tipo, monto, monto_destino, moneda, fecha, cuenta_id, cuenta_destino_id, categoria_id")
       .eq("user_id", user.id)
       .gte("fecha", fechaDesde3m)
       .lte("fecha", finMesActual),
@@ -51,7 +51,7 @@ export default async function CashFlowPage() {
 
   // Saldo actual de cuentas líquidas en ARS
   const movSaldo = movimientos.map(m => ({
-    tipo: m.tipo, monto: m.monto,
+    tipo: m.tipo, monto: m.monto, monto_destino: m.monto_destino,
     cuenta_id: m.cuenta_id, cuenta_destino_id: m.cuenta_destino_id,
   }));
 

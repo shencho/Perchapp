@@ -53,7 +53,7 @@ export default async function DashboardPage() {
       .select("*")
       .eq("user_id", user.id).eq("archivada", false),
     supabase.from("movimientos")
-      .select("tipo, monto, moneda, fecha, cuenta_id, cuenta_destino_id, tarjeta_id, categoria_id, necesidad, plantilla_recurrente_id, es_compartido, gc_mi_parte, es_reembolso")
+      .select("tipo, monto, monto_destino, moneda, fecha, cuenta_id, cuenta_destino_id, tarjeta_id, categoria_id, necesidad, plantilla_recurrente_id, es_compartido, gc_mi_parte, es_reembolso")
       .eq("user_id", user.id)
       .gte("fecha", fechaDesde24m),
     supabase.from("categorias")
@@ -75,7 +75,7 @@ export default async function DashboardPage() {
 
   // ── Saldos de cuentas ──────────────────────────────────────────────────────
   const movSaldo = movimientos.map(m => ({
-    tipo: m.tipo, monto: m.monto,
+    tipo: m.tipo, monto: m.monto, monto_destino: m.monto_destino,
     cuenta_id: m.cuenta_id, cuenta_destino_id: m.cuenta_destino_id,
   }));
 

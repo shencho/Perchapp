@@ -95,6 +95,7 @@ export async function createMovimiento(input: MovimientoInput): Promise<{ id: st
     user_id:           userId,
     tipo:              parsed.tipo,
     monto:             parsed.monto,
+    monto_destino:     parsed.tipo === "Transferencia" ? (parsed.monto_destino ?? null) : null,
     moneda:            parsed.moneda,
     tipo_cambio:       parsed.tipo_cambio ?? null,
     concepto:          parsed.concepto ?? null,
@@ -181,6 +182,19 @@ export async function deleteMovimiento(id: string) {
     .from("movimientos")
     .delete()
     .eq("id", id)
+    .eq("user_id", userId);
+
+  if (error) throw new Error(error.message);
+}
+
+/** Borra TODAS las cuotas de una compra (mismo cuota_grupo_id). */
+export async function deleteGrupoCuotas(cuotaGrupoId: string) {
+  const { supabase, userId } = await getAuthedUser();
+
+  const { error } = await supabase
+    .from("movimientos")
+    .delete()
+    .eq("cuota_grupo_id", cuotaGrupoId)
     .eq("user_id", userId);
 
   if (error) throw new Error(error.message);

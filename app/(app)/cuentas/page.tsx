@@ -50,7 +50,7 @@ export default async function CuentasPage() {
   const [cuentasRes, movRes] = await Promise.all([
     supabase.from("cuentas").select("*").eq("user_id", user.id).eq("archivada", false).order("orden"),
     supabase.from("movimientos")
-      .select("tipo, monto, cuenta_id, cuenta_destino_id")
+      .select("tipo, monto, monto_destino, cuenta_id, cuenta_destino_id")
       .eq("user_id", user.id),
   ]);
 
@@ -58,6 +58,7 @@ export default async function CuentasPage() {
   const movimientos: MovimientoParaSaldo[] = (movRes.data ?? []).map(m => ({
     tipo: m.tipo,
     monto: m.monto,
+    monto_destino: m.monto_destino,
     cuenta_id: m.cuenta_id,
     cuenta_destino_id: m.cuenta_destino_id,
   }));

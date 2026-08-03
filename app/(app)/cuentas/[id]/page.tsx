@@ -82,12 +82,13 @@ export default async function CuentaDetallePage({ params, searchParams }: Props)
 
   const { data: movAll } = await supabase
     .from("movimientos")
-    .select("tipo, monto, cuenta_id, cuenta_destino_id")
+    .select("tipo, monto, monto_destino, cuenta_id, cuenta_destino_id")
     .eq("user_id", user.id);
 
   const movSaldo: MovimientoParaSaldo[] = (movAll ?? []).map(m => ({
     tipo: m.tipo,
     monto: m.monto,
+    monto_destino: m.monto_destino,
     cuenta_id: m.cuenta_id,
     cuenta_destino_id: m.cuenta_destino_id,
   }));

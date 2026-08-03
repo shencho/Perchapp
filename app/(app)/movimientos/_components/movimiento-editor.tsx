@@ -54,6 +54,7 @@ const schema = z.object({
   moneda:            z.enum(["ARS", "USD"]),
   tipo_cambio:       z.number().positive().nullable().optional(),
   monto:             z.number().positive("El monto debe ser mayor a 0"),
+  monto_destino:     z.number().positive().nullable().optional(),
   categoria_id:      z.string().nullable().optional(),
   clasificacion:     z.enum(CLASIFICACIONES),
   cuotas:            z.number().int().min(1),
@@ -204,6 +205,7 @@ export function MovimientoEditor({ open, onClose, onSaved, editing, cuentas, tar
         moneda:            (editing.moneda ?? "ARS") as "ARS" | "USD",
         tipo_cambio:       editing.tipo_cambio ?? undefined,
         monto:             editing.monto,
+        monto_destino:     editing.monto_destino ?? undefined,
         clasificacion:     (editing.clasificacion ?? "Variable") as FormData["clasificacion"],
         cuotas:            editing.cuotas ?? 1,
         frecuencia:        (editing.frecuencia ?? "Corriente") as FormData["frecuencia"],
@@ -341,8 +343,31 @@ export function MovimientoEditor({ open, onClose, onSaved, editing, cuentas, tar
   const showDebitaDe = metodo === "Débito automático";
   const showNecesidad = tipo === "Egreso";
   const showCuotasChip = clasificacion === "Cuotas";
-  const showTipoCambio = moneda === "USD";
   const showCuentaDestino = tipo === "Transferencia";
+
+  // Transferencia cross-moneda (compra/venta de USD): las cuentas tienen distinta moneda.
+  const cuentaIdSel        = watch("cuenta_id");
+  const cuentaDestinoIdSel = watch("cuenta_destino_id");
+  const montoDestinoW      = watch("monto_destino");
+  const cuentaOrigenSel  = cuentas.find((c) => c.id === cuentaIdSel);
+  const cuentaDestinoSel = cuentas.find((c) => c.id === cuentaDestinoIdSel);
+  const crossMoneda =
+    tipo === "Transferencia" &&
+    !!cuentaOrigenSel && !!cuentaDestinoSel &&
+    cuentaOrigenSel.moneda !== cuentaDestinoSel.moneda;
+  // Tipo de cambio manual solo para movimientos USD que NO son cross-moneda (esos usan monto_destino).
+  const showTipoCambio = moneda === "USD" && !crossMoneda;
+  const tcCross = monto && montoDestinoW ? (monto / montoDestinoW) : null;
+
+  // En una transferencia, la moneda del movimiento = moneda de la cuenta origen.
+  useEffect(() => {
+    if (tipo !== "Transferencia") return;
+    const oc = cuentas.find((c) => c.id === cuentaIdSel);
+    if (!oc) return;
+    if ((oc.moneda === "ARS" || oc.moneda === "USD") && getValues("moneda") !== oc.moneda) {
+      setValue("moneda", oc.moneda);
+    }
+  }, [cuentaIdSel, tipo, cuentas, getValues, setValue]);
 
   // Autocalcular fecha_vencimiento al elegir una tarjeta (si está vacía) —
   // reutiliza la lógica de ciclo/vencimiento. Evita el 500 por date vacío.
@@ -444,10 +469,13 @@ export function MovimientoEditor({ open, onClose, onSaved, editing, cuentas, tar
     setIsSubmitting(true);
     setError(null);
     try {
+      // Cuotas (>1) y gasto compartido no se combinan: forzamos no-compartido.
+      const compartir = esCompartido && !(clasificacion === "Cuotas" && (cuotas ?? 1) > 1);
+
       // Gasto compartido: absorber diferencia de redondeo (≤ $1) en la parte del
       // usuario (gc_mi_parte) para que las partes cierren exactas contra el total.
       let gcMiParteFinal = gcMiParte;
-      if (esCompartido) {
+      if (compartir) {
         const sumParticipantesPend = participantes
           .filter((p) => p.estado === "pendiente")
           .reduce((acc, p) => acc + p.monto, 0);
@@ -457,9 +485,21 @@ export function MovimientoEditor({ open, onClose, onSaved, editing, cuentas, tar
         }
       }
 
+      const montoDestinoFinal = crossMoneda && Number.isFinite(values.monto_destino)
+        ? (values.monto_destino as number) : null;
+
+      if (crossMoneda && (!montoDestinoFinal || montoDestinoFinal <= 0)) {
+        setError(`Ingresá cuánto entra en ${cuentaDestinoSel?.nombre} (${cuentaDestinoSel?.moneda}).`);
+        setIsSubmitting(false);
+        return;
+      }
+
       const payload: MovimientoInput = {
         ...values,
-        tipo_cambio:       values.tipo_cambio ?? null,
+        monto_destino:     montoDestinoFinal,
+        tipo_cambio:       crossMoneda
+          ? (montoDestinoFinal && values.monto ? values.monto / montoDestinoFinal : null)
+          : (Number.isFinite(values.tipo_cambio) ? (values.tipo_cambio as number) : null),
         concepto:          values.concepto ?? null,
         descripcion:       values.descripcion ?? null,
         categoria_id:      subcatId ?? padreId ?? null,
@@ -472,13 +512,13 @@ export function MovimientoEditor({ open, onClose, onSaved, editing, cuentas, tar
         cuenta_destino_id: showCuentaDestino ? (values.cuenta_destino_id ?? null) : null,
         observaciones:     values.observaciones ?? null,
         unitario:          clasificacion === "Cuotas" ? unitario : values.monto,
-        es_compartido:     esCompartido,
-        gc_mi_parte:       esCompartido ? gcMiParteFinal : null,
+        es_compartido:     compartir,
+        gc_mi_parte:       compartir ? gcMiParteFinal : null,
       };
 
       // Preparar participantes para upsert: resolver "guardar en agenda" primero
       const participantesInput: ParticipanteInput[] = [];
-      if (esCompartido) {
+      if (compartir) {
         // Consumo propio del usuario (persona_id = null) — para balance grupal
         if (gcMiParte > 0) {
           participantesInput.push({
@@ -506,7 +546,7 @@ export function MovimientoEditor({ open, onClose, onSaved, editing, cuentas, tar
 
       if (editing) {
         await updateMovimiento(editing.id, payload);
-        if (esCompartido) {
+        if (compartir) {
           await Promise.all([
             upsertParticipantes(editing.id, participantesInput),
             upsertPagadores(editing.id, pagadores),
@@ -535,7 +575,7 @@ export function MovimientoEditor({ open, onClose, onSaved, editing, cuentas, tar
         // ── Crear movimiento ───────────────────────────────
         const { id: nuevoId } = await createMovimiento(payload);
 
-        if (esCompartido) {
+        if (compartir) {
           await Promise.all([
             upsertParticipantes(nuevoId, participantesInput),
             upsertPagadores(nuevoId, pagadores),
@@ -656,7 +696,7 @@ export function MovimientoEditor({ open, onClose, onSaved, editing, cuentas, tar
 
             {/* MONTO */}
             <div className="space-y-1.5">
-              <Label>Monto ({moneda})</Label>
+              <Label>{crossMoneda ? `Sale de ${cuentaOrigenSel?.nombre} (${cuentaOrigenSel?.moneda})` : `Monto (${moneda})`}</Label>
               <Input
                 type="number"
                 step="0.01"
@@ -666,6 +706,24 @@ export function MovimientoEditor({ open, onClose, onSaved, editing, cuentas, tar
               />
               {errors.monto && <p className="text-xs text-destructive">{errors.monto.message}</p>}
             </div>
+
+            {/* MONTO RECIBIDO (transferencia cross-moneda: compra/venta USD) */}
+            {crossMoneda && (
+              <div className="space-y-1.5">
+                <Label>Entra en {cuentaDestinoSel?.nombre} ({cuentaDestinoSel?.moneda})</Label>
+                <Input
+                  type="number"
+                  step="0.01"
+                  placeholder="0.00"
+                  {...register("monto_destino", { valueAsNumber: true })}
+                />
+                <p className="text-xs text-muted-foreground">
+                  {tcCross
+                    ? `Tipo de cambio: ${new Intl.NumberFormat("es-AR", { maximumFractionDigits: 2 }).format(tcCross)}`
+                    : "Ingresá cuánto entra en la otra moneda."}
+                </p>
+              </div>
+            )}
 
             {/* CATEGORÍA + SUBCATEGORÍA */}
             {tipo !== "Transferencia" && (
@@ -953,8 +1011,15 @@ export function MovimientoEditor({ open, onClose, onSaved, editing, cuentas, tar
               <Input placeholder="Notas adicionales" {...register("observaciones")} />
             </div>
 
+            {/* Cuotas + gasto compartido no se combinan (fuera de alcance): aviso. */}
+            {tipo === "Egreso" && clasificacion === "Cuotas" && (cuotas ?? 1) > 1 && (
+              <p className="text-xs text-muted-foreground border-t border-border pt-3">
+                Un gasto en cuotas no se puede marcar como compartido por ahora.
+              </p>
+            )}
+
             {/* ── GASTO COMPARTIDO ─────────────────────────────────────── */}
-            {tipo === "Egreso" && (
+            {tipo === "Egreso" && !(clasificacion === "Cuotas" && (cuotas ?? 1) > 1) && (
               <>
                 <hr className="border-border" />
 
