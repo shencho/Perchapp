@@ -54,6 +54,7 @@ const schema = z.object({
   moneda:            z.enum(["ARS", "USD"]),
   tipo_cambio:       z.number().positive().nullable().optional(),
   monto:             z.number().positive("El monto debe ser mayor a 0"),
+  monto_destino:     z.number().positive().nullable().optional(),
   categoria_id:      z.string().nullable().optional(),
   clasificacion:     z.enum(CLASIFICACIONES),
   cuotas:            z.number().int().min(1),
@@ -204,6 +205,7 @@ export function MovimientoEditor({ open, onClose, onSaved, editing, cuentas, tar
         moneda:            (editing.moneda ?? "ARS") as "ARS" | "USD",
         tipo_cambio:       editing.tipo_cambio ?? undefined,
         monto:             editing.monto,
+        monto_destino:     editing.monto_destino ?? undefined,
         clasificacion:     (editing.clasificacion ?? "Variable") as FormData["clasificacion"],
         cuotas:            editing.cuotas ?? 1,
         frecuencia:        (editing.frecuencia ?? "Corriente") as FormData["frecuencia"],
@@ -341,8 +343,31 @@ export function MovimientoEditor({ open, onClose, onSaved, editing, cuentas, tar
   const showDebitaDe = metodo === "Débito automático";
   const showNecesidad = tipo === "Egreso";
   const showCuotasChip = clasificacion === "Cuotas";
-  const showTipoCambio = moneda === "USD";
   const showCuentaDestino = tipo === "Transferencia";
+
+  // Transferencia cross-moneda (compra/venta de USD): las cuentas tienen distinta moneda.
+  const cuentaIdSel        = watch("cuenta_id");
+  const cuentaDestinoIdSel = watch("cuenta_destino_id");
+  const montoDestinoW      = watch("monto_destino");
+  const cuentaOrigenSel  = cuentas.find((c) => c.id === cuentaIdSel);
+  const cuentaDestinoSel = cuentas.find((c) => c.id === cuentaDestinoIdSel);
+  const crossMoneda =
+    tipo === "Transferencia" &&
+    !!cuentaOrigenSel && !!cuentaDestinoSel &&
+    cuentaOrigenSel.moneda !== cuentaDestinoSel.moneda;
+  // Tipo de cambio manual solo para movimientos USD que NO son cross-moneda (esos usan monto_destino).
+  const showTipoCambio = moneda === "USD" && !crossMoneda;
+  const tcCross = monto && montoDestinoW ? (monto / montoDestinoW) : null;
+
+  // En una transferencia, la moneda del movimiento = moneda de la cuenta origen.
+  useEffect(() => {
+    if (tipo !== "Transferencia") return;
+    const oc = cuentas.find((c) => c.id === cuentaIdSel);
+    if (!oc) return;
+    if ((oc.moneda === "ARS" || oc.moneda === "USD") && getValues("moneda") !== oc.moneda) {
+      setValue("moneda", oc.moneda);
+    }
+  }, [cuentaIdSel, tipo, cuentas, getValues, setValue]);
 
   // Autocalcular fecha_vencimiento al elegir una tarjeta (si está vacía) —
   // reutiliza la lógica de ciclo/vencimiento. Evita el 500 por date vacío.
@@ -460,9 +485,21 @@ export function MovimientoEditor({ open, onClose, onSaved, editing, cuentas, tar
         }
       }
 
+      const montoDestinoFinal = crossMoneda && Number.isFinite(values.monto_destino)
+        ? (values.monto_destino as number) : null;
+
+      if (crossMoneda && (!montoDestinoFinal || montoDestinoFinal <= 0)) {
+        setError(`Ingresá cuánto entra en ${cuentaDestinoSel?.nombre} (${cuentaDestinoSel?.moneda}).`);
+        setIsSubmitting(false);
+        return;
+      }
+
       const payload: MovimientoInput = {
         ...values,
-        tipo_cambio:       values.tipo_cambio ?? null,
+        monto_destino:     montoDestinoFinal,
+        tipo_cambio:       crossMoneda
+          ? (montoDestinoFinal && values.monto ? values.monto / montoDestinoFinal : null)
+          : (Number.isFinite(values.tipo_cambio) ? (values.tipo_cambio as number) : null),
         concepto:          values.concepto ?? null,
         descripcion:       values.descripcion ?? null,
         categoria_id:      subcatId ?? padreId ?? null,
@@ -659,7 +696,7 @@ export function MovimientoEditor({ open, onClose, onSaved, editing, cuentas, tar
 
             {/* MONTO */}
             <div className="space-y-1.5">
-              <Label>Monto ({moneda})</Label>
+              <Label>{crossMoneda ? `Sale de ${cuentaOrigenSel?.nombre} (${cuentaOrigenSel?.moneda})` : `Monto (${moneda})`}</Label>
               <Input
                 type="number"
                 step="0.01"
@@ -669,6 +706,24 @@ export function MovimientoEditor({ open, onClose, onSaved, editing, cuentas, tar
               />
               {errors.monto && <p className="text-xs text-destructive">{errors.monto.message}</p>}
             </div>
+
+            {/* MONTO RECIBIDO (transferencia cross-moneda: compra/venta USD) */}
+            {crossMoneda && (
+              <div className="space-y-1.5">
+                <Label>Entra en {cuentaDestinoSel?.nombre} ({cuentaDestinoSel?.moneda})</Label>
+                <Input
+                  type="number"
+                  step="0.01"
+                  placeholder="0.00"
+                  {...register("monto_destino", { valueAsNumber: true })}
+                />
+                <p className="text-xs text-muted-foreground">
+                  {tcCross
+                    ? `Tipo de cambio: ${new Intl.NumberFormat("es-AR", { maximumFractionDigits: 2 }).format(tcCross)}`
+                    : "Ingresá cuánto entra en la otra moneda."}
+                </p>
+              </div>
+            )}
 
             {/* CATEGORÍA + SUBCATEGORÍA */}
             {tipo !== "Transferencia" && (

@@ -16,6 +16,7 @@ export const FRECUENCIAS    = ["Corriente", "No corriente"] as const;
 export const movimientoSchema = z.object({
   tipo:               z.enum(TIPOS_MOV),
   monto:              z.number().positive("El monto debe ser mayor a 0"),
+  monto_destino:      z.number().positive().nullable().optional(), // transferencia cross-moneda: monto acreditado en la cuenta destino (su moneda)
   moneda:             z.enum(["ARS", "USD"]).default("ARS"),
   tipo_cambio:        z.number().positive().nullable().optional(),
   concepto:           z.string().nullable().optional(),

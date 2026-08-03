@@ -95,6 +95,7 @@ export async function createMovimiento(input: MovimientoInput): Promise<{ id: st
     user_id:           userId,
     tipo:              parsed.tipo,
     monto:             parsed.monto,
+    monto_destino:     parsed.tipo === "Transferencia" ? (parsed.monto_destino ?? null) : null,
     moneda:            parsed.moneda,
     tipo_cambio:       parsed.tipo_cambio ?? null,
     concepto:          parsed.concepto ?? null,

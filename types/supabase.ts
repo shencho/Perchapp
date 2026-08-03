@@ -506,6 +506,7 @@ export interface Database {
           tipo: "Ingreso" | "Egreso" | "Transferencia"
           ambito: "Personal" | "Profesional"
           monto: number
+          monto_destino: number | null
           moneda: string
           tipo_cambio: number | null
           concepto: string | null
@@ -543,6 +544,7 @@ export interface Database {
           tipo: "Ingreso" | "Egreso" | "Transferencia"
           ambito?: "Personal" | "Profesional"
           monto: number
+          monto_destino?: number | null
           moneda?: string
           tipo_cambio?: number | null
           concepto?: string | null
@@ -580,6 +582,7 @@ export interface Database {
           tipo?: "Ingreso" | "Egreso" | "Transferencia"
           ambito?: "Personal" | "Profesional"
           monto?: number
+          monto_destino?: number | null
           moneda?: string
           tipo_cambio?: number | null
           concepto?: string | null
