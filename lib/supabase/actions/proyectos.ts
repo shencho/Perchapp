@@ -162,9 +162,14 @@ export async function createProyecto(input: {
   const { data: perfil } = await supabase.from("profiles").select("nombre").eq("id", userId).single();
   const miNombre = perfil?.nombre?.split(" ")[0] ?? "Vos";
 
-  const { data: proyecto, error } = await supabase
+  // ID generado en el código: evitamos INSERT ... RETURNING porque la policy de
+  // SELECT (puede_ver_proyecto) re-consulta la tabla y la fila recién insertada
+  // aún no es visible durante el RETURNING → falso positivo de "viola RLS".
+  const proyectoId = crypto.randomUUID();
+  const { error } = await supabase
     .from("proyectos")
     .insert({
+      id: proyectoId,
       created_by: userId,
       nombre: input.nombre.trim(),
       tipo: input.tipo ?? "grupo",
@@ -172,16 +177,14 @@ export async function createProyecto(input: {
       fecha_fin: input.fechaFin ?? null,
       moneda_default: input.monedaDefault ?? "ARS",
       grupo_origen_id: input.grupoOrigenId ?? null,
-    })
-    .select("id")
-    .single();
-  if (error || !proyecto) return { error: friendlyDbError(error, "No se pudo crear el proyecto.") };
+    });
+  if (error) return { error: friendlyDbError(error, "No se pudo crear el proyecto.") };
 
   // El creador es miembro-owner
   const miembrosRows = [
-    { proyecto_id: proyecto.id, usuario_id: userId, nombre: miNombre, rol: "owner" },
+    { proyecto_id: proyectoId, usuario_id: userId, nombre: miNombre, rol: "owner" },
     ...(input.miembros ?? []).map((m) => ({
-      proyecto_id: proyecto.id,
+      proyecto_id: proyectoId,
       usuario_id: m.usuarioId ?? null,
       persona_id: m.personaId ?? null,
       nombre: m.nombre,
@@ -191,12 +194,12 @@ export async function createProyecto(input: {
   const { error: mErr } = await supabase.from("proyecto_miembros").insert(miembrosRows);
   if (mErr) {
     // Evitar proyecto huérfano si falla el alta de miembros.
-    await supabase.from("proyectos").delete().eq("id", proyecto.id);
+    await supabase.from("proyectos").delete().eq("id", proyectoId);
     return { error: friendlyDbError(mErr, "No se pudieron agregar los miembros.") };
   }
 
-  revalidar(proyecto.id);
-  return { id: proyecto.id };
+  revalidar(proyectoId);
+  return { id: proyectoId };
 }
 
 export async function updateProyecto(
@@ -288,30 +291,32 @@ export async function removeMiembro(miembroId: string, proyectoId: string): Prom
 export async function addProyectoGasto(input: GastoProyectoInput): Promise<{ id: string }> {
   const { supabase, userId } = await getAuthed();
 
-  const { data: gasto, error } = await supabase
+  // id generado en el código (sin RETURNING): pg_select usa puede_ver_proyecto()
+  // que re-consulta la tabla y la fila nueva no es visible durante el RETURNING.
+  const gastoId = crypto.randomUUID();
+  const { error } = await supabase
     .from("proyecto_gastos")
     .insert({
+      id: gastoId,
       proyecto_id: input.proyectoId,
       creado_por: userId,
       concepto: input.concepto,
       monto_total: input.montoTotal,
       moneda: input.moneda,
       fecha: input.fecha,
-    })
-    .select("id")
-    .single();
-  if (error || !gasto) throw new Error(error?.message ?? "Error al crear gasto");
+    });
+  if (error) throw new Error(error.message);
 
   if (input.pagadores.length > 0) {
     const { error: pErr } = await supabase.from("proyecto_gasto_pagadores").insert(
-      input.pagadores.map((p) => ({ gasto_id: gasto.id, miembro_id: p.miembroId, monto_pagado: p.montoPagado })),
+      input.pagadores.map((p) => ({ gasto_id: gastoId, miembro_id: p.miembroId, monto_pagado: p.montoPagado })),
     );
     if (pErr) throw new Error(pErr.message);
   }
   if (input.splits.length > 0) {
     const { error: sErr } = await supabase.from("proyecto_gasto_splits").insert(
       input.splits.map((s) => ({
-        gasto_id: gasto.id,
+        gasto_id: gastoId,
         miembro_id: s.miembroId,
         monto_consumido: s.montoConsumido,
         modo: s.modo ?? "a_repartir",
@@ -321,7 +326,7 @@ export async function addProyectoGasto(input: GastoProyectoInput): Promise<{ id:
   }
 
   revalidar(input.proyectoId);
-  return { id: gasto.id };
+  return { id: gastoId };
 }
 
 export async function deleteProyectoGasto(gastoId: string, proyectoId: string): Promise<void> {
