@@ -64,9 +64,10 @@ export function HubClient({ proyectos, debo, meDeben, cuentas, personasConectada
       const miembros = personasConectadas
         .filter((p) => seleccionados.has(p.id))
         .map((p) => ({ usuarioId: p.usuario_vinculado_id, nombre: p.nombre }));
-      const { id } = await createProyecto({ nombre: nombre.trim(), tipo, miembros });
+      const res = await createProyecto({ nombre: nombre.trim(), tipo, miembros });
+      if ("error" in res) { setError(res.error); return; }
       setShowForm(false);
-      router.push(`/proyectos/${id}`);
+      router.push(`/proyectos/${res.id}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Error al crear");
     } finally {

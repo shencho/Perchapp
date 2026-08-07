@@ -132,6 +132,22 @@ export async function getProyecto(id: string): Promise<ProyectoDetalle | null> {
 }
 
 // ── Mutations: proyecto ──────────────────────────────────────────────────────
+export type CreateProyectoResult = { id: string } | { error: string };
+
+// Traduce errores de DB a un mensaje claro. Clave: los errores LANZADOS desde
+// un server action se sanitizan en prod ("Server Components render error"),
+// por eso devolvemos el error en el valor de retorno (no se sanitiza).
+function friendlyDbError(
+  error: { code?: string; message?: string } | null,
+  fallback: string,
+): string {
+  const msg = error?.message ?? "";
+  if (error?.code === "42501" || /row-level security/i.test(msg)) {
+    return `${fallback} No hay permisos en la base — puede faltar aplicar una migración (RLS). Avisá al admin.`;
+  }
+  return msg || fallback;
+}
+
 export async function createProyecto(input: {
   nombre: string;
   tipo?: string;
@@ -140,7 +156,7 @@ export async function createProyecto(input: {
   monedaDefault?: string;
   miembros?: MiembroInput[];
   grupoOrigenId?: string | null;
-}): Promise<{ id: string }> {
+}): Promise<CreateProyectoResult> {
   const { supabase, userId } = await getAuthed();
 
   const { data: perfil } = await supabase.from("profiles").select("nombre").eq("id", userId).single();
@@ -159,7 +175,7 @@ export async function createProyecto(input: {
     })
     .select("id")
     .single();
-  if (error || !proyecto) throw new Error(error?.message ?? "Error al crear proyecto");
+  if (error || !proyecto) return { error: friendlyDbError(error, "No se pudo crear el proyecto.") };
 
   // El creador es miembro-owner
   const miembrosRows = [
@@ -173,7 +189,11 @@ export async function createProyecto(input: {
     })),
   ];
   const { error: mErr } = await supabase.from("proyecto_miembros").insert(miembrosRows);
-  if (mErr) throw new Error(mErr.message);
+  if (mErr) {
+    // Evitar proyecto huérfano si falla el alta de miembros.
+    await supabase.from("proyectos").delete().eq("id", proyecto.id);
+    return { error: friendlyDbError(mErr, "No se pudieron agregar los miembros.") };
+  }
 
   revalidar(proyecto.id);
   return { id: proyecto.id };
@@ -214,7 +234,7 @@ export async function deleteProyecto(id: string): Promise<void> {
 export async function crearProyectoDesdeGrupo(
   grupoId: string,
   input: { nombre: string; tipo?: string },
-): Promise<{ id: string }> {
+): Promise<CreateProyectoResult> {
   const { supabase } = await getAuthed();
 
   const { data: miembrosRaw } = await supabase

@@ -252,8 +252,13 @@ function GruposSection({
   async function handleCrearProyecto(g: GrupoConMiembros) {
     setCreandoProyecto(g.id);
     try {
-      const { id } = await crearProyectoDesdeGrupo(g.id, { nombre: g.nombre });
-      router.push(`/proyectos/${id}`);
+      const res = await crearProyectoDesdeGrupo(g.id, { nombre: g.nombre });
+      if ("error" in res) {
+        setCreandoProyecto(null);
+        alert(res.error);
+        return;
+      }
+      router.push(`/proyectos/${res.id}`);
     } catch {
       setCreandoProyecto(null);
     }
