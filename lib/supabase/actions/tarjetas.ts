@@ -14,6 +14,7 @@ export interface TarjetaData {
   limite_ars?: number | null;
   limite_usd?: number | null;
   cuenta_pago_default?: string | null;
+  cuenta_id?: string | null; // cuenta asociada (débito: de dónde debita)
 }
 
 export async function createTarjeta(data: TarjetaData) {
@@ -34,6 +35,7 @@ export async function createTarjeta(data: TarjetaData) {
     limite_ars: data.limite_ars || null,
     limite_usd: data.limite_usd || null,
     cuenta_pago_default: data.cuenta_pago_default || null,
+    cuenta_id: data.cuenta_id || null,
   });
 
   if (error) throw new Error(error.message);
@@ -59,6 +61,7 @@ export async function updateTarjeta(id: string, data: TarjetaData) {
       limite_ars: data.limite_ars || null,
       limite_usd: data.limite_usd || null,
       cuenta_pago_default: data.cuenta_pago_default || null,
+      cuenta_id: data.cuenta_id || null,
     })
     .eq("id", id)
     .eq("user_id", user.id);

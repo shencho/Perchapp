@@ -366,9 +366,14 @@ export function MovimientoEditor({ open, onClose, onSaved, editing, duplicando, 
   useEffect(() => { setSubcatId(null); }, [tipo, padreId]);
 
   // Visibilidad de tarjeta y fecha_vencimiento
-  const showTarjeta = metodo === "Crédito" || (metodo === "Débito automático" && debita_de === "tarjeta");
-  const showFechaVto = showTarjeta;
+  const esDebitoTarjeta = metodo === "Débito";
+  const showTarjeta = metodo === "Crédito" || esDebitoTarjeta || (metodo === "Débito automático" && debita_de === "tarjeta");
+  const showFechaVto = showTarjeta && !esDebitoTarjeta; // débito no tiene resumen/vencimiento
   const showDebitaDe = metodo === "Débito automático";
+  // Filtrar tarjetas por tipo según el método (débito muestra tarjetas de débito; crédito, de crédito).
+  const tarjetasFiltradas = tarjetas.filter((t) =>
+    esDebitoTarjeta ? t.tipo === "Débito" : t.tipo === "Crédito"
+  );
   const showNecesidad = tipo === "Egreso";
   const showCuotasChip = clasificacion === "Cuotas";
   const showCuentaDestino = tipo === "Transferencia";
@@ -397,11 +402,20 @@ export function MovimientoEditor({ open, onClose, onSaved, editing, duplicando, 
     }
   }, [cuentaIdSel, tipo, cuentas, getValues, setValue]);
 
-  // Autocalcular fecha_vencimiento al elegir una tarjeta (si está vacía) —
-  // reutiliza la lógica de ciclo/vencimiento. Evita el 500 por date vacío.
+  // Débito: al elegir una tarjeta de débito, autocompletar la cuenta asociada.
   const tarjetaIdSel = watch("tarjeta_id");
   useEffect(() => {
-    if (!showTarjeta || !tarjetaIdSel) return;
+    if (!esDebitoTarjeta || !tarjetaIdSel) return;
+    const t = tarjetas.find((x) => x.id === tarjetaIdSel);
+    if (t?.cuenta_id && getValues("cuenta_id") !== t.cuenta_id) {
+      setValue("cuenta_id", t.cuenta_id);
+    }
+  }, [tarjetaIdSel, esDebitoTarjeta, tarjetas, getValues, setValue]);
+
+  // Autocalcular fecha_vencimiento al elegir una tarjeta de crédito (si está vacía) —
+  // reutiliza la lógica de ciclo/vencimiento. Evita el 500 por date vacío.
+  useEffect(() => {
+    if (!showFechaVto || !tarjetaIdSel) return;
     if (getValues("fecha_vencimiento")) return; // no pisar un valor existente/editado
     const t = tarjetas.find((x) => x.id === tarjetaIdSel);
     if (!t) return;
@@ -412,7 +426,7 @@ export function MovimientoEditor({ open, onClose, onSaved, editing, duplicando, 
           ? getProximoVencimiento(t.vencimiento_dia)
           : null;
     if (fv) setValue("fecha_vencimiento", fv);
-  }, [tarjetaIdSel, showTarjeta, tarjetas, getValues, setValue]);
+  }, [tarjetaIdSel, showFechaVto, tarjetas, getValues, setValue]);
 
   // Chip de cuotas en vivo
   const unitario = monto && cuotas ? (monto / (cuotas || 1)) : 0;
@@ -959,20 +973,23 @@ export function MovimientoEditor({ open, onClose, onSaved, editing, duplicando, 
             {showTarjeta && (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="space-y-1.5 min-w-0">
-                  <Label>Tarjeta</Label>
+                  <Label>{esDebitoTarjeta ? "Tarjeta de débito" : "Tarjeta de crédito"}</Label>
                   <Controller
                     name="tarjeta_id"
                     control={control}
                     render={({ field }) => (
                       <NamedSelect
                         className="w-full"
-                        options={tarjetas.map(t => ({ value: t.id, label: t.nombre }))}
+                        options={tarjetasFiltradas.map(t => ({ value: t.id, label: t.nombre }))}
                         value={field.value ?? ""}
                         onValueChange={(v) => field.onChange(v)}
-                        placeholder="Seleccionar…"
+                        placeholder={tarjetasFiltradas.length ? "Seleccionar…" : "Sin tarjetas de este tipo"}
                       />
                     )}
                   />
+                  {esDebitoTarjeta && (
+                    <p className="text-xs text-muted-foreground">La cuenta se completa según la tarjeta elegida.</p>
+                  )}
                 </div>
                 {showFechaVto && (
                   <div className="space-y-1.5 min-w-0">

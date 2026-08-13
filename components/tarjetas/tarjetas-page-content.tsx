@@ -31,13 +31,14 @@ const schema = z.object({
   limite_ars: z.number().positive().nullable().optional(),
   limite_usd: z.number().positive().nullable().optional(),
   cuenta_pago_default: z.string().optional().nullable(),
+  cuenta_id: z.string().optional().nullable(),
 });
 
 type FormData = z.infer<typeof schema>;
 
 const EMPTY: FormData = {
   nombre: "", tipo: "Crédito", banco_emisor: "", ultimos_cuatro: "",
-  cierre_dia: null, vencimiento_dia: null, limite_ars: null, limite_usd: null, cuenta_pago_default: null,
+  cierre_dia: null, vencimiento_dia: null, limite_ars: null, limite_usd: null, cuenta_pago_default: null, cuenta_id: null,
 };
 
 interface Props {
@@ -75,6 +76,7 @@ export function TarjetasPageContent({ tarjetas, cuentas }: Props) {
       cierre_dia: t.cierre_dia ?? null, vencimiento_dia: t.vencimiento_dia ?? null,
       limite_ars: t.limite_ars ?? null, limite_usd: t.limite_usd ?? null,
       cuenta_pago_default: t.cuenta_pago_default ?? null,
+      cuenta_id: t.cuenta_id ?? null,
     });
     setActionError(null);
     setDialogOpen(true);
@@ -92,6 +94,8 @@ export function TarjetasPageContent({ tarjetas, cuentas }: Props) {
         vencimiento_dia: data.tipo === "Crédito" ? (data.vencimiento_dia || null) : null,
         limite_ars: data.limite_ars || null, limite_usd: data.limite_usd || null,
         cuenta_pago_default: data.cuenta_pago_default || null,
+        // Cuenta asociada: relevante para débito (de dónde debita).
+        cuenta_id: data.tipo === "Débito" ? (data.cuenta_id || null) : null,
       };
       if (editing) await updateTarjeta(editing.id, payload);
       else await createTarjeta(payload);
@@ -240,7 +244,7 @@ export function TarjetasPageContent({ tarjetas, cuentas }: Props) {
               </div>
             </div>
 
-            {cuentas.length > 0 && (
+            {cuentas.length > 0 && esCredito && (
               <div className="flex flex-col gap-1.5">
                 <Label>Cuenta de pago default</Label>
                 <Controller name="cuenta_pago_default" control={control} render={({ field }) => (
@@ -255,6 +259,25 @@ export function TarjetasPageContent({ tarjetas, cuentas }: Props) {
                     className="w-full"
                   />
                 )} />
+              </div>
+            )}
+
+            {cuentas.length > 0 && !esCredito && (
+              <div className="flex flex-col gap-1.5">
+                <Label>Cuenta asociada</Label>
+                <Controller name="cuenta_id" control={control} render={({ field }) => (
+                  <NamedSelect
+                    options={[
+                      { value: "", label: "Sin cuenta asignada" },
+                      ...cuentas.map(c => ({ value: c.id, label: `${c.nombre} (${c.moneda})` })),
+                    ]}
+                    value={field.value ?? ""}
+                    onValueChange={(v) => field.onChange(v)}
+                    placeholder="Sin cuenta asignada"
+                    className="w-full"
+                  />
+                )} />
+                <p className="text-xs text-muted-foreground">De qué cuenta debita. Al cargar un gasto con débito, la cuenta se completa sola.</p>
               </div>
             )}
 
