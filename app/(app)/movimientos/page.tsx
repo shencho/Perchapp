@@ -7,8 +7,10 @@ import type { GrupoConMiembros } from "@/lib/supabase/actions/grupos-types";
 import type { Persona } from "@/types/supabase";
 
 interface Props {
-  searchParams: Promise<{ mes?: string; pagina?: string; compartido?: string; generar?: string }>;
+  searchParams: Promise<{ mes?: string; pagina?: string; compartido?: string; generar?: string; q?: string; porPagina?: string; tipo?: string; metodo?: string; cuenta?: string; categoria?: string }>;
 }
+
+const PORPAGINA_OPCIONES = [25, 50, 75, 100];
 
 export default async function MovimientosPage({ searchParams }: Props) {
   const params = await searchParams;
@@ -21,8 +23,19 @@ export default async function MovimientosPage({ searchParams }: Props) {
   const now = new Date();
   const mesActual = params.mes ?? `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
   const pagina = parseInt(params.pagina ?? "0");
-  const PAGE_SIZE = 25;
+  const porPagina = PORPAGINA_OPCIONES.includes(Number(params.porPagina)) ? Number(params.porPagina) : 25;
+  const PAGE_SIZE = porPagina;
   const todosLosMeses = mesActual === "todos";
+  const q = (params.q ?? "").trim();
+  // Sanear para el .or() de PostgREST (coma y paréntesis rompen la sintaxis).
+  const qOr = q.replace(/[,()]/g, " ");
+
+  // Filtros (server-side, así la búsqueda y los totales abarcan TODO el set, no la página).
+  const filtroTipo      = params.tipo ?? "todos";
+  const filtroMetodo    = params.metodo ?? "todos";
+  const filtroCuenta    = params.cuenta ?? "todas";
+  const filtroCategoria = params.categoria ?? "todas";
+  const filtroCompartido = params.compartido === "true";
 
   // Nombre del usuario (para resolver "Vos" en balance grupal)
   const { data: perfil } = await supabase
@@ -32,7 +45,15 @@ export default async function MovimientosPage({ searchParams }: Props) {
     .single();
   const nombreUsuario = perfil?.nombre?.split(" ")[0] ?? "Vos";
 
-  // Construir query de movimientos con filtro de fecha opcional
+  // Rango de fechas del mes seleccionado (si aplica)
+  let inicio: string | null = null, fin: string | null = null;
+  if (!todosLosMeses) {
+    const [anio, mes] = mesActual.split("-");
+    inicio = `${anio}-${mes}-01`;
+    fin = new Date(Number(anio), Number(mes), 0).toISOString().slice(0, 10);
+  }
+
+  // Query principal (página actual) — con relaciones y count exacto.
   let movQuery = supabase
     .from("movimientos")
     .select(`
@@ -46,11 +67,35 @@ export default async function MovimientosPage({ searchParams }: Props) {
     `, { count: "exact" })
     .eq("user_id", user.id);
 
-  if (!todosLosMeses) {
-    const [anio, mes] = mesActual.split("-");
-    const inicio = `${anio}-${mes}-01`;
-    const fin = new Date(Number(anio), Number(mes), 0).toISOString().slice(0, 10);
+  // Query de totales — TODO el set filtrado (sin paginar), solo columnas mínimas.
+  let totalesQuery = supabase
+    .from("movimientos")
+    .select("tipo, monto, moneda")
+    .eq("user_id", user.id);
+
+  if (inicio && fin) {
     movQuery = movQuery.gte("fecha", inicio).lte("fecha", fin);
+    totalesQuery = totalesQuery.gte("fecha", inicio).lte("fecha", fin);
+  }
+  if (qOr) {
+    const orExpr = `concepto.ilike.%${qOr}%,descripcion.ilike.%${qOr}%`;
+    movQuery = movQuery.or(orExpr);
+    totalesQuery = totalesQuery.or(orExpr);
+  }
+  if (filtroTipo !== "todos") {
+    movQuery = movQuery.eq("tipo", filtroTipo); totalesQuery = totalesQuery.eq("tipo", filtroTipo);
+  }
+  if (filtroMetodo !== "todos") {
+    movQuery = movQuery.eq("metodo", filtroMetodo); totalesQuery = totalesQuery.eq("metodo", filtroMetodo);
+  }
+  if (filtroCuenta !== "todas") {
+    movQuery = movQuery.eq("cuenta_id", filtroCuenta); totalesQuery = totalesQuery.eq("cuenta_id", filtroCuenta);
+  }
+  if (filtroCategoria !== "todas") {
+    movQuery = movQuery.eq("categoria_id", filtroCategoria); totalesQuery = totalesQuery.eq("categoria_id", filtroCategoria);
+  }
+  if (filtroCompartido) {
+    movQuery = movQuery.eq("es_compartido", true); totalesQuery = totalesQuery.eq("es_compartido", true);
   }
 
   movQuery = movQuery
@@ -59,8 +104,9 @@ export default async function MovimientosPage({ searchParams }: Props) {
     .range(pagina * PAGE_SIZE, (pagina + 1) * PAGE_SIZE - 1);
 
   // Cargar movimientos + relaciones + datos de filtros + plantillas en paralelo
-  const [movRes, cuentasRes, tarjetasRes, categoriasRes, personasRes, gruposRes, plantillas] = await Promise.all([
+  const [movRes, totalesRes, cuentasRes, tarjetasRes, categoriasRes, personasRes, gruposRes, plantillas] = await Promise.all([
     movQuery,
+    totalesQuery,
     supabase
       .from("cuentas")
       .select("*")
@@ -116,10 +162,26 @@ export default async function MovimientosPage({ searchParams }: Props) {
 
   const plantillasPendientes = getPlantillasPendientesDelMes(plantillas, movsEsteMes, ahora);
 
+  // Totales del set filtrado completo, por moneda (Ingreso/Egreso).
+  const totales: Record<string, { ingreso: number; egreso: number }> = {};
+  for (const m of (totalesRes.data ?? []) as { tipo: string; monto: number; moneda: string }[]) {
+    const cur = (totales[m.moneda] ??= { ingreso: 0, egreso: 0 });
+    if (m.tipo === "Ingreso") cur.ingreso += m.monto;
+    else if (m.tipo === "Egreso") cur.egreso += m.monto;
+  }
+
   return (
     <MovimientosClient
       movimientos={(movRes.data ?? []) as Parameters<typeof MovimientosClient>[0]["movimientos"]}
       total={movRes.count ?? 0}
+      totales={totales}
+      pagina={pagina}
+      porPagina={porPagina}
+      busquedaInicial={q}
+      tipoInicial={filtroTipo}
+      metodoInicial={filtroMetodo}
+      cuentaInicial={filtroCuenta}
+      categoriaInicial={filtroCategoria}
       cuentas={cuentasRes.data ?? []}
       tarjetas={tarjetasRes.data ?? []}
       categorias={categoriasRes.data ?? []}

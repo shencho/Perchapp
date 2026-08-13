@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { NamedSelect } from "@/components/ui/named-select";
-import { deleteMovimiento, deleteGrupoCuotas, duplicateMovimiento } from "@/lib/supabase/actions/movimientos";
+import { deleteMovimiento, deleteGrupoCuotas } from "@/lib/supabase/actions/movimientos";
 import {
   getParticipantes,
   marcarCobrado,
@@ -36,6 +36,14 @@ type MovimientoConRelaciones = Movimiento & {
 interface Props {
   movimientos: MovimientoConRelaciones[];
   total: number;
+  totales?: Record<string, { ingreso: number; egreso: number }>;
+  pagina?: number;
+  porPagina?: number;
+  busquedaInicial?: string;
+  tipoInicial?: string;
+  metodoInicial?: string;
+  cuentaInicial?: string;
+  categoriaInicial?: string;
   cuentas: Cuenta[];
   tarjetas: Tarjeta[];
   categorias: Categoria[];
@@ -429,54 +437,71 @@ function getMeses() {
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
-export function MovimientosClient({ movimientos, total, cuentas, tarjetas, categorias, personas, grupos, mesActual, compartidoInicial, nombreUsuario, plantillasPendientes = [], generarInicialId }: Props) {
+export function MovimientosClient({ movimientos, total, totales = {}, pagina = 0, porPagina = 25, busquedaInicial = "", tipoInicial = "todos", metodoInicial = "todos", cuentaInicial = "todas", categoriaInicial = "todas", cuentas, tarjetas, categorias, personas, grupos, mesActual, compartidoInicial, nombreUsuario, plantillasPendientes = [], generarInicialId }: Props) {
   const router = useRouter();
   const [, startTransition] = useTransition();
 
   const [editorOpen, setEditorOpen]     = useState(false);
   const [editing, setEditing]           = useState<Movimiento | null>(null);
+  const [duplicando, setDuplicando]     = useState<Movimiento | null>(null);
   const [expandedId, setExpandedId]     = useState<string | null>(null);
   const [generarOpen, setGenerarOpen]   = useState(!!generarInicialId);
 
-  // Filtros locales (UI)
-  const [busqueda, setBusqueda] = useState("");
-  const [filtroMes, setFiltroMes] = useState(mesActual);
-  const [filtroTipo, setFiltroTipo] = useState<string>("todos");
-  const [filtroMetodo, setFiltroMetodo] = useState<string>("todos");
-  const [filtroCuenta, setFiltroCuenta] = useState<string>("todas");
-  const [filtroCategoria, setFiltroCategoria] = useState<string>("todas");
-  const [filtroCompartido, setFiltroCompartido] = useState(compartidoInicial ?? false);
+  // Búsqueda: estado local para tipear, con debounce → searchParam `q` (server-side).
+  const [busqueda, setBusqueda] = useState(busquedaInicial);
+
+  const filtroMes = mesActual;
+  const filtroTipo = tipoInicial;
+  const filtroMetodo = metodoInicial;
+  const filtroCuenta = cuentaInicial;
+  const filtroCategoria = categoriaInicial;
+  const filtroCompartido = compartidoInicial ?? false;
 
   const meses = getMeses();
   const catsPadre = categorias.filter((c) => !c.parent_id);
 
-  // Filtro local (cliente)
-  const filtrados = movimientos.filter((m) => {
-    if (busqueda) {
-      const b = busqueda.toLowerCase();
-      if (!(m.concepto?.toLowerCase().includes(b) || m.descripcion?.toLowerCase().includes(b))) return false;
+  // El servidor ya aplica todos los filtros (mes, búsqueda, tipo, método, cuenta,
+  // categoría, compartido) sobre TODA la lista → acá solo mostramos la página.
+  const filtrados = movimientos;
+  const totalPaginas = Math.max(1, Math.ceil(total / porPagina));
+
+  // Setea/borra searchParams (por defecto resetea la página).
+  function setParam(updates: Record<string, string | null>, resetPagina = true) {
+    const url = new URL(window.location.href);
+    for (const [k, v] of Object.entries(updates)) {
+      if (v === null || v === "") url.searchParams.delete(k);
+      else url.searchParams.set(k, v);
     }
-    if (filtroTipo !== "todos" && m.tipo !== filtroTipo) return false;
-    if (filtroMetodo !== "todos" && m.metodo !== filtroMetodo) return false;
-    if (filtroCuenta !== "todas" && m.cuenta_id !== filtroCuenta) return false;
-    if (filtroCategoria !== "todas" && m.categoria_id !== filtroCategoria) return false;
-    if (filtroCompartido && !(m.gastos_compartidos_participantes && m.gastos_compartidos_participantes.length > 0)) return false;
-    return true;
-  });
+    if (resetPagina) url.searchParams.delete("pagina");
+    startTransition(() => router.push(url.toString()));
+  }
+
+  // Debounce de la búsqueda hacia el searchParam.
+  useEffect(() => {
+    const t = setTimeout(() => {
+      if (busqueda.trim() !== busquedaInicial) setParam({ q: busqueda.trim() || null });
+    }, 400);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [busqueda]);
 
   function handleNuevo() {
+    setDuplicando(null);
     setEditing(null);
     setEditorOpen(true);
   }
 
   function handleEditar(m: Movimiento) {
+    setDuplicando(null);
     setEditing(m);
     setEditorOpen(true);
   }
 
-  async function handleDuplicar(id: string) {
-    await duplicateMovimiento(id);
-    startTransition(() => router.refresh());
+  // #5: duplicar abre el editor pre-cargado (crear), para editar antes de guardar.
+  function handleDuplicar(m: Movimiento) {
+    setEditing(null);
+    setDuplicando(m);
+    setEditorOpen(true);
   }
 
   async function handleEliminar(m: MovimientoConRelaciones) {
@@ -507,12 +532,7 @@ export function MovimientosClient({ movimientos, total, cuentas, tarjetas, categ
   }
 
   function handleMesChange(mes: string | null) {
-    if (!mes) return;
-    setFiltroMes(mes);
-    const url = new URL(window.location.href);
-    url.searchParams.set("mes", mes);
-    url.searchParams.delete("pagina");
-    router.push(url.toString());
+    if (mes) setParam({ mes });
   }
 
   // ── Render ─────────────────────────────────────────────────────────────────
@@ -570,7 +590,7 @@ export function MovimientosClient({ movimientos, total, cuentas, tarjetas, categ
         <NamedSelect
           options={[{ value: "todos", label: "Todos los tipos" }, ...TIPOS_MOV.map(t => ({ value: t, label: t }))]}
           value={filtroTipo !== "todos" ? filtroTipo : ""}
-          onValueChange={(v) => setFiltroTipo(v ?? "todos")}
+          onValueChange={(v) => setParam({ tipo: v && v !== "todos" ? v : null })}
           placeholder="Tipo"
           className={cn("h-8 text-sm w-36", filtroTipo !== "todos" && "ring-1 ring-primary/50 border-primary/50")}
         />
@@ -579,7 +599,7 @@ export function MovimientosClient({ movimientos, total, cuentas, tarjetas, categ
         <NamedSelect
           options={[{ value: "todos", label: "Todos los métodos" }, ...METODOS.map(m => ({ value: m, label: m }))]}
           value={filtroMetodo !== "todos" ? filtroMetodo : ""}
-          onValueChange={(v) => setFiltroMetodo(v ?? "todos")}
+          onValueChange={(v) => setParam({ metodo: v && v !== "todos" ? v : null })}
           placeholder="Método"
           className={cn("h-8 text-sm w-40", filtroMetodo !== "todos" && "ring-1 ring-primary/50 border-primary/50")}
         />
@@ -588,7 +608,7 @@ export function MovimientosClient({ movimientos, total, cuentas, tarjetas, categ
         <NamedSelect
           options={[{ value: "todas", label: "Todas las cuentas" }, ...cuentas.map(c => ({ value: c.id, label: c.nombre }))]}
           value={filtroCuenta !== "todas" ? filtroCuenta : ""}
-          onValueChange={(v) => setFiltroCuenta(v ?? "todas")}
+          onValueChange={(v) => setParam({ cuenta: v && v !== "todas" ? v : null })}
           placeholder="Cuenta"
           className={cn("h-8 text-sm w-36", filtroCuenta !== "todas" && "ring-1 ring-primary/50 border-primary/50")}
         />
@@ -597,14 +617,14 @@ export function MovimientosClient({ movimientos, total, cuentas, tarjetas, categ
         <NamedSelect
           options={[{ value: "todas", label: "Todas las categorías" }, ...catsPadre.map(c => ({ value: c.id, label: c.nombre }))]}
           value={filtroCategoria !== "todas" ? filtroCategoria : ""}
-          onValueChange={(v) => setFiltroCategoria(v ?? "todas")}
+          onValueChange={(v) => setParam({ categoria: v && v !== "todas" ? v : null })}
           placeholder="Categoría"
           className={cn("h-8 text-sm w-40", filtroCategoria !== "todas" && "ring-1 ring-primary/50 border-primary/50")}
         />
 
         {/* Compartidos */}
         <button
-          onClick={() => setFiltroCompartido(v => !v)}
+          onClick={() => setParam({ compartido: filtroCompartido ? null : "true" })}
           className={cn(
             "h-8 flex items-center gap-1.5 px-3 text-sm rounded-md border transition-colors",
             filtroCompartido
@@ -616,6 +636,23 @@ export function MovimientosClient({ movimientos, total, cuentas, tarjetas, categ
           Compartidos
         </button>
       </div>
+
+      {/* Totales del set filtrado, por moneda (#10) */}
+      {Object.keys(totales).length > 0 && (
+        <div className="flex flex-wrap items-center gap-x-5 gap-y-1 rounded-lg border border-border bg-surface/40 px-4 py-2 text-xs">
+          <span className="text-muted-foreground">Totales filtrados:</span>
+          {Object.entries(totales).map(([moneda, t]) => (
+            <span key={moneda} className="flex items-center gap-2">
+              <span className="font-medium">{moneda}</span>
+              <span className="text-success tabular-nums font-mono">+{formatMonto(t.ingreso, moneda)}</span>
+              <span className="text-danger tabular-nums font-mono">-{formatMonto(t.egreso, moneda)}</span>
+              <span className={cn("tabular-nums font-mono font-semibold", (t.ingreso - t.egreso) >= 0 ? "text-foreground" : "text-danger")}>
+                neto {formatMonto(t.ingreso - t.egreso, moneda)}
+              </span>
+            </span>
+          ))}
+        </div>
+      )}
 
       {/* Lista */}
       {filtrados.length === 0 ? (
@@ -734,7 +771,7 @@ export function MovimientosClient({ movimientos, total, cuentas, tarjetas, categ
                           <Button variant="ghost" size="icon-sm" onClick={() => handleEditar(m)} title="Editar">
                             <Pencil className="h-3.5 w-3.5" />
                           </Button>
-                          <Button variant="ghost" size="icon-sm" onClick={() => handleDuplicar(m.id)} title="Duplicar">
+                          <Button variant="ghost" size="icon-sm" onClick={() => handleDuplicar(m)} title="Duplicar">
                             <Copy className="h-3.5 w-3.5" />
                           </Button>
                           <Button variant="ghost" size="icon-sm" onClick={() => handleEliminar(m)} title="Eliminar" className="text-destructive hover:text-destructive">
@@ -853,7 +890,7 @@ export function MovimientosClient({ movimientos, total, cuentas, tarjetas, categ
                         <Button variant="ghost" size="icon-sm" onClick={() => handleEditar(m)}>
                           <Pencil className="h-3.5 w-3.5" />
                         </Button>
-                        <Button variant="ghost" size="icon-sm" onClick={() => handleDuplicar(m.id)}>
+                        <Button variant="ghost" size="icon-sm" onClick={() => handleDuplicar(m)}>
                           <Copy className="h-3.5 w-3.5" />
                         </Button>
                         <Button variant="ghost" size="icon-sm" onClick={() => handleEliminar(m)} className="text-destructive hover:text-destructive">
@@ -879,22 +916,38 @@ export function MovimientosClient({ movimientos, total, cuentas, tarjetas, categ
             })}
           </div>
 
-          {/* Paginación simple */}
-          {total > filtrados.length && (
-            <div className="text-center py-2">
-              <p className="text-xs text-muted-foreground">
-                Mostrando {filtrados.length} de {total}
-              </p>
-              <Button variant="ghost" size="sm" className="mt-1 gap-1" onClick={() => {
-                const url = new URL(window.location.href);
-                const pagina = parseInt(url.searchParams.get("pagina") ?? "0") + 1;
-                url.searchParams.set("pagina", String(pagina));
-                router.push(url.toString());
-              }}>
-                Cargar más <ChevronDown className="h-3.5 w-3.5" />
+          {/* Paginación real + tamaño de página (#12) */}
+          <div className="flex flex-wrap items-center justify-between gap-3 py-2">
+            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+              <span>Por página:</span>
+              <NamedSelect
+                options={[25, 50, 75, 100].map((n) => ({ value: String(n), label: String(n) }))}
+                value={String(porPagina)}
+                onValueChange={(v) => v && setParam({ porPagina: v })}
+                className="h-7 w-20 text-xs"
+              />
+              <span className="ml-1">{total} registros</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline" size="sm" className="h-7 px-2"
+                disabled={pagina <= 0}
+                onClick={() => setParam({ pagina: String(pagina - 1) }, false)}
+              >
+                ‹ Anterior
+              </Button>
+              <span className="text-xs text-muted-foreground tabular-nums">
+                Página {pagina + 1} de {totalPaginas}
+              </span>
+              <Button
+                variant="outline" size="sm" className="h-7 px-2"
+                disabled={pagina + 1 >= totalPaginas}
+                onClick={() => setParam({ pagina: String(pagina + 1) }, false)}
+              >
+                Siguiente ›
               </Button>
             </div>
-          )}
+          </div>
         </>
       )}
 
@@ -903,6 +956,7 @@ export function MovimientosClient({ movimientos, total, cuentas, tarjetas, categ
         open={editorOpen}
         onClose={() => setEditorOpen(false)}
         editing={editing}
+        duplicando={duplicando}
         cuentas={cuentas}
         tarjetas={tarjetas}
         categorias={categorias}

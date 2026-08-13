@@ -54,6 +54,7 @@ export interface DashboardData {
   hero: {
     totalARS: number; totalUSD: number;
     ingresosDelMes: number; egresosDelMes: number;
+    ingresosDelMesUSD: number; egresosDelMesUSD: number;
     balanceDelMes: number; balanceMesAnterior: number;
   };
   cuentasLiquidas: CuentaConSaldo[];
@@ -253,6 +254,14 @@ function HeroFinanciero({ hero, perfil }: { hero: DashboardData["hero"]; perfil:
           value={ahorroPct !== null ? `${ahorroPct}%` : "—"}
         />
       </div>
+      {(hero.ingresosDelMesUSD > 0 || hero.egresosDelMesUSD > 0) && (
+        <p className="text-xs text-muted-foreground">
+          En USD este mes:{" "}
+          {hero.ingresosDelMesUSD > 0 && <span className="text-success">+{fmt(hero.ingresosDelMesUSD, "USD")}</span>}
+          {hero.ingresosDelMesUSD > 0 && hero.egresosDelMesUSD > 0 && " · "}
+          {hero.egresosDelMesUSD > 0 && <span className="text-danger">-{fmt(hero.egresosDelMesUSD, "USD")}</span>}
+        </p>
+      )}
     </div>
   );
 }
@@ -260,13 +269,15 @@ function HeroFinanciero({ hero, perfil }: { hero: DashboardData["hero"]; perfil:
 // ── Bloque Cuentas ────────────────────────────────────────────────────────────
 
 function BloqueCuentas({ cuentas, tarjetas }: { cuentas: CuentaConSaldo[]; tarjetas: TarjetaResumen[] }) {
-  const top3 = [...cuentas].sort((a, b) => Math.abs(b.saldo) - Math.abs(a.saldo)).slice(0, 3);
+  const [verTodas, setVerTodas] = useState(false);
+  const ordenadas = [...cuentas].sort((a, b) => Math.abs(b.saldo) - Math.abs(a.saldo));
+  const visibles = verTodas ? ordenadas : ordenadas.slice(0, 3);
   return (
     <div className="space-y-3">
       {/* Cuentas */}
-      {top3.length > 0 && (
+      {visibles.length > 0 && (
         <div className="rounded-lg border border-border divide-y divide-border">
-          {top3.map(c => (
+          {visibles.map(c => (
             <Link key={c.id} href={`/cuentas/${c.id}`}
               className="flex items-center justify-between px-4 py-3 hover:bg-surface/50 transition-colors">
               <div>
@@ -278,6 +289,15 @@ function BloqueCuentas({ cuentas, tarjetas }: { cuentas: CuentaConSaldo[]; tarje
               </span>
             </Link>
           ))}
+          {ordenadas.length > 3 && (
+            <button
+              type="button"
+              onClick={() => setVerTodas(v => !v)}
+              className="w-full px-4 py-2.5 text-xs text-muted-foreground hover:text-gold transition-colors text-center"
+            >
+              {verTodas ? "Ver menos" : `Ver todas las cuentas (${ordenadas.length})`}
+            </button>
+          )}
         </div>
       )}
 

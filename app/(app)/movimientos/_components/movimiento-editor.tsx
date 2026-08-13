@@ -94,6 +94,7 @@ interface Props {
   onClose: () => void;
   onSaved?: () => void;
   editing?: Movimiento | null;
+  duplicando?: Movimiento | null; // duplicar: pre-carga en modo CREAR (edita antes de guardar)
   cuentas: Cuenta[];
   tarjetas: Tarjeta[];
   categorias: Categoria[];
@@ -133,7 +134,7 @@ function todayStr() {
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
-export function MovimientoEditor({ open, onClose, onSaved, editing, cuentas, tarjetas, categorias, defaultValues, suggestCategoria, personas = [], grupos = [] }: Props) {
+export function MovimientoEditor({ open, onClose, onSaved, editing, duplicando, cuentas, tarjetas, categorias, defaultValues, suggestCategoria, personas = [], grupos = [] }: Props) {
   const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -222,6 +223,31 @@ export function MovimientoEditor({ open, onClose, onSaved, editing, cuentas, tar
         observaciones:     editing.observaciones ?? undefined,
         fecha:             editing.fecha ?? todayStr(),
       });
+    } else if (duplicando) {
+      // Duplicar: mismos valores pero como movimiento NUEVO (fecha = hoy).
+      resolveCatId(duplicando.categoria_id);
+      reset({
+        tipo:              duplicando.tipo as FormData["tipo"],
+        moneda:            (duplicando.moneda ?? "ARS") as "ARS" | "USD",
+        tipo_cambio:       duplicando.tipo_cambio ?? undefined,
+        monto:             duplicando.monto,
+        monto_destino:     duplicando.monto_destino ?? undefined,
+        clasificacion:     (duplicando.clasificacion ?? "Variable") as FormData["clasificacion"],
+        cuotas:            duplicando.cuotas ?? 1,
+        frecuencia:        (duplicando.frecuencia ?? "Corriente") as FormData["frecuencia"],
+        necesidad:         duplicando.necesidad ?? undefined,
+        metodo:            (duplicando.metodo ?? undefined) as FormData["metodo"],
+        cuenta_id:         duplicando.cuenta_id ?? undefined,
+        tarjeta_id:        duplicando.tarjeta_id ?? undefined,
+        fecha_vencimiento: duplicando.fecha_vencimiento ?? undefined,
+        debita_de:         (duplicando.debita_de ?? undefined) as FormData["debita_de"],
+        cuenta_destino_id: duplicando.cuenta_destino_id ?? undefined,
+        concepto:          duplicando.concepto ?? undefined,
+        descripcion:       duplicando.descripcion ?? undefined,
+        cantidad:          duplicando.cantidad ?? 1,
+        observaciones:     duplicando.observaciones ?? undefined,
+        fecha:             todayStr(),
+      });
     } else if (defaultValues) {
       resolveCatId(defaultValues.categoria_id as string | null | undefined);
       reset({ tipo: "Egreso", moneda: "ARS", clasificacion: "Variable", cuotas: 1, frecuencia: "Corriente", cantidad: 1, fecha: todayStr(), ...defaultValues });
@@ -231,9 +257,11 @@ export function MovimientoEditor({ open, onClose, onSaved, editing, cuentas, tar
       reset({ tipo: "Egreso", moneda: "ARS", clasificacion: "Variable", cuotas: 1, frecuencia: "Corriente", cantidad: 1, fecha: todayStr() });
     }
 
-    // Gasto compartido
-    setEsCompartido(editing?.es_compartido ?? false);
-    setGcMiParte(editing?.gc_mi_parte ?? 0);
+    // Gasto compartido (editar o duplicar comparten el init escalar; los
+    // participantes solo se cargan al editar uno existente, no al duplicar).
+    const src = editing ?? duplicando;
+    setEsCompartido(src?.es_compartido ?? false);
+    setGcMiParte(src?.gc_mi_parte ?? 0);
     setGcMiParteEditada(false);
     setGcMiParteModo("a_repartir");
     setNuevaNombre("");
@@ -244,8 +272,8 @@ export function MovimientoEditor({ open, onClose, onSaved, editing, cuentas, tar
     setNuevoPagadorNombre("");
     setNuevoPagadorPersonaId(null);
     setNuevoPagadorMonto(0);
-    if (editing?.es_compartido) {
-      setPagadores([{ personaId: null, nombre: "Vos", montoPagado: editing.monto }]);
+    if (src?.es_compartido) {
+      setPagadores([{ personaId: null, nombre: "Vos", montoPagado: src.monto }]);
       setPagadoresAutoSync(true);
     } else {
       setPagadores([]);
@@ -285,7 +313,7 @@ export function MovimientoEditor({ open, onClose, onSaved, editing, cuentas, tar
       setParticipantes([]);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [editing, open]);
+  }, [editing, duplicando, open]);
 
   // Valores observados para condicionales
   const tipo         = watch("tipo");
@@ -422,7 +450,9 @@ export function MovimientoEditor({ open, onClose, onSaved, editing, cuentas, tar
     if (montoARepartir < 0 || !monto) return;
 
     const repartirParts = participantes.filter((p) => p.estado === "pendiente" && p.modo === "a_repartir");
-    const incluirUsuario = gcMiParteModo === "a_repartir";
+    // Si "Mi parte" es $0, el usuario queda FUERA del reparto: el total se divide
+    // solo entre las personas seleccionadas.
+    const incluirUsuario = gcMiParteModo === "a_repartir" && gcMiParte > 0;
     const n = repartirParts.length + (incluirUsuario ? 1 : 0);
     if (n === 0) return;
 

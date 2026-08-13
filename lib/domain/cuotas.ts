@@ -47,6 +47,10 @@ export function generarCuotas(params: {
     primera = fechaRegistro;
   }
 
+  // La compra se paga a partir del mes SIGUIENTE (más intuitivo para el control
+  // diario: el gasto de hoy impacta recién en el próximo resumen/mes).
+  primera = addMonthsISO(primera, 1);
+
   const out: CuotaGenerada[] = [];
   for (let i = 1; i <= N; i++) {
     const fecha = addMonthsISO(primera, i - 1);

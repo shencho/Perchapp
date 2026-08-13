@@ -109,16 +109,23 @@ export default async function DashboardPage() {
     .map(c => c.id);
 
   // ── Hero KPIs ──────────────────────────────────────────────────────────────
-  const movMesActual = movimientos.filter(m =>
+  // Los KPIs del mes y el análisis se calculan SOLO en ARS (mezclar ARS+USD
+  // daba totales/gráficos erróneos). El movimiento en USD del mes se resume aparte.
+  const enMesActual = movimientos.filter(m =>
     m.fecha >= inicioMesActual && m.fecha <= finMesActual &&
     !ajusteInversionIds.includes(m.categoria_id ?? "__")
   );
+  const movMesActual = enMesActual.filter(m => m.moneda === "ARS");
   const ingresosDelMes = movMesActual.filter(m => m.tipo === "Ingreso" && !m.es_reembolso).reduce((acc, m) => acc + m.monto, 0);
   const egresosDelMes  = movMesActual.filter(m => m.tipo === "Egreso").reduce((acc, m) => acc + montoPropio(m), 0);
   const balanceDelMes  = ingresosDelMes - egresosDelMes;
 
+  const movMesActualUSD = enMesActual.filter(m => m.moneda === "USD");
+  const ingresosDelMesUSD = movMesActualUSD.filter(m => m.tipo === "Ingreso" && !m.es_reembolso).reduce((acc, m) => acc + m.monto, 0);
+  const egresosDelMesUSD  = movMesActualUSD.filter(m => m.tipo === "Egreso").reduce((acc, m) => acc + montoPropio(m), 0);
+
   const movMesAnt = movimientos.filter(m =>
-    m.fecha >= inicioMesAnt && m.fecha <= finMesAnt &&
+    m.fecha >= inicioMesAnt && m.fecha <= finMesAnt && m.moneda === "ARS" &&
     !ajusteInversionIds.includes(m.categoria_id ?? "__")
   );
   const balanceMesAnterior =
@@ -267,6 +274,7 @@ export default async function DashboardPage() {
     hero: {
       totalARS, totalUSD,
       ingresosDelMes, egresosDelMes,
+      ingresosDelMesUSD, egresosDelMesUSD,
       balanceDelMes, balanceMesAnterior,
     },
     cuentasLiquidas,
