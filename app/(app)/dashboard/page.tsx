@@ -7,6 +7,7 @@ import { calcularConsumoTarjeta, getPeriodoCierre, getProximoVencimiento, getCic
 import { getPlantillas } from "@/lib/supabase/actions/plantillas";
 import { getPlantillasParaAlerta } from "@/lib/domain/plantillas";
 import { getAlertasSilenciadasVigentes } from "@/lib/supabase/actions/alertas";
+import { getPresupuestos } from "@/lib/supabase/actions/presupuestos";
 import { calcularSaldoPrestamo } from "@/lib/domain/calcularSaldoPrestamo";
 import { DashboardClient } from "./_components/dashboard-client";
 import type { DashboardData, Alerta, MovGrafico } from "./_components/dashboard-client";
@@ -42,9 +43,10 @@ export default async function DashboardPage() {
   const fechaDesde24m    = new Date(anio, mes - 23, 1).toISOString().slice(0, 10);
 
   // ── Phase 2: todas las queries principales en paralelo ─────────────────────
+  const mesActualStr = `${anio}-${String(mes + 1).padStart(2, "0")}`;
   const [
     cuentasRes, tarjetasRes, movimientosRes, categoriasRes,
-    prestamosRaw, gastosRes, plantillas, silenciadasRaw,
+    prestamosRaw, gastosRes, plantillas, silenciadasRaw, presupuestosMes,
   ] = await Promise.all([
     supabase.from("cuentas")
       .select("*")
@@ -57,7 +59,7 @@ export default async function DashboardPage() {
       .eq("user_id", user.id)
       .gte("fecha", fechaDesde24m),
     supabase.from("categorias")
-      .select("id, nombre")
+      .select("id, nombre, parent_id")
       .eq("user_id", user.id).eq("archivada", false),
     getPrestamos(),
     supabase.from("gastos_compartidos_participantes")
@@ -65,6 +67,7 @@ export default async function DashboardPage() {
       .eq("user_id", user.id).eq("estado", "pendiente"),
     getPlantillas(),
     getAlertasSilenciadasVigentes(),
+    getPresupuestos(mesActualStr).catch(() => []),
   ]);
 
   const cuentas     = cuentasRes.data ?? [];
@@ -203,6 +206,23 @@ export default async function DashboardPage() {
     }))
     .filter(n => n.monto > 0);
 
+  // ── Presupuesto vs gastado por categoría (mes actual, ARS) ─────────────────
+  const parentDe = new Map<string, string>();
+  for (const c of categorias) parentDe.set(c.id, (c as { parent_id: string | null }).parent_id ?? c.id);
+  const gastadoPorPadre: Record<string, number> = {};
+  for (const mv of movEgresoMes) {
+    const padre = mv.categoria_id ? (parentDe.get(mv.categoria_id) ?? mv.categoria_id) : "__sin__";
+    gastadoPorPadre[padre] = (gastadoPorPadre[padre] ?? 0) + montoPropio(mv);
+  }
+  const presupuestos = (presupuestosMes as { categoria_id: string; monto: number }[])
+    .map(p => ({
+      categoriaId: p.categoria_id,
+      nombre: categoriaMap[p.categoria_id] ?? "Categoría",
+      presupuesto: p.monto,
+      gastado: gastadoPorPadre[p.categoria_id] ?? 0,
+    }))
+    .sort((a, b) => (b.gastado / (b.presupuesto || 1)) - (a.gastado / (a.presupuesto || 1)));
+
   // ── Alertas ────────────────────────────────────────────────────────────────
   const alertas: Alerta[] = [];
 
@@ -292,6 +312,7 @@ export default async function DashboardPage() {
     prestamos: prestamosResumen,
     compartidos: { totalPendiente: totalCompartidoPendiente, porPersona: compartidosPorPersona },
     analisis: { topCategorias, porNecesidad },
+    presupuestos,
     alertas,
   };
 

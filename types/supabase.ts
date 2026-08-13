@@ -51,6 +51,38 @@ export interface Database {
           updated_at?: string
         }
       }
+      presupuestos: {
+        Row: {
+          id: string
+          user_id: string
+          categoria_id: string
+          anio_mes: string
+          moneda: string
+          monto: number
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          categoria_id: string
+          anio_mes: string
+          moneda?: string
+          monto: number
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          categoria_id?: string
+          anio_mes?: string
+          moneda?: string
+          monto?: number
+          created_at?: string
+          updated_at?: string
+        }
+      }
       bug_reports: {
         Row: {
           id: string
@@ -1331,6 +1363,7 @@ export type Conexion = Database["public"]["Tables"]["conexiones"]["Row"]
 export type Notificacion = Database["public"]["Tables"]["notificaciones"]["Row"]
 export type DeudaCompartida = Database["public"]["Tables"]["deudas_compartidas"]["Row"]
 export type BugReport = Database["public"]["Tables"]["bug_reports"]["Row"]
+export type Presupuesto = Database["public"]["Tables"]["presupuestos"]["Row"]
 export type Proyecto = Database["public"]["Tables"]["proyectos"]["Row"]
 export type ProyectoMiembro = Database["public"]["Tables"]["proyecto_miembros"]["Row"]
 export type ProyectoGasto = Database["public"]["Tables"]["proyecto_gastos"]["Row"]

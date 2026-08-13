@@ -69,6 +69,7 @@ export interface DashboardData {
     topCategorias: { id: string; nombre: string; monto: number; porcentaje: number }[];
     porNecesidad: { nivel: number; monto: number }[];
   };
+  presupuestos?: { categoriaId: string; nombre: string; presupuesto: number; gastado: number }[];
   alertas: Alerta[];
 }
 
@@ -706,6 +707,37 @@ export function DashboardClient({ data }: { data: DashboardData }) {
         <DashBlock id="analisis" title="Análisis del mes" hiddenBlocks={hiddenBlocks} onToggle={toggleBlock}>
           <BloqueAnalisis analisis={data.analisis} />
         </DashBlock>
+      )}
+
+      {/* Presupuesto del mes (gastado vs objetivo por categoría) */}
+      {data.presupuestos && data.presupuestos.length > 0 && (
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <h2 className="text-base font-semibold">Presupuesto del mes</h2>
+            <Link href="/presupuestos" className="text-xs text-muted-foreground hover:text-gold transition-colors flex items-center gap-1">
+              Editar <ChevronRight className="h-3 w-3" />
+            </Link>
+          </div>
+          <div className="rounded-lg border border-border divide-y divide-border">
+            {data.presupuestos.map(p => {
+              const pct = p.presupuesto > 0 ? Math.min(100, Math.round((p.gastado / p.presupuesto) * 100)) : 0;
+              const excedido = p.gastado > p.presupuesto;
+              return (
+                <div key={p.categoriaId} className="px-4 py-3 space-y-1.5">
+                  <div className="flex items-center justify-between text-sm gap-3">
+                    <span className="font-medium truncate">{p.nombre}</span>
+                    <span className={cn("tabular-nums font-mono text-xs shrink-0", excedido ? "text-danger" : "text-muted-foreground")}>
+                      {fmt(p.gastado)} / {fmt(p.presupuesto)}
+                    </span>
+                  </div>
+                  <div className="h-1.5 w-full rounded-full bg-surface overflow-hidden border border-border/40">
+                    <div className={cn("h-full rounded-full transition-all", excedido ? "bg-danger" : "bg-success")} style={{ width: `${pct}%` }} />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
       )}
     </div>
   );
