@@ -435,19 +435,36 @@ export function MovimientoEditor({ open, onClose, onSaved, editing, duplicando, 
   const datalistId = useId();
   const pagadoresDatalistId = useId();
 
-  function agregarParticipante() {
-    if (!nuevaNombre.trim()) return;
+  const [agregandoPersona, setAgregandoPersona] = useState(false);
+
+  async function agregarParticipante() {
+    const nombre = nuevaNombre.trim();
+    if (!nombre) return;
+    // Si no matchea una persona existente, se crea al instante en la agenda
+    // (como al crear una categoría desde el editor).
+    let personaId = nuevaPersonaId;
+    if (!personaId) {
+      setAgregandoPersona(true);
+      try {
+        const nueva = await createPersona(nombre);
+        personaId = nueva.id;
+      } catch {
+        /* si falla la creación, igual se agrega con el nombre suelto */
+      } finally {
+        setAgregandoPersona(false);
+      }
+    }
     setParticipantes((prev) => [
       ...prev,
       {
         tempId:          `temp-${Date.now()}`,
-        persona_nombre:  nuevaNombre.trim(),
-        persona_id:      nuevaPersonaId,
+        persona_nombre:  nombre,
+        persona_id:      personaId,
         monto:           0,
         montoEditado:    false,
         modo:            "a_repartir" as const,
         estado:          "pendiente" as const,
-        guardarEnAgenda: nuevaGuardarEnAgenda,
+        guardarEnAgenda: false,
       },
     ]);
     setNuevaNombre("");
@@ -1430,29 +1447,21 @@ export function MovimientoEditor({ open, onClose, onSaved, editing, duplicando, 
                           type="button"
                           size="sm"
                           variant="outline"
-                          disabled={!nuevaNombre.trim()}
+                          disabled={!nuevaNombre.trim() || agregandoPersona}
                           onClick={agregarParticipante}
                         >
-                          <Plus className="h-3.5 w-3.5" />
+                          <Plus className="h-3.5 w-3.5 mr-1" />
+                          {nuevaNombre.trim() && !nuevaPersonaId ? "Crear" : "Agregar"}
                         </Button>
                       </div>
                       {nuevaNombre.trim() && !nuevaPersonaId && (
-                        <div className="flex items-center gap-2">
-                          <input
-                            type="checkbox"
-                            id="guardar-agenda"
-                            className="h-3.5 w-3.5 rounded border-border accent-primary cursor-pointer"
-                            checked={nuevaGuardarEnAgenda}
-                            onChange={(e) => setNuevaGuardarEnAgenda(e.target.checked)}
-                          />
-                          <label
-                            htmlFor="guardar-agenda"
-                            className="text-xs text-muted-foreground cursor-pointer"
-                          >
-                            Guardar en mi agenda de personas
-                          </label>
-                        </div>
+                        <p className="text-xs text-muted-foreground">
+                          &ldquo;{nuevaNombre.trim()}&rdquo; no está en tu agenda — se creará al agregarla.
+                        </p>
                       )}
+                      <p className="text-xs text-muted-foreground">
+                        Elegí una persona de tu agenda o cargá un grupo arriba.
+                      </p>
                     </div>
 
                     {/* Soft warning: suma de partes ≠ monto total */}
