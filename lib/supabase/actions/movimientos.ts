@@ -155,6 +155,20 @@ export async function createMovimiento(input: MovimientoInput): Promise<{ id: st
   return { id: data.id };
 }
 
+/**
+ * Columnas actualizables de `movimientos`. El payload del editor arrastra campos
+ * que sólo viven en el formulario y no en la tabla; se filtran contra esta lista.
+ */
+const COLUMNAS_MOVIMIENTO = new Set([
+  "cuenta_id", "categoria_id", "tipo", "ambito", "monto", "monto_destino", "moneda",
+  "tipo_cambio", "concepto", "descripcion", "clasificacion", "cuotas", "frecuencia",
+  "necesidad", "metodo", "tarjeta_id", "fecha_vencimiento", "debita_de",
+  "cuenta_destino_id", "cantidad", "unitario", "observaciones", "cliente_id",
+  "servicio_id", "fecha", "es_compartido", "gc_mi_parte", "es_reembolso",
+  "cuota_numero", "cuota_grupo_id", "prestamo_id", "prestamo_pago_id",
+  "plantilla_recurrente_id",
+]);
+
 export async function updateMovimiento(id: string, input: Partial<MovimientoInput>) {
   const { supabase, userId } = await getAuthedUser();
 
@@ -167,14 +181,17 @@ export async function updateMovimiento(id: string, input: Partial<MovimientoInpu
 
   if (fetchError || !existing) throw new Error("Movimiento no encontrado");
 
-  // cuotas_primera_fecha es un parámetro de generación de cuotas, NO una columna
-  // de la tabla: si se manda al update, Postgres rechaza toda la operación.
-  const campos = { ...input };
-  delete campos.cuotas_primera_fecha;
+  // Sólo se mandan columnas reales de la tabla: el formulario incluye campos que
+  // no son columnas (cuotas_primera_fecha, crear_recurrente, nombre_plantilla,
+  // dia_mes_recurrente…) y cualquiera de ellos hace fallar TODO el update.
+  const campos: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(input)) {
+    if (COLUMNAS_MOVIMIENTO.has(k)) campos[k] = v;
+  }
 
   const { error } = await supabase
     .from("movimientos")
-    .update(campos as Record<string, unknown>)
+    .update(campos)
     .eq("id", id)
     .eq("user_id", userId);
 
