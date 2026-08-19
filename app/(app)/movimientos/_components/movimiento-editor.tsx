@@ -142,6 +142,9 @@ export function MovimientoEditor({ open, onClose, onSaved, editing, duplicando, 
   const [padreId, setPadreId] = useState<string | null>(null);
   const [subcatId, setSubcatId] = useState<string | null>(null);
 
+  // Tipo de cambio tipeado en una compra/venta de USD (ARS por USD).
+  const [tcManual, setTcManual] = useState<number | null>(null);
+
   // Cuotas ya en curso (carga inicial): el usuario fija el mes de la próxima cuota.
   const [cuotasEnCurso, setCuotasEnCurso] = useState(false);
   const [cuotasPrimeraMes, setCuotasPrimeraMes] = useState<string>(""); // YYYY-MM
@@ -260,6 +263,9 @@ export function MovimientoEditor({ open, onClose, onSaved, editing, duplicando, 
       setSubcatId(null);
       reset({ tipo: "Egreso", moneda: "ARS", clasificacion: "Variable", cuotas: 1, frecuencia: "Corriente", cantidad: 1, fecha: todayStr() });
     }
+
+    // Compra/venta USD: el TC tipeado no persiste entre aperturas.
+    setTcManual(null);
 
     // Cuotas en curso: siempre arranca apagado al abrir el editor.
     setCuotasEnCurso(false);
@@ -398,7 +404,37 @@ export function MovimientoEditor({ open, onClose, onSaved, editing, duplicando, 
     cuentaOrigenSel.moneda !== cuentaDestinoSel.moneda;
   // Tipo de cambio manual solo para movimientos USD que NO son cross-moneda (esos usan monto_destino).
   const showTipoCambio = moneda === "USD" && !crossMoneda;
-  const tcCross = monto && montoDestinoW ? (monto / montoDestinoW) : null;
+  // TC siempre expresado en ARS por USD (sin importar la dirección de la operación).
+  const tcCross = crossMoneda && monto && montoDestinoW
+    ? (cuentaOrigenSel?.moneda === "ARS" ? monto / montoDestinoW : montoDestinoW / monto)
+    : null;
+
+  // Atajo comprar/vender USD: arma la transferencia cross-moneda eligiendo cuentas.
+  const cuentasARS = cuentas.filter((c) => c.moneda === "ARS");
+  const cuentasUSD = cuentas.filter((c) => c.moneda === "USD");
+  const hayCuentaARS = cuentasARS.length > 0;
+  const hayCuentaUSD = cuentasUSD.length > 0;
+  const operacionUSD: "comprar" | "vender" | null = crossMoneda
+    ? (cuentaOrigenSel?.moneda === "ARS" ? "comprar" : "vender")
+    : null;
+
+  function armarOperacionUSD(op: "comprar" | "vender") {
+    const origen  = op === "comprar" ? cuentasARS[0] : cuentasUSD[0];
+    const destino = op === "comprar" ? cuentasUSD[0] : cuentasARS[0];
+    if (!origen || !destino) return;
+    setValue("cuenta_id", origen.id);
+    setValue("cuenta_destino_id", destino.id);
+    setValue("moneda", origen.moneda as "ARS" | "USD");
+  }
+
+  // Con monto + TC, calcula el monto que entra en la cuenta destino.
+  function aplicarTipoCambio(tc: number) {
+    setTcManual(Number.isFinite(tc) ? tc : null);
+    const m = getValues("monto");
+    if (!tc || !m || tc <= 0) return;
+    const destino = cuentaOrigenSel?.moneda === "ARS" ? m / tc : m * tc;
+    setValue("monto_destino", Math.round(destino * 100) / 100);
+  }
 
   // En una transferencia, la moneda del movimiento = moneda de la cuenta origen.
   useEffect(() => {
@@ -569,8 +605,13 @@ export function MovimientoEditor({ open, onClose, onSaved, editing, duplicando, 
       const payload: MovimientoInput = {
         ...values,
         monto_destino:     montoDestinoFinal,
+        // En cross-moneda el TC se guarda siempre como ARS por USD.
         tipo_cambio:       crossMoneda
-          ? (montoDestinoFinal && values.monto ? values.monto / montoDestinoFinal : null)
+          ? (montoDestinoFinal && values.monto
+              ? (cuentaOrigenSel?.moneda === "ARS"
+                  ? values.monto / montoDestinoFinal
+                  : montoDestinoFinal / values.monto)
+              : null)
           : (Number.isFinite(values.tipo_cambio) ? (values.tipo_cambio as number) : null),
         concepto:          values.concepto ?? null,
         descripcion:       values.descripcion ?? null,
@@ -782,6 +823,23 @@ export function MovimientoEditor({ open, onClose, onSaved, editing, duplicando, 
               {errors.monto && <p className="text-xs text-destructive">{errors.monto.message}</p>}
             </div>
 
+            {/* TIPO DE CAMBIO (compra/venta USD): calcula solo el monto de la otra moneda */}
+            {crossMoneda && (
+              <div className="space-y-1.5">
+                <Label>Tipo de cambio (ARS por USD)</Label>
+                <Input
+                  type="number"
+                  step="0.01"
+                  placeholder="ej. 1200"
+                  value={tcManual ?? ""}
+                  onChange={(e) => aplicarTipoCambio(parseFloat(e.target.value))}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Con el monto y el tipo de cambio se calcula solo cuánto entra en la otra cuenta.
+                </p>
+              </div>
+            )}
+
             {/* MONTO RECIBIDO (transferencia cross-moneda: compra/venta USD) */}
             {crossMoneda && (
               <div className="space-y-1.5">
@@ -795,7 +853,7 @@ export function MovimientoEditor({ open, onClose, onSaved, editing, duplicando, 
                 <p className="text-xs text-muted-foreground">
                   {tcCross
                     ? `Tipo de cambio: ${new Intl.NumberFormat("es-AR", { maximumFractionDigits: 2 }).format(tcCross)}`
-                    : "Ingresá cuánto entra en la otra moneda."}
+                    : "Ingresá cuánto entra en la otra moneda (o usá el tipo de cambio de arriba)."}
                 </p>
               </div>
             )}
@@ -1059,6 +1117,32 @@ export function MovimientoEditor({ open, onClose, onSaved, editing, duplicando, 
                     <p className="text-xs text-muted-foreground">Cuándo vence el resumen (se autocompleta).</p>
                   </div>
                 )}
+              </div>
+            )}
+
+            {/* COMPRAR / VENDER USD (atajo que arma la transferencia cross-moneda) */}
+            {tipo === "Transferencia" && (hayCuentaARS && hayCuentaUSD) && (
+              <div className="space-y-1.5">
+                <Label>Operación con dólares</Label>
+                <div className="flex gap-2">
+                  <Button
+                    type="button" variant="outline" size="sm"
+                    className={cn(operacionUSD === "comprar" && "border-navy text-navy bg-navy/5")}
+                    onClick={() => armarOperacionUSD("comprar")}
+                  >
+                    Comprar USD
+                  </Button>
+                  <Button
+                    type="button" variant="outline" size="sm"
+                    className={cn(operacionUSD === "vender" && "border-navy text-navy bg-navy/5")}
+                    onClick={() => armarOperacionUSD("vender")}
+                  >
+                    Vender USD
+                  </Button>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Completa las cuentas de origen y destino. Después ingresá el monto y el tipo de cambio.
+                </p>
               </div>
             )}
 

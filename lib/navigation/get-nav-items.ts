@@ -13,6 +13,7 @@ import {
   Settings,
   ClipboardList,
   Target,
+  ChartPie,
   type LucideIcon,
 } from "lucide-react";
 
@@ -41,6 +42,7 @@ export function getNavItems(): NavItem[] {
     { href: "/tarjetas",                label: "Tarjetas",               icon: CreditCard, drawerOnly: true },
     { href: "/personas",                label: "Personas y grupos",      icon: Users,     drawerOnly: true },
     { href: "/categorias",              label: "Categorías",             icon: Tag,       drawerOnly: true },
+    { href: "/estadisticas",            label: "Estadísticas",           icon: ChartPie,  drawerOnly: true },
     { href: "/presupuestos",            label: "Presupuestos",           icon: Target,    drawerOnly: true },
     { href: "/movimientos-recurrentes", label: "Movimientos recurrentes", icon: RefreshCw, drawerOnly: true },
     { href: "/control",                 label: "Control",                icon: ClipboardList, drawerOnly: true, adminOnly: true },
