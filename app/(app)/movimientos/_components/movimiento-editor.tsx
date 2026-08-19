@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useId, useRef, useState } from "react";
-import { useForm, Controller } from "react-hook-form";
+import { useForm, Controller, type DefaultValues } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useRouter } from "next/navigation";
@@ -132,6 +132,41 @@ function todayStr() {
   return new Date().toISOString().slice(0, 10);
 }
 
+/**
+ * Formulario en blanco con TODOS los campos declarados. Es la base de cada
+ * reset: si un campo se omite, react-hook-form puede conservar el valor
+ * anterior (sobre todo en los campos condicionales, que se desmontan y vuelven
+ * a montar), y el movimiento nuevo aparece con datos del anterior.
+ */
+function emptyForm(): DefaultValues<FormData> {
+  return {
+    tipo:               "Egreso",
+    moneda:             "ARS",
+    tipo_cambio:        undefined,
+    monto:              undefined,
+    monto_destino:      undefined,
+    categoria_id:       null,
+    clasificacion:      "Variable",
+    cuotas:             1,
+    frecuencia:         "Corriente",
+    necesidad:          null,
+    metodo:             null,
+    cuenta_id:          null,
+    tarjeta_id:         null,
+    fecha_vencimiento:  null,
+    debita_de:          null,
+    cuenta_destino_id:  null,
+    concepto:           "",
+    descripcion:        "",
+    cantidad:           1,
+    observaciones:      "",
+    fecha:              todayStr(),
+    crear_recurrente:   false,
+    nombre_plantilla:   "",
+    dia_mes_recurrente: undefined,
+  };
+}
+
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export function MovimientoEditor({ open, onClose, onSaved, editing, duplicando, cuentas, tarjetas, categorias, defaultValues, suggestCategoria, personas = [], grupos = [] }: Props) {
@@ -178,17 +213,7 @@ export function MovimientoEditor({ open, onClose, onSaved, editing, duplicando, 
     formState: { errors },
   } = useForm<FormData>({
     resolver: zodResolver(schema),
-    defaultValues: {
-      tipo:          "Egreso",
-      moneda:        "ARS",
-      clasificacion: "Variable",
-      cuotas:        1,
-      frecuencia:       "Corriente",
-      cantidad:         1,
-      fecha:            todayStr(),
-      crear_recurrente: false,
-      ...defaultValues,
-    },
+    defaultValues: { ...emptyForm(), ...defaultValues },
   });
 
   // Sincronizar si viene editing o defaultValues
@@ -209,6 +234,7 @@ export function MovimientoEditor({ open, onClose, onSaved, editing, duplicando, 
     if (editing) {
       resolveCatId(editing.categoria_id);
       reset({
+        ...emptyForm(),
         tipo:              editing.tipo as FormData["tipo"],
         moneda:            (editing.moneda ?? "ARS") as "ARS" | "USD",
         tipo_cambio:       editing.tipo_cambio ?? undefined,
@@ -234,6 +260,7 @@ export function MovimientoEditor({ open, onClose, onSaved, editing, duplicando, 
       // Duplicar: mismos valores pero como movimiento NUEVO (fecha = hoy).
       resolveCatId(duplicando.categoria_id);
       reset({
+        ...emptyForm(),
         tipo:              duplicando.tipo as FormData["tipo"],
         moneda:            (duplicando.moneda ?? "ARS") as "ARS" | "USD",
         tipo_cambio:       duplicando.tipo_cambio ?? undefined,
@@ -257,11 +284,11 @@ export function MovimientoEditor({ open, onClose, onSaved, editing, duplicando, 
       });
     } else if (defaultValues) {
       resolveCatId(defaultValues.categoria_id as string | null | undefined);
-      reset({ tipo: "Egreso", moneda: "ARS", clasificacion: "Variable", cuotas: 1, frecuencia: "Corriente", cantidad: 1, fecha: todayStr(), ...defaultValues });
+      reset({ ...emptyForm(), ...defaultValues });
     } else {
       setPadreId(null);
       setSubcatId(null);
-      reset({ tipo: "Egreso", moneda: "ARS", clasificacion: "Variable", cuotas: 1, frecuencia: "Corriente", cantidad: 1, fecha: todayStr() });
+      reset(emptyForm());
     }
 
     // Compra/venta USD: el TC tipeado no persiste entre aperturas.
