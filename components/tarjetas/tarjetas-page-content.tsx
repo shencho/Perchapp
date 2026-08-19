@@ -5,7 +5,8 @@ import { useForm, Controller, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useRouter } from "next/navigation";
-import { Plus, Pencil, Archive } from "lucide-react";
+import Link from "next/link";
+import { Plus, Pencil, Archive, BarChart3 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -159,6 +160,13 @@ export function TarjetasPageContent({ tarjetas, cuentas }: Props) {
                   </span>
                 </div>
                 <div className="flex items-center gap-1">
+                  <Link
+                    href={`/cuentas/tarjetas/${t.id}`}
+                    title="Ver consumos"
+                    className="inline-flex items-center justify-center h-7 w-7 rounded-md text-muted-foreground hover:bg-surface hover:text-foreground transition-colors"
+                  >
+                    <BarChart3 className="h-3.5 w-3.5" />
+                  </Link>
                   <Button size="icon-sm" variant="ghost" onClick={() => openEdit(t)} title="Editar">
                     <Pencil className="h-3.5 w-3.5" />
                   </Button>

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { ChevronLeft } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { calcularConsumoTarjeta, getPeriodoCierre, getProximoVencimiento, getCicloDelProximoVencimiento } from "@/lib/domain/calcularConsumoTarjeta";
+import { GraficoTarjeta } from "./_components/grafico-tarjeta";
 
 function fmt(n: number, moneda = "ARS") {
   return new Intl.NumberFormat("es-AR", {
@@ -62,16 +63,31 @@ export default async function TarjetaDetallePage({ params }: Props) {
     .order("fecha", { ascending: false });
 
   // Cuotas pendientes (fuera del período actual, clasificacion=Cuotas)
-  const hoy = new Date().toISOString().slice(0, 10);
+  const ahora = new Date();
+  const hoy = `${ahora.getFullYear()}-${String(ahora.getMonth() + 1).padStart(2, "0")}-${String(ahora.getDate()).padStart(2, "0")}`;
+  const mesActual = hoy.slice(0, 7);
   const { data: cuotasPendientes } = await supabase
     .from("movimientos")
-    .select("id, monto, moneda, concepto, fecha, cuotas, fecha_vencimiento")
+    .select("id, monto, moneda, concepto, fecha, cuotas, cuota_numero, fecha_vencimiento")
     .eq("user_id", user.id)
     .eq("tarjeta_id", id)
     .eq("clasificacion", "Cuotas")
     .gt("fecha_vencimiento", hoy)
     .order("fecha_vencimiento", { ascending: true })
     .limit(20);
+
+  // Ventana amplia (±24 meses) para los gráficos de tendencia y acumulado.
+  const desde = `${ahora.getFullYear() - 2}-${String(ahora.getMonth() + 1).padStart(2, "0")}-01`;
+  const hasta = `${ahora.getFullYear() + 2}-${String(ahora.getMonth() + 1).padStart(2, "0")}-28`;
+  const { data: movVentana } = await supabase
+    .from("movimientos")
+    .select("fecha, monto")
+    .eq("user_id", user.id)
+    .eq("tarjeta_id", id)
+    .eq("tipo", "Egreso")
+    .eq("moneda", "ARS")
+    .gte("fecha", desde)
+    .lte("fecha", hasta);
 
   const consumoTotal = calcularConsumoTarjeta(id, (movPeriodo ?? []).map(m => ({
     monto: m.monto, tarjeta_id: id, fecha: m.fecha,
@@ -114,6 +130,9 @@ export default async function TarjetaDetallePage({ params }: Props) {
           )}
         </div>
       </div>
+
+      {/* Tendencia mes a mes + acumulado comprometido */}
+      <GraficoTarjeta movimientos={movVentana ?? []} mesActual={mesActual} />
 
       {/* Consumos del período */}
       <div className="space-y-2">
@@ -159,8 +178,8 @@ export default async function TarjetaDetallePage({ params }: Props) {
               <thead>
                 <tr className="border-b border-border bg-surface">
                   <th className="text-left px-4 py-2.5 font-medium text-muted-foreground">Concepto</th>
-                  <th className="text-left px-4 py-2.5 font-medium text-muted-foreground">Cuotas</th>
-                  <th className="text-right px-4 py-2.5 font-medium text-muted-foreground">Monto/cuota</th>
+                  <th className="text-left px-4 py-2.5 font-medium text-muted-foreground">Cuota</th>
+                  <th className="text-right px-4 py-2.5 font-medium text-muted-foreground">Monto</th>
                   <th className="text-right px-4 py-2.5 font-medium text-muted-foreground">Vto.</th>
                 </tr>
               </thead>
@@ -168,8 +187,11 @@ export default async function TarjetaDetallePage({ params }: Props) {
                 {cuotasPendientes.map((m) => (
                   <tr key={m.id} className="border-b border-border last:border-0">
                     <td className="px-4 py-3 font-medium truncate max-w-[200px]">{m.concepto || "—"}</td>
-                    <td className="px-4 py-3 text-muted-foreground text-xs">{m.cuotas ?? "—"} cuotas</td>
-                    <td className="px-4 py-3 text-right tabular-nums font-mono">{fmt(m.monto / (m.cuotas ?? 1), m.moneda)}</td>
+                    <td className="px-4 py-3 text-muted-foreground text-xs">
+                      {m.cuota_numero ? `${m.cuota_numero}/${m.cuotas}` : `${m.cuotas ?? "—"} cuotas`}
+                    </td>
+                    {/* Cada fila YA es una cuota: el monto es el de esa cuota. */}
+                    <td className="px-4 py-3 text-right tabular-nums font-mono">{fmt(m.monto, m.moneda)}</td>
                     <td className="px-4 py-3 text-right text-muted-foreground text-xs">
                       {m.fecha_vencimiento ? fmtFecha(m.fecha_vencimiento) : "—"}
                     </td>
