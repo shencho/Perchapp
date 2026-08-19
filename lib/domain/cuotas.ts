@@ -1,5 +1,5 @@
 import { clampDay, toLocalISO } from "./_utils/dates";
-import { getCicloDelProximoVencimiento, getProximoVencimiento } from "./calcularConsumoTarjeta";
+import { getPrimeraCuotaVencimiento, getProximoVencimiento } from "./calcularConsumoTarjeta";
 
 function addMonthsISO(iso: string, n: number): string {
   const [y, m, d] = iso.split("-").map(Number);
@@ -26,30 +26,38 @@ export function generarCuotas(params: {
   cuotas: number;
   fechaRegistro: string; // YYYY-MM-DD
   tarjeta?: { cierre_dia: number | null; vencimiento_dia: number | null } | null;
+  /**
+   * Carga inicial de cuotas YA en curso: fija el mes/fecha de la PRÓXIMA cuota
+   * (YYYY-MM-DD) y saltea la lógica de cierre. Las N cuotas arrancan desde acá.
+   */
+  fechaPrimeraOverride?: string | null;
 }): CuotaGenerada[] {
-  const { montoTotal, cuotas, fechaRegistro, tarjeta } = params;
+  const { montoTotal, cuotas, fechaRegistro, tarjeta, fechaPrimeraOverride } = params;
   const N = Math.max(1, Math.floor(cuotas));
   const unitario = r2(montoTotal / N);
 
   let primera: string;
   let usaVto = false;
-  if (tarjeta?.cierre_dia && tarjeta?.vencimiento_dia) {
-    primera = getCicloDelProximoVencimiento(
+  if (fechaPrimeraOverride) {
+    // Cuotas en curso: el usuario indica cuándo cae la próxima; se respeta tal cual.
+    primera = fechaPrimeraOverride;
+    usaVto = !!tarjeta?.vencimiento_dia;
+  } else if (tarjeta?.cierre_dia && tarjeta?.vencimiento_dia) {
+    // Primer pago según el ciclo: evalúa si la compra entró antes/después del cierre.
+    primera = getPrimeraCuotaVencimiento(
       tarjeta.cierre_dia,
       tarjeta.vencimiento_dia,
       new Date(fechaRegistro + "T12:00:00"),
-    ).fechaVencimiento;
+    );
     usaVto = true;
   } else if (tarjeta?.vencimiento_dia) {
-    primera = getProximoVencimiento(tarjeta.vencimiento_dia) ?? fechaRegistro;
+    // Sólo vencimiento (sin cierre): próximo vto, pagando desde el mes siguiente.
+    primera = addMonthsISO(getProximoVencimiento(tarjeta.vencimiento_dia) ?? fechaRegistro, 1);
     usaVto = true;
   } else {
-    primera = fechaRegistro;
+    // Sin tarjeta: se paga a partir del mes SIGUIENTE (intuitivo para el control diario).
+    primera = addMonthsISO(fechaRegistro, 1);
   }
-
-  // La compra se paga a partir del mes SIGUIENTE (más intuitivo para el control
-  // diario: el gasto de hoy impacta recién en el próximo resumen/mes).
-  primera = addMonthsISO(primera, 1);
 
   const out: CuotaGenerada[] = [];
   for (let i = 1; i <= N; i++) {

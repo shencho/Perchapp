@@ -130,6 +130,7 @@ export async function createMovimiento(input: MovimientoInput): Promise<{ id: st
       cuotas: parsed.cuotas,
       fechaRegistro: baseFecha,
       tarjeta: tarjetaCiclo,
+      fechaPrimeraOverride: parsed.cuotas_primera_fecha ?? null,
     });
 
     const rows = cuotasGen.map((c) => ({

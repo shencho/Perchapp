@@ -39,6 +39,9 @@ export const movimientoSchema = z.object({
   es_compartido:           z.boolean().optional(),
   gc_mi_parte:             z.number().positive().nullable().optional(),
   plantilla_recurrente_id: z.string().uuid().nullable().optional(),
+  // Carga inicial de cuotas ya en curso: fecha (YYYY-MM-DD) de la PRÓXIMA cuota.
+  // No es columna de DB; sólo se usa para fechar las cuotas generadas.
+  cuotas_primera_fecha:    z.string().nullable().optional(),
 });
 
 export type MovimientoInput = z.infer<typeof movimientoSchema>;

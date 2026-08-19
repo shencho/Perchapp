@@ -1,7 +1,3 @@
-// NOTE: getPeriodoCierre, getProximoVencimiento y calcularConsumoTarjeta usan
-// toISOString() que puede devolver un día anterior en zonas UTC- (e.g. Argentina).
-// Pendiente fix en PR separado.
-
 import { clampDay, addDays, toLocalISO } from "./_utils/dates";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -45,6 +41,31 @@ export function getCicloDelProximoVencimiento(
 
 // ─────────────────────────────────────────────────────────────────────────────
 
+/**
+ * Fecha del PRIMER vencimiento (primer pago) de una compra en cuotas, según el
+ * ciclo de la tarjeta. Evalúa si la compra entró antes o después del cierre:
+ *  - compra el día ≤ cierre_dia → el resumen cierra ESTE mes → paga en el vto de ese ciclo.
+ *  - compra el día > cierre_dia → el resumen cierra el mes SIGUIENTE → paga un mes después.
+ * El vencimiento cae el mismo mes del cierre si vencimiento_dia > cierre_dia, o el
+ * mes siguiente si vencimiento_dia ≤ cierre_dia (típico: cierra 25, vence 10).
+ */
+export function getPrimeraCuotaVencimiento(
+  cierre_dia: number,
+  vencimiento_dia: number,
+  fechaCompra: Date = new Date(),
+): string {
+  const y = fechaCompra.getFullYear();
+  const m = fechaCompra.getMonth();
+  const d = fechaCompra.getDate();
+
+  const cierreDate = d <= cierre_dia ? clampDay(y, m, cierre_dia) : clampDay(y, m + 1, cierre_dia);
+  const vtoMonthOffset = vencimiento_dia > cierre_dia ? 0 : 1;
+  const vtoDate = clampDay(cierreDate.getFullYear(), cierreDate.getMonth() + vtoMonthOffset, vencimiento_dia);
+  return toLocalISO(vtoDate);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+
 export function getPeriodoCierre(
   cierre_dia: number | null,
 ): { inicio: string; fin: string } {
@@ -54,21 +75,21 @@ export function getPeriodoCierre(
   const dia = hoy.getDate();
 
   if (!cierre_dia) {
-    const inicio = new Date(año, mes, 1).toISOString().slice(0, 10);
-    const fin = new Date(año, mes + 1, 0).toISOString().slice(0, 10);
+    const inicio = toLocalISO(new Date(año, mes, 1));
+    const fin = toLocalISO(new Date(año, mes + 1, 0));
     return { inicio, fin };
   }
 
   // Before the close day: period started last month
   if (dia < cierre_dia) {
-    const inicio = new Date(año, mes - 1, cierre_dia).toISOString().slice(0, 10);
-    const fin = new Date(año, mes, cierre_dia - 1).toISOString().slice(0, 10);
+    const inicio = toLocalISO(clampDay(año, mes - 1, cierre_dia));
+    const fin = toLocalISO(new Date(año, mes, cierre_dia - 1));
     return { inicio, fin };
   }
 
   // At or after close day: period started this month
-  const inicio = new Date(año, mes, cierre_dia).toISOString().slice(0, 10);
-  const fin = new Date(año, mes + 1, cierre_dia - 1).toISOString().slice(0, 10);
+  const inicio = toLocalISO(clampDay(año, mes, cierre_dia));
+  const fin = toLocalISO(new Date(año, mes + 1, cierre_dia - 1));
   return { inicio, fin };
 }
 
@@ -94,11 +115,6 @@ export function getProximoVencimiento(
   const vtoDia = vencimiento_dia;
 
   // Find next vencimiento date
-  let vtoDate: Date;
-  if (dia <= vtoDia) {
-    vtoDate = new Date(año, mes, vtoDia);
-  } else {
-    vtoDate = new Date(año, mes + 1, vtoDia);
-  }
-  return vtoDate.toISOString().slice(0, 10);
+  const vtoDate = dia <= vtoDia ? clampDay(año, mes, vtoDia) : clampDay(año, mes + 1, vtoDia);
+  return toLocalISO(vtoDate);
 }

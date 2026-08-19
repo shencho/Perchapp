@@ -64,7 +64,8 @@ export default async function DashboardPage() {
     getPrestamos(),
     supabase.from("gastos_compartidos_participantes")
       .select("persona_nombre, monto")
-      .eq("user_id", user.id).eq("estado", "pendiente"),
+      .eq("user_id", user.id).eq("estado", "pendiente")
+      .not("persona_id", "is", null), // excluye la parte propia "Vos" (no es deuda cobrable)
     getPlantillas(),
     getAlertasSilenciadasVigentes(),
     getPresupuestos(mesActualStr).catch(() => []),
