@@ -142,6 +142,10 @@ export function MovimientoEditor({ open, onClose, onSaved, editing, duplicando, 
   const [padreId, setPadreId] = useState<string | null>(null);
   const [subcatId, setSubcatId] = useState<string | null>(null);
 
+  // Cuotas ya en curso (carga inicial): el usuario fija el mes de la próxima cuota.
+  const [cuotasEnCurso, setCuotasEnCurso] = useState(false);
+  const [cuotasPrimeraMes, setCuotasPrimeraMes] = useState<string>(""); // YYYY-MM
+
   // Gasto compartido
   const [esCompartido, setEsCompartido] = useState(false);
   const [gcMiParte, setGcMiParte] = useState<number>(0);
@@ -256,6 +260,10 @@ export function MovimientoEditor({ open, onClose, onSaved, editing, duplicando, 
       setSubcatId(null);
       reset({ tipo: "Egreso", moneda: "ARS", clasificacion: "Variable", cuotas: 1, frecuencia: "Corriente", cantidad: 1, fecha: todayStr() });
     }
+
+    // Cuotas en curso: siempre arranca apagado al abrir el editor.
+    setCuotasEnCurso(false);
+    setCuotasPrimeraMes(`${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, "0")}`);
 
     // Gasto compartido (editar o duplicar comparten el init escalar; los
     // participantes solo se cargan al editar uno existente, no al duplicar).
@@ -473,7 +481,11 @@ export function MovimientoEditor({ open, onClose, onSaved, editing, duplicando, 
   }
 
   function repartirResto() {
-    const fixedUser = gcMiParteModo === "fijo" ? gcMiParte : 0;
+    // "Mi parte" cuenta como FIJA si está bloqueada (modo "fijo") o si el usuario
+    // la escribió a mano: en ese caso el resto (monto − mi parte − otros fijos) se
+    // reparte SOLO entre las personas marcadas como ÷, sin re-dividir el total.
+    const usuarioFijo = gcMiParteModo === "fijo" || gcMiParteEditada;
+    const fixedUser = usuarioFijo ? gcMiParte : 0;
     const fixedParts = participantes
       .filter((p) => p.estado === "pendiente" && p.modo === "fijo")
       .reduce((acc, p) => acc + p.monto, 0);
@@ -481,9 +493,8 @@ export function MovimientoEditor({ open, onClose, onSaved, editing, duplicando, 
     if (montoARepartir < 0 || !monto) return;
 
     const repartirParts = participantes.filter((p) => p.estado === "pendiente" && p.modo === "a_repartir");
-    // Si "Mi parte" es $0, el usuario queda FUERA del reparto: el total se divide
-    // solo entre las personas seleccionadas.
-    const incluirUsuario = gcMiParteModo === "a_repartir" && gcMiParte > 0;
+    // El usuario entra al reparto sólo si NO fijó/escribió su parte (caso "somos N iguales").
+    const incluirUsuario = !usuarioFijo;
     const n = repartirParts.length + (incluirUsuario ? 1 : 0);
     if (n === 0) return;
 
@@ -573,6 +584,9 @@ export function MovimientoEditor({ open, onClose, onSaved, editing, duplicando, 
         cuenta_destino_id: showCuentaDestino ? (values.cuenta_destino_id ?? null) : null,
         observaciones:     values.observaciones ?? null,
         unitario:          clasificacion === "Cuotas" ? unitario : values.monto,
+        cuotas_primera_fecha: clasificacion === "Cuotas" && cuotas > 1 && cuotasEnCurso && cuotasPrimeraMes
+          ? `${cuotasPrimeraMes}-01`
+          : null,
         es_compartido:     compartir,
         gc_mi_parte:       compartir ? gcMiParteFinal : null,
       };
@@ -915,6 +929,36 @@ export function MovimientoEditor({ open, onClose, onSaved, editing, duplicando, 
                     <span>
                       {cuotas} cuotas de {formatMonto(unitario, moneda)} · {formatMonto(total, moneda)} total
                     </span>
+                  </div>
+                )}
+                {/* Carga inicial: cuotas que YA venías pagando (del resumen actual). */}
+                {cuotas > 1 && !editing && (
+                  <div className="space-y-2 rounded-lg border border-dashed border-border p-3">
+                    <label className="flex items-start gap-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={cuotasEnCurso}
+                        onChange={(e) => setCuotasEnCurso(e.target.checked)}
+                        className="mt-0.5"
+                      />
+                      <span className="text-sm">
+                        Estas cuotas ya están en curso
+                        <span className="block text-xs text-muted-foreground">
+                          Para cargar cuotas que ya venís pagando: poné cuántas te quedan y desde qué mes cae la próxima.
+                        </span>
+                      </span>
+                    </label>
+                    {cuotasEnCurso && (
+                      <div className="space-y-1.5">
+                        <Label>Próxima cuota (mes)</Label>
+                        <Input
+                          type="month"
+                          value={cuotasPrimeraMes}
+                          onChange={(e) => setCuotasPrimeraMes(e.target.value)}
+                          className="w-44"
+                        />
+                      </div>
+                    )}
                   </div>
                 )}
               </div>

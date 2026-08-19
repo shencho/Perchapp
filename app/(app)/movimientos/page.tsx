@@ -62,7 +62,7 @@ export default async function MovimientosPage({ searchParams }: Props) {
       cuentas:cuenta_id ( id, nombre, tipo ),
       cuenta_destino:cuenta_destino_id ( id, nombre ),
       tarjetas:tarjeta_id ( id, nombre ),
-      gastos_compartidos_participantes!movimiento_id ( id, estado, monto ),
+      gastos_compartidos_participantes!movimiento_id ( id, estado, monto, persona_id ),
       prestamos:prestamo_id ( id, tipo, institucion_nombre, persona_id, personas ( nombre ) )
     `, { count: "exact" })
     .eq("user_id", user.id);

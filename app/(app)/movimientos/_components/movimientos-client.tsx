@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useTransition, Fragment } from "react";
 import { useRouter } from "next/navigation";
-import { Plus, Pencil, Copy, Trash2, Search, ChevronDown, Users, Landmark, ArrowRight } from "lucide-react";
+import { Plus, Pencil, Copy, Trash2, Search, ChevronDown, ChevronLeft, ChevronRight, Users, Landmark, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
@@ -29,7 +29,7 @@ type MovimientoConRelaciones = Movimiento & {
   cuentas?: { id: string; nombre: string; tipo: string } | null;
   cuenta_destino?: { id: string; nombre: string } | null;
   tarjetas?: { id: string; nombre: string } | null;
-  gastos_compartidos_participantes?: { id: string; estado: string; monto: number }[] | null;
+  gastos_compartidos_participantes?: { id: string; estado: string; monto: number; persona_id: string | null }[] | null;
   prestamos?: { id: string; tipo: string; institucion_nombre: string | null; persona_id: string | null; personas?: { nombre: string } | null } | null;
 };
 
@@ -421,16 +421,34 @@ function CompartidoPanel({
 }
 
 // Genera lista de los últimos 12 meses para el filtro
-function getMeses() {
+// Meses disponibles: incluye FUTUROS (para ver cuotas ya materializadas) y pasados.
+const MESES_FUTUROS = 12;
+const MESES_PASADOS = 12;
+
+function mesValue(d: Date) {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+}
+
+function labelMes(value: string) {
+  return new Date(`${value}-01T12:00:00`).toLocaleDateString("es-AR", { month: "long", year: "numeric" });
+}
+
+// `seleccionado` se inyecta si cae fuera de la ventana (p. ej. al navegar con las flechas).
+function getMeses(seleccionado?: string) {
   const meses: { value: string; label: string }[] = [
     { value: "todos", label: "Todos los movimientos" },
   ];
   const now = new Date();
-  for (let i = 0; i < 12; i++) {
-    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-    const value = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
-    const label = d.toLocaleDateString("es-AR", { month: "long", year: "numeric" });
-    meses.push({ value, label });
+  // De los futuros (más lejano primero) hasta los pasados, en orden descendente.
+  for (let i = MESES_FUTUROS; i > -MESES_PASADOS; i--) {
+    const d = new Date(now.getFullYear(), now.getMonth() + i, 1);
+    meses.push({ value: mesValue(d), label: labelMes(mesValue(d)) });
+  }
+  if (seleccionado && seleccionado !== "todos" && !meses.some((m) => m.value === seleccionado)) {
+    // Insertar respetando el orden descendente por valor.
+    const item = { value: seleccionado, label: labelMes(seleccionado) };
+    const idx = meses.findIndex((m, i) => i > 0 && m.value < seleccionado);
+    if (idx === -1) meses.push(item); else meses.splice(idx, 0, item);
   }
   return meses;
 }
@@ -457,7 +475,7 @@ export function MovimientosClient({ movimientos, total, totales = {}, pagina = 0
   const filtroCategoria = categoriaInicial;
   const filtroCompartido = compartidoInicial ?? false;
 
-  const meses = getMeses();
+  const meses = getMeses(mesActual);
   const catsPadre = categorias.filter((c) => !c.parent_id);
 
   // El servidor ya aplica todos los filtros (mes, búsqueda, tipo, método, cuenta,
@@ -535,6 +553,13 @@ export function MovimientosClient({ movimientos, total, totales = {}, pagina = 0
     if (mes) setParam({ mes });
   }
 
+  // Avanza/retrocede un mes con las flechas (desde "todos" arranca en el mes actual).
+  function stepMes(delta: number) {
+    const base = filtroMes === "todos" ? new Date() : new Date(`${filtroMes}-01T12:00:00`);
+    const d = new Date(base.getFullYear(), base.getMonth() + delta, 1);
+    setParam({ mes: mesValue(d) });
+  }
+
   // ── Render ─────────────────────────────────────────────────────────────────
 
   return (
@@ -578,13 +603,27 @@ export function MovimientosClient({ movimientos, total, totales = {}, pagina = 0
           />
         </div>
 
-        {/* Mes */}
-        <NamedSelect
-          options={meses}
-          value={filtroMes}
-          onValueChange={(v) => v && handleMesChange(v)}
-          className={cn("h-8 text-sm", filtroMes === "todos" ? "w-52" : "w-40")}
-        />
+        {/* Mes con flechas ‹ › (permite ver meses futuros: cuotas ya cargadas) */}
+        <div className="flex items-center gap-1">
+          <Button
+            type="button" variant="outline" size="icon" className="h-8 w-8 shrink-0"
+            onClick={() => stepMes(-1)} title="Mes anterior"
+          >
+            <ChevronLeft className="h-4 w-4" />
+          </Button>
+          <NamedSelect
+            options={meses}
+            value={filtroMes}
+            onValueChange={(v) => v && handleMesChange(v)}
+            className={cn("h-8 text-sm", filtroMes === "todos" ? "w-52" : "w-40")}
+          />
+          <Button
+            type="button" variant="outline" size="icon" className="h-8 w-8 shrink-0"
+            onClick={() => stepMes(1)} title="Mes siguiente"
+          >
+            <ChevronRight className="h-4 w-4" />
+          </Button>
+        </div>
 
         {/* Tipo — muestra "Tipo" (muted) cuando no hay filtro */}
         <NamedSelect
@@ -679,8 +718,10 @@ export function MovimientosClient({ movimientos, total, totales = {}, pagina = 0
               </thead>
               <tbody>
                 {filtrados.map((m) => {
-                  const partsTotal = m.gastos_compartidos_participantes?.length ?? 0;
-                  const partsCobrados = m.gastos_compartidos_participantes?.filter((p) => p.estado === "cobrado").length ?? 0;
+                  // Solo participantes cobrables (excluye la fila propia "Vos" con persona_id null).
+                  const cobrables = m.gastos_compartidos_participantes?.filter((p) => p.persona_id !== null) ?? [];
+                  const partsTotal = cobrables.length;
+                  const partsCobrados = cobrables.filter((p) => p.estado === "cobrado").length;
                   const isExpanded = expandedId === m.id;
                   return (
                     <Fragment key={m.id}>
@@ -707,8 +748,8 @@ export function MovimientosClient({ movimientos, total, totales = {}, pagina = 0
                               <span>Compartido · {partsCobrados}/{partsTotal} cobrado</span>
                             </div>
                             {(() => {
-                              const totalMonto = m.gastos_compartidos_participantes?.reduce((acc, p) => acc + p.monto, 0) ?? 0;
-                              const cobradoMonto = m.gastos_compartidos_participantes?.filter(p => p.estado === "cobrado").reduce((acc, p) => acc + p.monto, 0) ?? 0;
+                              const totalMonto = cobrables.reduce((acc, p) => acc + p.monto, 0);
+                              const cobradoMonto = cobrables.filter(p => p.estado === "cobrado").reduce((acc, p) => acc + p.monto, 0);
                               const pct = totalMonto > 0 ? Math.min(100, Math.round((cobradoMonto / totalMonto) * 100)) : 0;
                               if (totalMonto === 0) return null;
                               return (
@@ -804,8 +845,10 @@ export function MovimientosClient({ movimientos, total, totales = {}, pagina = 0
           {/* Mobile: cards */}
           <div className="md:hidden flex flex-col gap-2">
             {filtrados.map((m) => {
-              const partsTotal = m.gastos_compartidos_participantes?.length ?? 0;
-              const partsCobrados = m.gastos_compartidos_participantes?.filter((p) => p.estado === "cobrado").length ?? 0;
+              // Solo participantes cobrables (excluye la fila propia "Vos" con persona_id null).
+              const cobrables = m.gastos_compartidos_participantes?.filter((p) => p.persona_id !== null) ?? [];
+              const partsTotal = cobrables.length;
+              const partsCobrados = cobrables.filter((p) => p.estado === "cobrado").length;
               const isExpanded = expandedId === m.id;
               return (
                 <div key={m.id} className="border border-border rounded-lg bg-card overflow-hidden">
@@ -849,8 +892,8 @@ export function MovimientosClient({ movimientos, total, totales = {}, pagina = 0
                               <span>Compartido · {partsCobrados}/{partsTotal} cobrado</span>
                             </div>
                             {(() => {
-                              const totalMonto = m.gastos_compartidos_participantes?.reduce((acc, p) => acc + p.monto, 0) ?? 0;
-                              const cobradoMonto = m.gastos_compartidos_participantes?.filter(p => p.estado === "cobrado").reduce((acc, p) => acc + p.monto, 0) ?? 0;
+                              const totalMonto = cobrables.reduce((acc, p) => acc + p.monto, 0);
+                              const cobradoMonto = cobrables.filter(p => p.estado === "cobrado").reduce((acc, p) => acc + p.monto, 0);
                               const pct = totalMonto > 0 ? Math.min(100, Math.round((cobradoMonto / totalMonto) * 100)) : 0;
                               if (totalMonto === 0) return null;
                               return (
