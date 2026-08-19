@@ -167,9 +167,14 @@ export async function updateMovimiento(id: string, input: Partial<MovimientoInpu
 
   if (fetchError || !existing) throw new Error("Movimiento no encontrado");
 
+  // cuotas_primera_fecha es un parámetro de generación de cuotas, NO una columna
+  // de la tabla: si se manda al update, Postgres rechaza toda la operación.
+  const campos = { ...input };
+  delete campos.cuotas_primera_fecha;
+
   const { error } = await supabase
     .from("movimientos")
-    .update(input as Record<string, unknown>)
+    .update(campos as Record<string, unknown>)
     .eq("id", id)
     .eq("user_id", userId);
 
