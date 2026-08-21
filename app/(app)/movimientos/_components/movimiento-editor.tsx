@@ -180,6 +180,9 @@ export function MovimientoEditor({ open, onClose, onSaved, editing, duplicando, 
   // Tipo de cambio tipeado en una compra/venta de USD (ARS por USD).
   const [tcManual, setTcManual] = useState<number | null>(null);
 
+  // Pago de resumen de tarjeta (Transferencia con tarjeta y sin cuenta destino).
+  const [modoPagoTarjeta, setModoPagoTarjeta] = useState(false);
+
   // Cuotas ya en curso (carga inicial): el usuario fija el mes de la próxima cuota.
   const [cuotasEnCurso, setCuotasEnCurso] = useState(false);
   const [cuotasPrimeraMes, setCuotasPrimeraMes] = useState<string>(""); // YYYY-MM
@@ -293,6 +296,11 @@ export function MovimientoEditor({ open, onClose, onSaved, editing, duplicando, 
 
     // Compra/venta USD: el TC tipeado no persiste entre aperturas.
     setTcManual(null);
+
+    // Pago de tarjeta: se detecta al editar (Transferencia + tarjeta, sin destino).
+    setModoPagoTarjeta(
+      !!editing && editing.tipo === "Transferencia" && !!editing.tarjeta_id && !editing.cuenta_destino_id,
+    );
 
     // Cuotas en curso: siempre arranca apagado al abrir el editor.
     setCuotasEnCurso(false);
@@ -408,16 +416,24 @@ export function MovimientoEditor({ open, onClose, onSaved, editing, duplicando, 
 
   // Visibilidad de tarjeta y fecha_vencimiento
   const esDebitoTarjeta = metodo === "Débito";
-  const showTarjeta = metodo === "Crédito" || esDebitoTarjeta || (metodo === "Débito automático" && debita_de === "tarjeta");
+  const showTarjeta = metodo === "Crédito" || esDebitoTarjeta || (metodo === "Débito automático" && debita_de === "tarjeta") || (tipo === "Transferencia" && modoPagoTarjeta);
   const showFechaVto = showTarjeta && !esDebitoTarjeta; // débito no tiene resumen/vencimiento
   const showDebitaDe = metodo === "Débito automático";
+  // Un consumo que va a la tarjeta de CRÉDITO no mueve ninguna cuenta: queda como
+  // deuda de la tarjeta y la plata sale recién al pagar el resumen. Si además
+  // descontara de una cuenta, el pago del resumen la descontaría dos veces.
+  const vaATarjetaCredito =
+    metodo === "Crédito" || (metodo === "Débito automático" && debita_de === "tarjeta");
+  const showCuenta = tipo === "Transferencia" || !vaATarjetaCredito;
   // Filtrar tarjetas por tipo según el método (débito muestra tarjetas de débito; crédito, de crédito).
   const tarjetasFiltradas = tarjetas.filter((t) =>
     esDebitoTarjeta ? t.tipo === "Débito" : t.tipo === "Crédito"
   );
   const showNecesidad = tipo === "Egreso";
   const showCuotasChip = clasificacion === "Cuotas";
-  const showCuentaDestino = tipo === "Transferencia";
+  const esPagoTarjeta = tipo === "Transferencia" && modoPagoTarjeta;
+  // En un pago de resumen el destino es la tarjeta, no otra cuenta.
+  const showCuentaDestino = tipo === "Transferencia" && !esPagoTarjeta;
 
   // Transferencia cross-moneda (compra/venta de USD): las cuentas tienen distinta moneda.
   const cuentaIdSel        = watch("cuenta_id");
@@ -645,7 +661,7 @@ export function MovimientoEditor({ open, onClose, onSaved, editing, duplicando, 
         categoria_id:      subcatId ?? padreId ?? null,
         necesidad:         showNecesidad ? (values.necesidad ?? null) : null,
         metodo:            values.metodo ?? null,
-        cuenta_id:         values.cuenta_id ?? null,
+        cuenta_id:         showCuenta ? (values.cuenta_id ?? null) : null,
         tarjeta_id:        showTarjeta ? (values.tarjeta_id ?? null) : null,
         fecha_vencimiento: showFechaVto ? (values.fecha_vencimiento || null) : null,
         debita_de:         showDebitaDe ? (values.debita_de ?? null) : null,
@@ -1147,6 +1163,30 @@ export function MovimientoEditor({ open, onClose, onSaved, editing, duplicando, 
               </div>
             )}
 
+            {/* PAGO DE RESUMEN DE TARJETA (Transferencia hacia la tarjeta) */}
+            {tipo === "Transferencia" && tarjetas.some((t) => t.tipo === "Crédito") && (
+              <div className="space-y-1.5">
+                <Label>Pago de tarjeta</Label>
+                <Button
+                  type="button" variant="outline" size="sm"
+                  className={cn(modoPagoTarjeta && "border-navy text-navy bg-navy/5")}
+                  onClick={() => setModoPagoTarjeta((v) => !v)}
+                >
+                  {modoPagoTarjeta ? "Es un pago de resumen" : "Marcar como pago de resumen"}
+                </Button>
+                <p className="text-xs text-muted-foreground">
+                  {modoPagoTarjeta
+                    ? "Elegí la tarjeta y la cuenta desde la que pagás. No cuenta como gasto nuevo: los consumos ya están registrados."
+                    : "Para registrar el pago del resumen de una tarjeta de crédito."}
+                </p>
+                {modoPagoTarjeta && (
+                  <p className="text-xs text-muted-foreground">
+                    Para que traiga el total del resumen, usá el botón <strong>Pagar resumen</strong> en el detalle de la tarjeta.
+                  </p>
+                )}
+              </div>
+            )}
+
             {/* COMPRAR / VENDER USD (atajo que arma la transferencia cross-moneda) */}
             {tipo === "Transferencia" && (hayCuentaARS && hayCuentaUSD) && (
               <div className="space-y-1.5">
@@ -1173,8 +1213,13 @@ export function MovimientoEditor({ open, onClose, onSaved, editing, duplicando, 
               </div>
             )}
 
-            {/* CUENTA */}
-            <div className="grid grid-cols-2 gap-3">
+            {/* CUENTA — se oculta si el consumo va a la tarjeta de crédito */}
+            {!showCuenta && (
+              <p className="text-xs text-muted-foreground rounded-lg border border-dashed border-border px-3 py-2">
+                Este consumo queda en la tarjeta. La plata sale de tu cuenta cuando pagués el resumen.
+              </p>
+            )}
+            <div className={cn("grid grid-cols-2 gap-3", !showCuenta && "hidden")}>
               <div className="space-y-1.5">
                 <Label>{tipo === "Transferencia" ? "Cuenta origen" : "Cuenta"}</Label>
                 <Controller

@@ -5,6 +5,8 @@ import { ChevronLeft } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { calcularConsumoTarjeta, getPeriodoCierre, getProximoVencimiento, getCicloDelProximoVencimiento } from "@/lib/domain/calcularConsumoTarjeta";
 import { GraficoTarjeta } from "./_components/grafico-tarjeta";
+import { PagarResumen } from "./_components/pagar-resumen";
+import { getResumenTarjeta } from "@/lib/supabase/actions/pagos-tarjeta";
 
 function fmt(n: number, moneda = "ARS") {
   return new Intl.NumberFormat("es-AR", {
@@ -89,6 +91,13 @@ export default async function TarjetaDetallePage({ params }: Props) {
     .gte("fecha", desde)
     .lte("fecha", hasta);
 
+  // Cuentas + resumen del ciclo, para el pago del resumen.
+  const [{ data: cuentas }, resumen] = await Promise.all([
+    supabase.from("cuentas").select("id, nombre, moneda")
+      .eq("user_id", user.id).eq("archivada", false).order("orden"),
+    getResumenTarjeta(id),
+  ]);
+
   const consumoTotal = calcularConsumoTarjeta(id, (movPeriodo ?? []).map(m => ({
     monto: m.monto, tarjeta_id: id, fecha: m.fecha,
   })), inicio, fin);
@@ -110,6 +119,19 @@ export default async function TarjetaDetallePage({ params }: Props) {
           {tarjeta.ultimos_cuatro && <span className="text-xs text-muted-foreground">···· {tarjeta.ultimos_cuatro}</span>}
         </div>
       </div>
+
+      {/* Pago del resumen (sólo tarjetas de crédito) */}
+      {tarjeta.tipo !== "Débito" && resumen && (cuentas ?? []).length > 0 && (
+        <div className="flex justify-end">
+          <PagarResumen
+            tarjetaId={id}
+            tarjetaNombre={tarjeta.nombre}
+            cuentas={cuentas ?? []}
+            cuentaPagoDefault={tarjeta.cuenta_pago_default ?? null}
+            resumen={resumen}
+          />
+        </div>
+      )}
 
       {/* KPIs */}
       <div className="grid grid-cols-2 gap-3">
