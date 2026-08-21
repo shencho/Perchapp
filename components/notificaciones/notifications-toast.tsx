@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { use, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import type { Notificacion } from "@/types/supabase";
@@ -13,10 +13,11 @@ const STORAGE_KEY = "perchapp:notif-toasted";
  * no se repite en cada navegación server-side.
  */
 export function NotificationsToast({
-  notificaciones,
+  notificacionesPromise,
 }: {
-  notificaciones: Notificacion[];
+  notificacionesPromise: Promise<Notificacion[]>;
 }) {
+  const notificaciones = use(notificacionesPromise);
   const router = useRouter();
   const ranRef = useRef(false);
 

@@ -18,7 +18,7 @@ export function MobileBottomNav({ userEmail, esAdmin = false }: Props) {
   const rightPrimary = allItems.find((i) => i.href === "/balances")!;
 
   return (
-    <nav className="md:hidden fixed bottom-0 left-0 right-0 h-16 border-t border-border bg-background z-30">
+    <nav className="md:hidden fixed bottom-0 left-0 right-0 h-16 border-t border-border bg-background z-30 pb-[env(safe-area-inset-bottom)]">
       <div className="h-full grid grid-cols-5 [&>*]:min-w-0">
         <NavItemComponent item={inicio} variant="bottom" />
         <NavItemComponent item={movimientos} variant="bottom" />
@@ -30,7 +30,7 @@ export function MobileBottomNav({ userEmail, esAdmin = false }: Props) {
 
         <NavigationDrawer
           trigger={
-            <button className="flex flex-col items-center justify-center gap-0.5 h-full w-full text-xs text-muted-foreground hover:text-foreground transition-colors">
+            <button className="flex flex-col items-center justify-center gap-0.5 h-full w-full text-xs text-muted-foreground hover:text-foreground rounded-lg mx-0.5 transition-[transform,background-color,color] duration-100 active:scale-[0.96] active:bg-primary/10">
               <MoreHorizontal className="h-5 w-5 shrink-0" />
               <span className="truncate max-w-[68px] leading-none">Más</span>
             </button>

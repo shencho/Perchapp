@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { use, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Bell, Check, X } from "lucide-react";
 import {
@@ -19,11 +19,13 @@ import { responderInvitacion } from "@/lib/supabase/actions/conexiones";
 import type { Notificacion } from "@/types/supabase";
 
 interface Props {
-  notificaciones: Notificacion[];
+  /** Promesa creada en el layout: no bloquea el shell, se resuelve acá. */
+  notificacionesPromise: Promise<Notificacion[]>;
   className?: string;
 }
 
-export function NotificationsBell({ notificaciones, className }: Props) {
+export function NotificationsBell({ notificacionesPromise, className }: Props) {
+  const notificaciones = use(notificacionesPromise);
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
