@@ -163,7 +163,7 @@ function BugRow({ bug, onChanged }: { bug: BugReport; onChanged: () => void }) {
   }
 
   return (
-    <div className="border border-border rounded-lg bg-card overflow-hidden">
+    <div className="mango-card overflow-hidden">
       <button onClick={() => setOpen((o) => !o)} className="w-full flex items-center justify-between gap-3 px-4 py-3 text-left">
         <div className="flex items-center gap-2 min-w-0">
           <span className={cn("inline-flex items-center px-2 py-0.5 rounded-full text-[11px] border shrink-0", est.cls)}>{est.label}</span>

@@ -258,7 +258,7 @@ export function BalancesClient({ balances, cuentas, nombreUsuario: _nombreUsuari
         {/* KPIs */}
         <div className="flex flex-wrap gap-3">
           {totalTeDebenARS > 0 && (
-            <div className="rounded-lg border border-border bg-card px-4 py-3">
+            <div className="mango-card px-4 py-3">
               <p className="text-xs text-muted-foreground">Te deben ARS</p>
               <p className="text-xl font-bold text-success mt-0.5 tabular-nums font-mono">
                 {fmt(totalTeDebenARS)}
@@ -266,7 +266,7 @@ export function BalancesClient({ balances, cuentas, nombreUsuario: _nombreUsuari
             </div>
           )}
           {totalTeDebenUSD > 0 && (
-            <div className="rounded-lg border border-border bg-card px-4 py-3">
+            <div className="mango-card px-4 py-3">
               <p className="text-xs text-muted-foreground">Te deben USD</p>
               <p className="text-xl font-bold text-success mt-0.5 tabular-nums font-mono">
                 {fmt(totalTeDebenUSD, "USD")}
@@ -305,7 +305,7 @@ export function BalancesClient({ balances, cuentas, nombreUsuario: _nombreUsuari
             return (
               <div
                 key={persona.personaId}
-                className="border border-border rounded-lg bg-card overflow-hidden"
+                className="mango-card overflow-hidden"
               >
                 {/* Row principal */}
                 <div className="p-3 sm:p-4">

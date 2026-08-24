@@ -46,7 +46,7 @@ function CustomTooltip({ active, payload, label, moneda }: {
 }) {
   if (!active || !payload?.length) return null;
   return (
-    <div className="rounded-lg border border-border bg-card px-3 py-2 shadow-lg text-sm">
+    <div className="mango-card px-3 py-2 shadow-lg text-sm">
       <p className="font-medium mb-1">{label}</p>
       {payload.map(p => (
         <p key={p.name} style={{ color: p.color }} className="tabular-nums font-mono">
@@ -86,7 +86,7 @@ export function CashFlowClient({ saldoInicial, promedios, futurosPorMes = {}, mo
   return (
     <div className="space-y-6">
       {/* KPI header */}
-      <div className="rounded-xl border border-border bg-card p-4">
+      <div className="mango-card p-4">
         <p className="text-xs text-muted-foreground mb-1">
           Saldo proyectado en {periodoMeses} {periodoMeses === 1 ? "mes" : "meses"}
         </p>
@@ -130,7 +130,7 @@ export function CashFlowClient({ saldoInicial, promedios, futurosPorMes = {}, mo
       </div>
 
       {/* Gráfico */}
-      <div className="rounded-xl border border-border bg-card p-4">
+      <div className="mango-card p-4">
         <p className="text-xs font-medium text-muted-foreground mb-3">Saldo proyectado</p>
         <ResponsiveContainer width="100%" height={220}>
           <LineChart data={proyeccion} margin={{ top: 4, right: 4, bottom: 0, left: 0 }}>
@@ -159,7 +159,7 @@ export function CashFlowClient({ saldoInicial, promedios, futurosPorMes = {}, mo
       </div>
 
       {/* Tabla */}
-      <div className="rounded-xl border border-border bg-card overflow-hidden">
+      <div className="mango-card overflow-hidden">
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-border bg-surface/40">

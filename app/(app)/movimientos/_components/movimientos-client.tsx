@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useTransition, Fragment } from "react";
 import { useRouter } from "next/navigation";
-import { Plus, Pencil, Copy, Trash2, Search, ChevronDown, ChevronLeft, ChevronRight, Users, Landmark, ArrowRight } from "lucide-react";
+import { Plus, Pencil, Copy, Trash2, Search, ChevronDown, ChevronLeft, ChevronRight, RefreshCw, Users, Landmark, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
@@ -565,25 +565,37 @@ export function MovimientosClient({ movimientos, total, totales = {}, pagina = 0
   return (
     <div className="flex flex-col gap-4">
 
-      {/* Header */}
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <div>
+      {/* Header — min-w-0 en ambos lados: sin eso el botón de pendientes (texto
+          largo, sin envolver) estiraba la fila y habilitaba scroll horizontal. */}
+      <div className="flex flex-wrap items-center justify-between gap-2 min-w-0">
+        <div className="min-w-0">
           <h1 className="text-xl font-semibold">Movimientos</h1>
           <p className="text-xs text-muted-foreground mt-0.5">{total} registros</p>
         </div>
-        <div className="flex items-center gap-2">
-          {plantillasPendientes.length > 0 && (
-            <Button variant="outline" size="sm" onClick={() => setGenerarOpen(true)} className="gap-1.5">
-              {(() => {
-                const e = plantillasPendientes.filter(p => p.plantilla.tipo !== "Ingreso").length;
-                const i = plantillasPendientes.filter(p => p.plantilla.tipo === "Ingreso").length;
-                if (e > 0 && i > 0) return `Generar pendientes (${e} egresos + ${i} ingresos)`;
-                if (i > 0) return `Generar pendientes (${i} ingreso${i !== 1 ? "s" : ""})`;
-                return `Generar pendientes (${e} egreso${e !== 1 ? "s" : ""})`;
-              })()}
-            </Button>
-          )}
-          <Button onClick={handleNuevo} size="sm" className="gap-1.5">
+        <div className="flex items-center gap-2 min-w-0 flex-wrap">
+          {plantillasPendientes.length > 0 && (() => {
+            const e = plantillasPendientes.filter(p => p.plantilla.tipo !== "Ingreso").length;
+            const i = plantillasPendientes.filter(p => p.plantilla.tipo === "Ingreso").length;
+            const largo = e > 0 && i > 0
+              ? `Generar pendientes (${e} egresos + ${i} ingresos)`
+              : i > 0
+                ? `Generar pendientes (${i} ingreso${i !== 1 ? "s" : ""})`
+                : `Generar pendientes (${e} egreso${e !== 1 ? "s" : ""})`;
+            return (
+              <Button
+                variant="outline" size="sm"
+                onClick={() => setGenerarOpen(true)}
+                title={largo}
+                className="gap-1.5 min-w-0 max-w-full border-[var(--alert-border)] bg-[var(--alert-bg)] text-foreground hover:bg-[var(--alert-bg)]/70"
+              >
+                <RefreshCw className="h-3.5 w-3.5 shrink-0 text-warning" />
+                {/* En mobile solo el conteo; el texto completo va en desktop. */}
+                <span className="hidden sm:inline truncate">{largo}</span>
+                <span className="sm:hidden">Pendientes ({e + i})</span>
+              </Button>
+            );
+          })()}
+          <Button onClick={handleNuevo} size="sm" className="gap-1.5 shrink-0">
             <Plus className="h-4 w-4" />
             Nuevo
           </Button>
@@ -591,7 +603,7 @@ export function MovimientosClient({ movimientos, total, totales = {}, pagina = 0
       </div>
 
       {/* Filtros */}
-      <div className="flex flex-wrap gap-2">
+      <div className="flex flex-wrap gap-2 min-w-0">
         {/* Búsqueda */}
         <div className="relative">
           <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
@@ -851,7 +863,7 @@ export function MovimientosClient({ movimientos, total, totales = {}, pagina = 0
               const partsCobrados = cobrables.filter((p) => p.estado === "cobrado").length;
               const isExpanded = expandedId === m.id;
               return (
-                <div key={m.id} className="border border-border rounded-lg bg-card overflow-hidden">
+                <div key={m.id} className="mango-card overflow-hidden">
                   <div className="p-3">
                     <div className="flex items-start justify-between gap-2">
                       <div className="flex-1 min-w-0">
