@@ -1,24 +1,19 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useMemo, useState } from "react";
+import Link from "next/link";
+import { ArrowLeft } from "lucide-react";
 import {
-  LineChart, Line, XAxis, YAxis, CartesianGrid,
-  Tooltip, ResponsiveContainer, ReferenceLine,
+  ComposedChart, Bar, Line, XAxis, YAxis, CartesianGrid, Tooltip, ReferenceLine, ResponsiveContainer,
 } from "recharts";
 import { cn } from "@/lib/utils";
-
-interface Promedios {
-  ingCorriente: number;
-  egCorriente: number;
-  ingNoCorriente: number;
-  egNoCorriente: number;
-}
+import { proyectar, baseRecurrente, type MesResumen } from "@/lib/domain/cashflow";
 
 interface Props {
-  saldoInicial: number;
-  promedios: Promedios;
-  futurosPorMes?: Record<string, { ing: number; eg: number }>;
-  moneda: "ARS" | "USD";
+  mesActual: string;
+  monedas: string[];
+  saldoInicial: Record<string, number>;
+  porMoneda: Record<string, MesResumen[]>;
 }
 
 function fmt(n: number, moneda = "ARS") {
@@ -28,175 +23,206 @@ function fmt(n: number, moneda = "ARS") {
   }).format(n);
 }
 
-function fmtShort(n: number): string {
-  if (Math.abs(n) >= 1_000_000) return `$${(n / 1_000_000).toFixed(1)}M`;
-  if (Math.abs(n) >= 1_000) return `$${(n / 1_000).toFixed(0)}K`;
-  return `$${Math.round(n)}`;
+function fmtShort(n: number, moneda = "ARS") {
+  const sig = moneda === "USD" ? "US$" : "$";
+  if (Math.abs(n) >= 1_000_000) return `${sig}${(n / 1_000_000).toFixed(1)}M`;
+  if (Math.abs(n) >= 1_000) return `${sig}${Math.round(n / 1_000)}K`;
+  return `${sig}${Math.round(n)}`;
 }
 
-function labelMes(date: Date) {
-  return date.toLocaleDateString("es-AR", { month: "short", year: "2-digit" });
+function labelMes(mes: string) {
+  return new Date(`${mes}-01T12:00:00`)
+    .toLocaleDateString("es-AR", { month: "short", year: "2-digit" })
+    .replace(".", "");
 }
 
-function CustomTooltip({ active, payload, label, moneda }: {
-  active?: boolean;
-  payload?: { name: string; value: number; color: string }[];
-  label?: string;
-  moneda: string;
-}) {
-  if (!active || !payload?.length) return null;
-  return (
-    <div className="mango-card px-3 py-2 shadow-lg text-sm">
-      <p className="font-medium mb-1">{label}</p>
-      {payload.map(p => (
-        <p key={p.name} style={{ color: p.color }} className="tabular-nums font-mono">
-          {p.name}: {fmt(p.value, moneda)}
-        </p>
-      ))}
-    </div>
+const HORIZONTES = [3, 6, 12];
+
+export function CashFlowClient({ mesActual, monedas, saldoInicial, porMoneda }: Props) {
+  const [moneda, setMoneda] = useState(monedas[0] ?? "ARS");
+  const [horizonte, setHorizonte] = useState(6);
+  const [incluirCompromisos, setIncluirCompromisos] = useState(true);
+
+  const filas = useMemo(() => porMoneda[moneda] ?? [], [porMoneda, moneda]);
+  const base = useMemo(() => baseRecurrente(filas, mesActual), [filas, mesActual]);
+
+  const proyectadas = useMemo(
+    () => proyectar(filas, { mesActual, saldoInicial: saldoInicial[moneda] ?? 0, incluirCompromisos }),
+    [filas, mesActual, saldoInicial, moneda, incluirCompromisos],
   );
-}
 
-export function CashFlowClient({ saldoInicial, promedios, futurosPorMes = {}, moneda }: Props) {
-  const [periodoMeses, setPeriodoMeses] = useState<1 | 3 | 6 | 12>(3);
-  const [incluirFuturos, setIncluirFuturos] = useState(true);
+  // Ventana visible: los 6 meses cerrados previos + el horizonte elegido.
+  const visibles = useMemo(() => {
+    const iActual = proyectadas.findIndex((f) => f.mes === mesActual);
+    const desde = Math.max(0, iActual - 6);
+    return proyectadas.slice(desde, iActual + horizonte + 1);
+  }, [proyectadas, mesActual, horizonte]);
 
-  const proyeccion = useMemo(() => {
-    const now = new Date();
-    const base = Array.from({ length: periodoMeses }, (_, i) => {
-      const fecha = new Date(now.getFullYear(), now.getMonth() + i + 1, 1);
-      const key = `${fecha.getFullYear()}-${String(fecha.getMonth() + 1).padStart(2, "0")}`;
-      const fut = incluirFuturos ? (futurosPorMes[key] ?? { ing: 0, eg: 0 }) : { ing: 0, eg: 0 };
-      const ing = promedios.ingCorriente + fut.ing;
-      const eg = promedios.egCorriente + fut.eg;
-      return { label: labelMes(fecha), ingresos: ing, egresos: eg, neto: ing - eg };
-    });
-    // saldo acumulado (prefix sum, sin mutación de variables del render)
-    return base.map((row, i) => ({
-      ...row,
-      saldo: saldoInicial + base.slice(0, i + 1).reduce((acc, r) => acc + r.neto, 0),
-    }));
-  }, [saldoInicial, periodoMeses, incluirFuturos, promedios, futurosPorMes]);
+  const data = visibles.map((f) => ({ ...f, label: labelMes(f.mes) }));
+  const ultima = visibles[visibles.length - 1];
+  const saldoHoy = saldoInicial[moneda] ?? 0;
+  const delta = ultima ? ultima.saldo - saldoHoy : 0;
 
-  const saldoFinal = proyeccion[proyeccion.length - 1]?.saldo ?? saldoInicial;
-  const pillBase = "px-3 py-1 rounded-md text-xs font-medium border transition-colors";
-  const pillActive = "border-primary bg-primary/10 text-primary";
-  const pillInactive = "border-border text-muted-foreground hover:text-foreground hover:bg-surface";
+  const pillBase = "px-2.5 py-1 rounded-[var(--radius-pill)] text-xs font-medium border transition-colors";
+  const pillActive = "bg-navy text-white border-navy";
+  const pillInactive = "border-border text-muted-foreground hover:border-foreground/40";
 
   return (
-    <div className="space-y-6">
-      {/* KPI header */}
-      <div className="mango-card p-4">
-        <p className="text-xs text-muted-foreground mb-1">
-          Saldo proyectado en {periodoMeses} {periodoMeses === 1 ? "mes" : "meses"}
-        </p>
-        <p className={cn(
-          "text-3xl font-bold tabular-nums font-mono",
-          saldoFinal >= 0 ? "text-success" : "text-destructive"
-        )}>
-          {fmt(saldoFinal, moneda)}
-        </p>
-        <p className="text-xs text-muted-foreground mt-1">
-          Saldo actual: {fmt(saldoInicial, moneda)}
-          {" · "}
-          <span className={cn(saldoFinal - saldoInicial >= 0 ? "text-success" : "text-destructive")}>
-            {saldoFinal - saldoInicial >= 0 ? "+" : ""}{fmt(saldoFinal - saldoInicial, moneda)}
-          </span>
-        </p>
+    <div className="flex flex-col gap-6 max-w-4xl">
+      <div className="flex items-center gap-3">
+        <Link href="/dashboard" className="text-muted-foreground hover:text-gold transition-colors">
+          <ArrowLeft className="h-5 w-5" />
+        </Link>
+        <div>
+          <h1 className="text-2xl font-semibold">Cash flow</h1>
+          <p className="text-sm text-muted-foreground mt-0.5">
+            Histórico real y proyección de cuentas líquidas.
+          </p>
+        </div>
       </div>
 
-      {/* Filtros */}
-      <div className="flex flex-wrap items-center gap-3">
-        <div className="flex items-center gap-1">
-          {([1, 3, 6, 12] as const).map(p => (
-            <button
-              key={p}
-              onClick={() => setPeriodoMeses(p)}
-              className={cn(pillBase, periodoMeses === p ? pillActive : pillInactive)}
-            >
-              {p}m
+      {/* Moneda */}
+      <div className="flex gap-1.5">
+        {monedas.map((mo) => (
+          <button key={mo} type="button" onClick={() => setMoneda(mo)}
+            className={cn(pillBase, moneda === mo ? pillActive : pillInactive)}>
+            {mo}
+          </button>
+        ))}
+      </div>
+
+      {/* KPI */}
+      <div className="mango-card p-[22px]">
+        <p className="text-xs text-muted-foreground">
+          Saldo proyectado en {horizonte} {horizonte === 1 ? "mes" : "meses"}
+        </p>
+        <p className={cn(
+          "text-3xl font-bold tabular-nums font-mono mt-1",
+          (ultima?.saldo ?? 0) >= 0 ? "text-foreground" : "text-danger",
+        )}>
+          {fmt(ultima?.saldo ?? 0, moneda)}
+        </p>
+        <p className="text-xs text-muted-foreground mt-1.5">
+          Hoy {fmt(saldoHoy, moneda)}
+          {" · "}
+          <span className={delta >= 0 ? "text-success" : "text-danger"}>
+            {delta >= 0 ? "+" : ""}{fmt(delta, moneda)}
+          </span>
+        </p>
+        {base.meses > 0 && (
+          <p className="text-xs text-muted-foreground mt-2">
+            Base recurrente ({base.meses} {base.meses === 1 ? "mes" : "meses"}):{" "}
+            <span className="text-success tabular-nums font-mono">{fmt(base.ingresos, moneda)}</span>
+            {" / "}
+            <span className="text-danger tabular-nums font-mono">{fmt(base.egresos, moneda)}</span>
+            {" por mes"}
+          </p>
+        )}
+      </div>
+
+      {/* Controles */}
+      <div className="flex items-center gap-3 flex-wrap">
+        <div className="flex gap-1.5">
+          {HORIZONTES.map((h) => (
+            <button key={h} type="button" onClick={() => setHorizonte(h)}
+              className={cn(pillBase, horizonte === h ? pillActive : pillInactive)}>
+              {h}m
             </button>
           ))}
         </div>
-        <label className="flex items-center gap-2 text-xs text-muted-foreground cursor-pointer select-none">
+        <label className="flex items-center gap-2 text-xs text-muted-foreground cursor-pointer">
           <input
             type="checkbox"
-            checked={incluirFuturos}
-            onChange={e => setIncluirFuturos(e.target.checked)}
-            className="rounded border-border"
+            checked={incluirCompromisos}
+            onChange={(e) => setIncluirCompromisos(e.target.checked)}
           />
-          Incluir cuotas y gastos futuros
+          Incluir cuotas y gastos no corrientes ya cargados
         </label>
       </div>
 
       {/* Gráfico */}
-      <div className="mango-card p-4">
-        <p className="text-xs font-medium text-muted-foreground mb-3">Saldo proyectado</p>
-        <ResponsiveContainer width="100%" height={220}>
-          <LineChart data={proyeccion} margin={{ top: 4, right: 4, bottom: 0, left: 0 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" vertical={false} />
-            <XAxis
-              dataKey="label"
-              tick={{ fill: "#6b7280", fontSize: 11 }}
-              axisLine={false} tickLine={false}
+      <div className="h-72 w-full mango-card p-3">
+        <ResponsiveContainer width="100%" height="100%">
+          <ComposedChart data={data} margin={{ top: 4, right: 4, left: -12, bottom: 0 }}>
+            <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" vertical={false} />
+            <XAxis dataKey="label" tick={{ fontSize: 11 }} tickLine={false} axisLine={false} />
+            <YAxis tickFormatter={(v) => fmtShort(v as number, moneda)} tick={{ fontSize: 11 }} tickLine={false} axisLine={false} width={58} />
+            <Tooltip
+              formatter={(v, name) => [
+                fmt(v as number, moneda),
+                name === "ingresos" ? "Ingresos" : name === "egresos" ? "Egresos" : "Saldo",
+              ]}
+              contentStyle={{
+                borderRadius: 8,
+                border: "1px solid var(--color-border)",
+                background: "var(--color-card)",
+                fontSize: 12,
+              }}
             />
-            <YAxis
-              tickFormatter={fmtShort}
-              tick={{ fill: "#6b7280", fontSize: 11 }}
-              axisLine={false} tickLine={false}
-              width={56}
-            />
-            <Tooltip content={<CustomTooltip moneda={moneda} />} />
-            <ReferenceLine y={0} stroke="#9ca3af" strokeDasharray="4 4" />
-            <Line
-              type="monotone" dataKey="saldo" name="Saldo"
-              stroke="#3b82f6" strokeWidth={2}
-              dot={{ r: 4, fill: "#3b82f6", strokeWidth: 0 }}
-              activeDot={{ r: 6 }}
-            />
-          </LineChart>
+            <ReferenceLine y={0} stroke="var(--color-border)" />
+            <Bar dataKey="ingresos" fill="var(--color-success)" radius={[3, 3, 0, 0]} maxBarSize={18} />
+            <Bar dataKey="egresos" fill="var(--color-danger)" radius={[3, 3, 0, 0]} maxBarSize={18} />
+            <Line type="monotone" dataKey="saldo" stroke="var(--color-navy)" strokeWidth={2} dot={false} />
+          </ComposedChart>
         </ResponsiveContainer>
       </div>
 
-      {/* Tabla */}
-      <div className="mango-card overflow-hidden">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b border-border bg-surface/40">
-              <th className="text-left px-4 py-2.5 text-xs font-medium text-muted-foreground">Mes</th>
-              <th className="text-right px-4 py-2.5 text-xs font-medium text-muted-foreground">Ingresos</th>
-              <th className="text-right px-4 py-2.5 text-xs font-medium text-muted-foreground">Egresos</th>
-              <th className="text-right px-4 py-2.5 text-xs font-medium text-muted-foreground">Neto</th>
-              <th className="text-right px-4 py-2.5 text-xs font-medium text-muted-foreground">Saldo</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-border">
-            {proyeccion.map((row, i) => (
-              <tr key={i} className="hover:bg-surface/30 transition-colors">
-                <td className="px-4 py-2.5 font-medium">{row.label}</td>
-                <td className="px-4 py-2.5 text-right tabular-nums font-mono text-success">{fmt(row.ingresos, moneda)}</td>
-                <td className="px-4 py-2.5 text-right tabular-nums font-mono text-destructive">{fmt(row.egresos, moneda)}</td>
-                <td className={cn(
-                  "px-4 py-2.5 text-right tabular-nums font-mono font-medium",
-                  row.neto >= 0 ? "text-success" : "text-destructive"
-                )}>
-                  {row.neto >= 0 ? "+" : ""}{fmt(row.neto, moneda)}
-                </td>
-                <td className={cn(
-                  "px-4 py-2.5 text-right tabular-nums font-mono font-semibold",
-                  row.saldo >= 0 ? "text-foreground" : "text-destructive"
-                )}>
-                  {fmt(row.saldo, moneda)}
-                </td>
+      {/* Tabla mes a mes */}
+      <div className="space-y-2">
+        <h2 className="text-sm font-medium text-muted-foreground">Mes a mes</h2>
+        <div className="rounded-[var(--radius-card)] border border-border overflow-x-auto">
+          <table className="w-full text-sm min-w-[640px]">
+            <thead>
+              <tr className="border-b border-border bg-surface">
+                <th className="text-left px-3 py-2.5 font-medium text-muted-foreground">Mes</th>
+                <th className="text-right px-3 py-2.5 font-medium text-success">Ing. corr.</th>
+                <th className="text-right px-3 py-2.5 font-medium text-muted-foreground">Ing. no corr.</th>
+                <th className="text-right px-3 py-2.5 font-medium text-danger">Gasto corr.</th>
+                <th className="text-right px-3 py-2.5 font-medium text-muted-foreground">No corr.</th>
+                <th className="text-right px-3 py-2.5 font-medium text-gold">Cuotas</th>
+                <th className="text-right px-3 py-2.5 font-medium text-muted-foreground">Neto</th>
+                <th className="text-right px-3 py-2.5 font-medium text-muted-foreground">Saldo</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {visibles.map((f) => {
+                const esActual = f.mes === mesActual;
+                return (
+                  <tr
+                    key={f.mes}
+                    className={cn(
+                      "border-b border-border last:border-0",
+                      esActual && "bg-surface border-t-2 border-t-navy",
+                      f.esFuturo && "italic text-muted-foreground",
+                    )}
+                  >
+                    <td className={cn("px-3 py-2.5 whitespace-nowrap", esActual && "font-semibold text-navy not-italic")}>
+                      {labelMes(f.mes)}
+                    </td>
+                    <td className="px-3 py-2.5 text-right tabular-nums font-mono">{fmt(f.ingresoCorriente, moneda)}</td>
+                    <td className="px-3 py-2.5 text-right tabular-nums font-mono">{f.ingresoNoCorriente ? fmt(f.ingresoNoCorriente, moneda) : "—"}</td>
+                    <td className="px-3 py-2.5 text-right tabular-nums font-mono">{fmt(f.egresoCorriente, moneda)}</td>
+                    <td className="px-3 py-2.5 text-right tabular-nums font-mono">{f.egresoNoCorriente ? fmt(f.egresoNoCorriente, moneda) : "—"}</td>
+                    <td className={cn("px-3 py-2.5 text-right tabular-nums font-mono", f.egresoCuotas > 0 && "text-gold")}>
+                      {f.egresoCuotas ? fmt(f.egresoCuotas, moneda) : "—"}
+                    </td>
+                    <td className={cn("px-3 py-2.5 text-right tabular-nums font-mono", f.neto >= 0 ? "text-success" : "text-danger")}>
+                      {fmt(f.neto, moneda)}
+                    </td>
+                    <td className={cn("px-3 py-2.5 text-right tabular-nums font-mono", esActual && "font-semibold not-italic")}>
+                      {fmt(f.saldo, moneda)}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+        <p className="text-xs text-muted-foreground">
+          En itálica, meses proyectados: se les aplica la base recurrente y se suman las cuotas y
+          gastos no corrientes ya cargados. La columna Cuotas es parte de los gastos, no se suma aparte.
+        </p>
       </div>
-
-      <p className="text-xs text-muted-foreground text-center">
-        Promedio de los últimos 3 meses + cuotas y gastos futuros ya cargados. Solo {moneda}. Estimado.
-      </p>
     </div>
   );
 }
