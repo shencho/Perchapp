@@ -128,4 +128,9 @@
   html {
     @apply font-sans;
   }
+  /* El resaltado gris del navegador tapa nuestro estado active:. Lo sacamos y
+     el feedback lo da el propio componente (escala + fondo). */
+  a, button, [role="button"] {
+    -webkit-tap-highlight-color: transparent;
+  }
 }

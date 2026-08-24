@@ -1,5 +1,6 @@
 "use client";
 
+import { Suspense } from "react";
 import { MoreHorizontal } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
 import { Button } from "@/components/ui/button";
@@ -14,18 +15,20 @@ import type { Notificacion } from "@/types/supabase";
 interface Props {
   asistenteNombre: string;
   userEmail?: string;
-  notificaciones?: Notificacion[];
+  notificacionesPromise: Promise<Notificacion[]>;
   esAdmin?: boolean;
 }
 
-export function DesktopSidebar({ asistenteNombre, userEmail, notificaciones = [], esAdmin = false }: Props) {
+export function DesktopSidebar({ asistenteNombre, userEmail, notificacionesPromise, esAdmin = false }: Props) {
   const sidebarItems = getNavItems().filter((item) => !item.drawerOnly);
 
   return (
     <aside className="hidden md:flex flex-col w-60 border-r border-border h-screen sticky top-0 bg-card shrink-0">
       <div className="px-4 py-5 flex items-center justify-between">
         <MangoLogo size={28} showWordmark />
-        <NotificationsBell notificaciones={notificaciones} />
+        <Suspense fallback={<div className="h-9 w-9" />}>
+          <NotificationsBell notificacionesPromise={notificacionesPromise} />
+        </Suspense>
       </div>
 
       <div className="px-2 pb-2">
