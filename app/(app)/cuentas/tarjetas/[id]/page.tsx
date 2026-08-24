@@ -89,7 +89,7 @@ export default async function TarjetaDetallePage({ params }: Props) {
   // Movimientos del período actual con esta tarjeta
   const { data: movPeriodo } = await supabase
     .from("movimientos")
-    .select("id, tipo, monto, moneda, concepto, descripcion, fecha, metodo, clasificacion, cuotas, cuota_numero, fecha_vencimiento, categorias ( id, nombre, parent_id )")
+    .select("id, tipo, monto, moneda, concepto, descripcion, fecha, metodo, clasificacion, cuotas, cuota_numero, fecha_compra, fecha_vencimiento, categorias ( id, nombre, parent_id )")
     .eq("user_id", user.id)
     .eq("tarjeta_id", id)
     .gte("fecha", inicio)
@@ -241,6 +241,7 @@ export default async function TarjetaDetallePage({ params }: Props) {
                             </span>
                             <span className="block text-xs text-muted-foreground truncate">
                               {cat?.nombre ?? "Sin categoría"}
+                              {m.fecha_compra ? ` · compra ${fmtFecha(m.fecha_compra)}` : ""}
                             </span>
                           </span>
                         </div>

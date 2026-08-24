@@ -16,7 +16,9 @@ export interface ResumenMoneda {
   total: number;
   /** Parte que ya descontó de una cuenta al comprarse (criterio viejo): no se vuelve a pagar. */
   yaDescontado: number;
-  /** total - yaDescontado */
+  /** Ya pagado en este ciclo (pagos parciales incluidos). */
+  yaPagado: number;
+  /** total - yaDescontado - yaPagado (nunca negativo) */
   aPagar: number;
 }
 
@@ -56,21 +58,33 @@ export async function getResumenTarjeta(tarjetaId: string): Promise<ResumenTarje
 
   const porMoneda: Record<string, ResumenMoneda> = {};
   for (const c of consumos ?? []) {
-    const m = (porMoneda[c.moneda] ??= { total: 0, yaDescontado: 0, aPagar: 0 });
+    const m = (porMoneda[c.moneda] ??= { total: 0, yaDescontado: 0, aPagar: 0, yaPagado: 0 });
     m.total += c.monto;
     // Consumos cargados con cuenta ya salieron del banco al comprarse: si se
     // incluyeran en el pago, esa plata se descontaría dos veces.
     if (c.cuenta_id) m.yaDescontado += c.monto;
   }
-  for (const m of Object.values(porMoneda)) m.aPagar = Math.round((m.total - m.yaDescontado) * 100) / 100;
 
   // Pagos ya hechos para este ciclo (Transferencia con tarjeta y sin destino).
+  // Se acota por el vencimiento del ciclo: sin tope, los pagos de ciclos
+  // siguientes se contaban como si fueran de éste.
+  const topePagos = vencimiento ?? fin;
   const { data: pagos } = await supabase
     .from("movimientos")
     .select("id, monto, moneda, fecha")
     .eq("user_id", user.id).eq("tarjeta_id", tarjetaId).eq("tipo", "Transferencia")
     .is("cuenta_destino_id", null)
-    .gte("fecha", inicio);
+    .gte("fecha", inicio).lte("fecha", topePagos);
+
+  // Lo ya pagado se descuenta del pendiente, POR MONEDA: así el monto que se
+  // propone es lo que realmente falta y los pagos parciales se acumulan bien.
+  for (const p of pagos ?? []) {
+    const m = (porMoneda[p.moneda] ??= { total: 0, yaDescontado: 0, aPagar: 0, yaPagado: 0 });
+    m.yaPagado += p.monto;
+  }
+  for (const m of Object.values(porMoneda)) {
+    m.aPagar = Math.max(0, Math.round((m.total - m.yaDescontado - m.yaPagado) * 100) / 100);
+  }
 
   return { inicio, fin, vencimiento, porMoneda, yaPagado: pagos ?? [] };
 }
