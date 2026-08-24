@@ -1,7 +1,10 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { montoPropio } from "@/lib/domain/_utils/movimiento";
+import { idsAjusteInversion, totalesPorMoneda } from "@/lib/domain/finanzas";
+import { buildJerarquia, agruparPorCategoria } from "@/lib/domain/categorias";
 import { EstadisticasClient } from "./_components/estadisticas-client";
+
+const MONEDAS = ["ARS", "USD"];
 
 interface Props {
   searchParams: Promise<{ mes?: string }>;
@@ -20,10 +23,10 @@ export default async function EstadisticasPage({ searchParams }: Props) {
   const fin = `${anioMes}-${String(new Date(y, m, 0).getDate()).padStart(2, "0")}`;
 
   const [{ data: movRaw }, { data: categoriasRaw }] = await Promise.all([
+    // Sin filtro de moneda: antes se pedía sólo ARS y el USD era invisible.
     supabase.from("movimientos")
-      .select("tipo, monto, moneda, categoria_id, es_compartido, gc_mi_parte")
+      .select("tipo, monto, moneda, categoria_id, es_compartido, gc_mi_parte, es_reembolso")
       .eq("user_id", user.id)
-      .eq("moneda", "ARS")
       .neq("tipo", "Transferencia")
       .gte("fecha", inicio).lte("fecha", fin),
     supabase.from("categorias")
@@ -33,40 +36,28 @@ export default async function EstadisticasPage({ searchParams }: Props) {
 
   const movimientos = movRaw ?? [];
   const categorias = categoriasRaw ?? [];
-  const nombreDe = new Map(categorias.map((c) => [c.id, c.nombre]));
-  // Las subcategorías se agrupan bajo su categoría padre.
-  const padreDe = new Map(categorias.map((c) => [c.id, c.parent_id ?? c.id]));
+  const excluir = idsAjusteInversion(categorias);
+  const jerarquia = buildJerarquia(categorias);
 
-  function agrupar(tipo: "Ingreso" | "Egreso") {
-    const delTipo = movimientos.filter((mv) => mv.tipo === tipo);
-    // Para egresos se usa la parte propia (en gastos compartidos, no el total).
-    const montoDe = (mv: (typeof delTipo)[number]) =>
-      tipo === "Egreso" ? montoPropio(mv) : mv.monto;
+  const totales = totalesPorMoneda(movimientos, { excluirCategorias: excluir, monedas: MONEDAS });
 
-    const porCat: Record<string, number> = {};
-    for (const mv of delTipo) {
-      const padre = mv.categoria_id ? (padreDe.get(mv.categoria_id) ?? mv.categoria_id) : "__sin__";
-      porCat[padre] = (porCat[padre] ?? 0) + montoDe(mv);
-    }
-    const total = delTipo.reduce((acc, mv) => acc + montoDe(mv), 0);
-
-    const categoriasOrdenadas = Object.entries(porCat)
-      .map(([id, monto]) => ({
-        id,
-        nombre: id === "__sin__" ? "Sin categoría" : (nombreDe.get(id) ?? "Sin categoría"),
-        monto,
-        porcentaje: total > 0 ? Math.round((monto / total) * 100) : 0,
-      }))
-      .sort((a, b) => b.monto - a.monto);
-
-    return { total, categorias: categoriasOrdenadas };
-  }
+  // Un desglose por moneda y tipo, con las subcategorías anidadas.
+  const porMoneda = Object.fromEntries(
+    MONEDAS.map((moneda) => {
+      const delMes = movimientos.filter((mv) => mv.moneda === moneda);
+      return [moneda, {
+        ingresos: agruparPorCategoria(delMes, jerarquia, { tipo: "Ingreso", excluirCategorias: excluir }),
+        egresos: agruparPorCategoria(delMes, jerarquia, { tipo: "Egreso", excluirCategorias: excluir }),
+      }];
+    }),
+  );
 
   return (
     <EstadisticasClient
       anioMes={anioMes}
-      ingresos={agrupar("Ingreso")}
-      egresos={agrupar("Egreso")}
+      monedas={MONEDAS}
+      totales={totales}
+      porMoneda={porMoneda}
     />
   );
 }

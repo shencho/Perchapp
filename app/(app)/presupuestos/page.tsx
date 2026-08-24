@@ -1,6 +1,8 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getPresupuestos } from "@/lib/supabase/actions/presupuestos";
+import { buildJerarquia, agruparPorCategoria } from "@/lib/domain/categorias";
+import { idsAjusteInversion } from "@/lib/domain/finanzas";
 import { PresupuestosClient } from "./_components/presupuestos-client";
 
 interface Props {
@@ -23,7 +25,7 @@ export default async function PresupuestosPage({ searchParams }: Props) {
     supabase.from("categorias").select("id, nombre, tipo, parent_id").eq("user_id", user.id).eq("archivada", false).order("nombre"),
     getPresupuestos(anioMes).catch(() => []),
     supabase.from("movimientos")
-      .select("monto, moneda, categoria_id")
+      .select("tipo, monto, moneda, categoria_id, es_compartido, gc_mi_parte, es_reembolso")
       .eq("user_id", user.id).eq("tipo", "Egreso").eq("moneda", "ARS")
       .gte("fecha", inicio).lte("fecha", fin),
   ]);
@@ -32,15 +34,17 @@ export default async function PresupuestosPage({ searchParams }: Props) {
   // Categorías padre de egreso (donde se cargan presupuestos)
   const catsPadre = categorias.filter((c) => !c.parent_id && (c.tipo === "Egreso" || c.tipo === "Ambos"));
   // Mapa categoria_id → categoría padre (para atribuir el gasto)
-  const parentDe = new Map<string, string>();
-  for (const c of categorias) parentDe.set(c.id, c.parent_id ?? c.id);
 
-  // Gastado del mes por categoría padre (ARS)
-  const gastadoPorCat: Record<string, number> = {};
-  for (const mv of (movRaw ?? []) as { monto: number; categoria_id: string | null }[]) {
-    const padre = mv.categoria_id ? (parentDe.get(mv.categoria_id) ?? mv.categoria_id) : "__sin__";
-    gastadoPorCat[padre] = (gastadoPorCat[padre] ?? 0) + mv.monto;
-  }
+  // Gastado del mes por categoría padre (ARS), con el criterio único: en un
+  // gasto compartido cuenta sólo tu parte. Antes sumaba el monto total, así
+  // que el presupuesto se "consumía" con plata que no era tuya.
+  const resumenGasto = agruparPorCategoria(movRaw ?? [], buildJerarquia(categorias), {
+    tipo: "Egreso",
+    excluirCategorias: idsAjusteInversion(categorias),
+  });
+  const gastadoPorCat: Record<string, number> = Object.fromEntries(
+    resumenGasto.filas.map((f) => [f.id, f.monto]),
+  );
 
   const presupuestoPorCat: Record<string, number> = {};
   for (const p of presupuestos) presupuestoPorCat[p.categoria_id] = p.monto;
