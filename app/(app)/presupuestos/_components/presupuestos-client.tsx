@@ -90,11 +90,11 @@ export function PresupuestosClient({ anioMes, categorias, presupuestoPorCat, gas
 
       {/* Resumen */}
       <div className="flex flex-wrap gap-3">
-        <div className="mango-card px-4 py-3">
+        <div className="rounded-lg border border-border bg-card px-4 py-3">
           <p className="text-xs text-muted-foreground">Presupuesto total</p>
           <p className="text-lg font-bold tabular-nums font-mono mt-0.5">{fmt(totalPresu)}</p>
         </div>
-        <div className="mango-card px-4 py-3">
+        <div className="rounded-lg border border-border bg-card px-4 py-3">
           <p className="text-xs text-muted-foreground">Gastado</p>
           <p className={cn("text-lg font-bold tabular-nums font-mono mt-0.5", totalGastado > totalPresu && totalPresu > 0 ? "text-danger" : "text-foreground")}>{fmt(totalGastado)}</p>
         </div>

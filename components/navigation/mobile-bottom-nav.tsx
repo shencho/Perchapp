@@ -18,7 +18,7 @@ export function MobileBottomNav({ userEmail, esAdmin = false }: Props) {
   const rightPrimary = allItems.find((i) => i.href === "/balances")!;
 
   return (
-    <nav className="md:hidden fixed bottom-0 left-0 right-0 h-16 border-t border-[#eee4d0] bg-background z-30 pb-[env(safe-area-inset-bottom)]">
+    <nav className="md:hidden fixed bottom-0 left-0 right-0 h-16 border-t border-border bg-background z-30 pb-[env(safe-area-inset-bottom)]">
       <div className="h-full grid grid-cols-5 [&>*]:min-w-0">
         <NavItemComponent item={inicio} variant="bottom" />
         <NavItemComponent item={movimientos} variant="bottom" />

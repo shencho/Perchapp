@@ -66,7 +66,7 @@ export function EstadisticasClient({ anioMes, ingresos, egresos }: Props) {
       </div>
 
       {/* Barra de mes con flechas */}
-      <div className="flex items-center justify-between gap-2 mango-card px-2 py-2">
+      <div className="flex items-center justify-between gap-2 rounded-lg border border-border bg-card px-2 py-2">
         <Button variant="ghost" size="icon" className="h-9 w-9" onClick={() => stepMes(-1)} title="Mes anterior">
           <ChevronLeft className="h-5 w-5" />
         </Button>

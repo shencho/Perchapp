@@ -9,7 +9,6 @@ import { NavigationDrawer } from "@/components/navigation/navigation-drawer";
 import { MangoAIButton } from "@/components/navigation/mango-ai-button";
 import { MangoLogo } from "@/components/ui/mango-logo";
 import { NotificationsBell } from "@/components/notificaciones/notifications-bell";
-import { UserSection } from "@/components/navigation/user-section";
 import { getNavItems } from "@/lib/navigation/get-nav-items";
 import type { Notificacion } from "@/types/supabase";
 
@@ -24,9 +23,9 @@ export function DesktopSidebar({ asistenteNombre, userEmail, notificacionesPromi
   const sidebarItems = getNavItems().filter((item) => !item.drawerOnly);
 
   return (
-    <aside className="hidden md:flex flex-col w-[250px] border-r border-border h-screen sticky top-0 bg-sidebar shrink-0">
+    <aside className="hidden md:flex flex-col w-60 border-r border-border h-screen sticky top-0 bg-card shrink-0">
       <div className="px-4 py-5 flex items-center justify-between">
-        <MangoLogo size={30} showWordmark />
+        <MangoLogo size={28} showWordmark />
         <Suspense fallback={<div className="h-9 w-9" />}>
           <NotificationsBell notificacionesPromise={notificacionesPromise} />
         </Suspense>
@@ -46,7 +45,7 @@ export function DesktopSidebar({ asistenteNombre, userEmail, notificacionesPromi
 
       <Separator />
 
-      <div className="px-2 pt-2">
+      <div className="p-2">
         <NavigationDrawer
           trigger={
             <Button variant="ghost" size="sm" className="w-full gap-2 justify-start">
@@ -58,8 +57,6 @@ export function DesktopSidebar({ asistenteNombre, userEmail, notificacionesPromi
           esAdmin={esAdmin}
         />
       </div>
-
-      <UserSection userEmail={userEmail} />
     </aside>
   );
 }

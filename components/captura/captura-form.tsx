@@ -193,7 +193,7 @@ export function CapturaForm({
   return (
     <>
       {/* Frases sugeridas */}
-      <div className="flex flex-wrap gap-2 mb-5 w-full">
+      <div className="flex flex-wrap gap-2 justify-center mb-6 w-full">
         {FRASES_SUGERIDAS_INICIALES.map((frase) => (
           <button
             key={frase}
@@ -202,7 +202,7 @@ export function CapturaForm({
               setTexto(frase);
               textareaRef.current?.focus();
             }}
-            className="text-xs px-3 py-1.5 rounded-[var(--radius-pill)] bg-surface-2 text-muted-foreground transition-[transform,color,background-color] duration-150 hover:text-foreground hover:bg-border/60 active:scale-95"
+            className="text-xs px-3 py-1.5 rounded-full border border-border bg-surface text-muted-foreground hover:text-foreground hover:border-foreground/40 transition-colors"
           >
             {frase}
           </button>
@@ -219,10 +219,10 @@ export function CapturaForm({
             placeholder="ej. Gasté 15 mil en el super con débito..."
             rows={4}
             className={cn(
-              "w-full resize-none rounded-[16px] border border-border bg-surface px-4 py-3.5 text-sm min-h-[110px]",
-              "placeholder:text-muted-foreground focus:outline-none focus:border-navy focus:border-[1.5px]",
+              "w-full resize-none rounded-xl border bg-card px-4 py-3 text-sm",
+              "placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50",
               "transition-colors",
-              escuchando && "border-navy border-[1.5px]"
+              escuchando && "border-primary ring-2 ring-primary/30"
             )}
             onKeyDown={(e) => {
               if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {

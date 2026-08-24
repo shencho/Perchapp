@@ -109,7 +109,7 @@ export function HubClient({ proyectos, debo, meDeben, cuentas, personasConectada
                   <Link
                     key={p.proyecto.id}
                     href={`/proyectos/${p.proyecto.id}`}
-                    className="flex items-center justify-between gap-3 mango-card px-4 py-3 hover:bg-surface transition-colors"
+                    className="flex items-center justify-between gap-3 rounded-lg border border-border bg-card px-4 py-3 hover:bg-surface transition-colors"
                   >
                     <div className="flex items-center gap-3 min-w-0">
                       <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10 text-primary shrink-0">
