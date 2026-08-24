@@ -8,13 +8,22 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
 import type { ResumenCategorias } from "@/lib/domain/categorias";
-import type { TotalesMoneda } from "@/lib/domain/finanzas";
+
+type Corte = "categoria" | "metodo" | "cuenta" | "necesidad";
+
+type Cortes = Record<Corte, ResumenCategorias>;
+
+const CORTES: { value: Corte; label: string }[] = [
+  { value: "categoria", label: "Categoría" },
+  { value: "metodo", label: "Medio de pago" },
+  { value: "cuenta", label: "Cuenta" },
+  { value: "necesidad", label: "Necesidad" },
+];
 
 interface Props {
   anioMes: string;
   monedas: string[];
-  totales: Record<string, TotalesMoneda>;
-  porMoneda: Record<string, { ingresos: ResumenCategorias; egresos: ResumenCategorias }>;
+  porMoneda: Record<string, { ingresos: Cortes; egresos: Cortes }>;
 }
 
 // Paleta de categorías (tokens de marca MANGO + acentos).
@@ -36,16 +45,14 @@ function labelMes(anioMes: string) {
   return d.toLocaleDateString("es-AR", { month: "short", year: "numeric" }).replace(".", "");
 }
 
-export function EstadisticasClient({ anioMes, monedas, totales, porMoneda }: Props) {
+export function EstadisticasClient({ anioMes, monedas, porMoneda }: Props) {
   const router = useRouter();
   const [tab, setTab] = useState("egresos");
   const [moneda, setMoneda] = useState(monedas[0] ?? "ARS");
+  const [corte, setCorte] = useState<Corte>("categoria");
 
-  const resumen = porMoneda[moneda] ?? {
-    ingresos: { total: 0, filas: [] },
-    egresos: { total: 0, filas: [] },
-  };
-  const totalMoneda = totales[moneda] ?? { ingresos: 0, egresos: 0, balance: 0 };
+  const vacio: Cortes = { categoria: { total: 0, filas: [] }, metodo: { total: 0, filas: [] }, cuenta: { total: 0, filas: [] }, necesidad: { total: 0, filas: [] } };
+  const resumen = porMoneda[moneda] ?? { ingresos: vacio, egresos: vacio };
 
   function stepMes(delta: number) {
     const base = new Date(`${anioMes}-01T12:00:00`);
@@ -61,7 +68,7 @@ export function EstadisticasClient({ anioMes, monedas, totales, porMoneda }: Pro
       <div>
         <h1 className="text-2xl font-semibold">Estadísticas</h1>
         <p className="text-sm text-muted-foreground mt-1">
-          Ingresos y gastos por categoría. Tocá una categoría para ver sus subcategorías.
+          Ingresos y gastos del mes. Cambiá el corte para ver la misma plata agrupada distinto.
         </p>
       </div>
 
@@ -74,6 +81,25 @@ export function EstadisticasClient({ anioMes, monedas, totales, porMoneda }: Pro
         <Button variant="ghost" size="icon" className="h-9 w-9" onClick={() => stepMes(1)} title="Mes siguiente">
           <ChevronRight className="h-5 w-5" />
         </Button>
+      </div>
+
+      {/* Corte: la misma plata agrupada de distintas maneras */}
+      <div className="flex gap-1.5 flex-wrap">
+        {CORTES.map((c) => (
+          <button
+            key={c.value}
+            type="button"
+            onClick={() => setCorte(c.value)}
+            className={cn(
+              "px-3 py-1.5 rounded-[var(--radius-pill)] text-xs font-medium border transition-colors",
+              corte === c.value
+                ? "bg-navy text-white border-navy"
+                : "border-border text-muted-foreground hover:border-foreground/40",
+            )}
+          >
+            {c.label}
+          </button>
+        ))}
       </div>
 
       {/* Moneda: las escalas no se mezclan, se mira una por vez */}
@@ -99,19 +125,19 @@ export function EstadisticasClient({ anioMes, monedas, totales, porMoneda }: Pro
         <TabsList className="w-full group-data-horizontal/tabs:h-auto">
           <TabsTrigger value="ingresos" className="flex-1 flex-col gap-0.5 py-2">
             <span className="text-sm">Ingresos</span>
-            <span className="text-xs tabular-nums font-mono text-success">{fmt(totalMoneda.ingresos, moneda)}</span>
+            <span className="text-xs tabular-nums font-mono text-success">{fmt(resumen.ingresos[corte].total, moneda)}</span>
           </TabsTrigger>
           <TabsTrigger value="egresos" className="flex-1 flex-col gap-0.5 py-2">
             <span className="text-sm">Gastos</span>
-            <span className="text-xs tabular-nums font-mono text-danger">{fmt(totalMoneda.egresos, moneda)}</span>
+            <span className="text-xs tabular-nums font-mono text-danger">{fmt(resumen.egresos[corte].total, moneda)}</span>
           </TabsTrigger>
         </TabsList>
 
         <TabsContent value="ingresos" className="mt-4">
-          <SeccionCategorias resumen={resumen.ingresos} moneda={moneda} vacio="No hay ingresos en este mes." />
+          <SeccionCategorias resumen={resumen.ingresos[corte]} moneda={moneda} vacio="No hay ingresos en este mes." />
         </TabsContent>
         <TabsContent value="egresos" className="mt-4">
-          <SeccionCategorias resumen={resumen.egresos} moneda={moneda} vacio="No hay gastos en este mes." />
+          <SeccionCategorias resumen={resumen.egresos[corte]} moneda={moneda} vacio="No hay gastos en este mes." />
         </TabsContent>
       </Tabs>
     </div>

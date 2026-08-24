@@ -102,42 +102,72 @@ export function resumenMensual(
 }
 
 /**
- * Base recurrente: promedio de lo CORRIENTE de los últimos `n` meses cerrados.
- * Sólo lo corriente, porque es lo único que se repite mes a mes.
+ * Base recurrente: lo CORRIENTE del ÚLTIMO MES CERRADO.
+ *
+ * Antes era el promedio de 3 meses, que se contaminaba con meses atípicos
+ * (un mes con un gasto no corriente grande inflaba toda la proyección). El
+ * último mes cerrado es más predecible y es lo que se replica hacia adelante.
  */
-export function baseRecurrente(filas: MesResumen[], mesActual: string, n = 3) {
-  const cerrados = filas.filter((f) => f.mes < mesActual).slice(-n);
-  if (cerrados.length === 0) return { ingresos: 0, egresos: 0, meses: 0 };
-  const ingresos = cerrados.reduce((a, f) => a + f.ingresoCorriente, 0) / cerrados.length;
-  const egresos = cerrados.reduce((a, f) => a + f.egresoCorriente, 0) / cerrados.length;
-  return { ingresos, egresos, meses: cerrados.length };
+export function baseRecurrente(filas: MesResumen[], mesActual: string) {
+  const cerrados = filas.filter((f) => f.mes < mesActual);
+  const ultimo = cerrados[cerrados.length - 1];
+  return {
+    ingresos: ultimo?.ingresoCorriente ?? 0,
+    egresos: ultimo?.egresoCorriente ?? 0,
+    mes: ultimo?.mes ?? null,
+  };
+}
+
+export interface MesProyectado extends MesResumen {
+  saldo: number;
+  /** true si a este mes se le aplicó la base recurrente. */
+  proyectado: boolean;
 }
 
 /**
- * Proyección: a los meses futuros se les suma la base recurrente y se
- * conservan los compromisos ya cargados (cuotas y no corrientes), que se
- * cuentan UNA sola vez porque la base excluye lo no corriente.
+ * Proyección hacia adelante.
+ *
+ * - Meses cerrados: tal cual se cargaron.
+ * - Mes en curso: lo real MÁS lo que faltaría del corriente para un mes
+ *   completo. Se usa max(real, base) para no inventar gasto si el mes ya
+ *   viene más cargado que la base.
+ * - Meses futuros: la base recurrente + los compromisos ya cargados (cuotas y
+ *   no corrientes), que se cuentan una sola vez porque la base excluye lo no
+ *   corriente.
  */
 export function proyectar(
   filas: MesResumen[],
   opts: { mesActual: string; saldoInicial: number; incluirCompromisos?: boolean },
-): (MesResumen & { saldo: number })[] {
+): MesProyectado[] {
   const { mesActual, saldoInicial, incluirCompromisos = true } = opts;
   const base = baseRecurrente(filas, mesActual);
 
   let saldo = saldoInicial;
   return filas.map((f) => {
-    if (!f.esFuturo) return { ...f, saldo: (saldo = f.mes >= mesActual ? saldo + f.neto : saldo) };
+    if (f.mes < mesActual) {
+      return { ...f, saldo, proyectado: false };
+    }
 
-    const ingresos = base.ingresos + (incluirCompromisos ? f.ingresoNoCorriente : 0);
-    const egresos = base.egresos + (incluirCompromisos ? f.egresoNoCorriente : 0);
+    const esActual = f.mes === mesActual;
+    // En el mes en curso lo real manda si ya supera la base.
+    const ingresoCorriente = esActual ? Math.max(f.ingresoCorriente, base.ingresos) : base.ingresos;
+    const egresoCorriente = esActual ? Math.max(f.egresoCorriente, base.egresos) : base.egresos;
+
+    const ingresoNoCorriente = incluirCompromisos ? f.ingresoNoCorriente : 0;
+    const egresoNoCorriente = incluirCompromisos ? f.egresoNoCorriente : 0;
+
+    const ingresos = ingresoCorriente + ingresoNoCorriente;
+    const egresos = egresoCorriente + egresoNoCorriente;
     const neto = ingresos - egresos;
     saldo += neto;
+
     return {
       ...f,
-      ingresoCorriente: base.ingresos,
-      egresoCorriente: base.egresos,
+      ingresoCorriente, egresoCorriente,
+      ingresoNoCorriente, egresoNoCorriente,
+      egresoCuotas: incluirCompromisos ? f.egresoCuotas : 0,
       ingresos, egresos, neto, saldo,
+      proyectado: true,
     };
   });
 }

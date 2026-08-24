@@ -7,7 +7,7 @@ import {
   ComposedChart, Bar, Line, XAxis, YAxis, CartesianGrid, Tooltip, ReferenceLine, ResponsiveContainer,
 } from "recharts";
 import { cn } from "@/lib/utils";
-import { proyectar, baseRecurrente, type MesResumen } from "@/lib/domain/cashflow";
+import { proyectar, baseRecurrente, type MesResumen, type MesProyectado } from "@/lib/domain/cashflow";
 
 interface Props {
   mesActual: string;
@@ -37,6 +37,7 @@ function labelMes(mes: string) {
 }
 
 const HORIZONTES = [3, 6, 12];
+const MESES_ATRAS_VISIBLES = 4;
 
 export function CashFlowClient({ mesActual, monedas, saldoInicial, porMoneda }: Props) {
   const [moneda, setMoneda] = useState(monedas[0] ?? "ARS");
@@ -51,10 +52,9 @@ export function CashFlowClient({ mesActual, monedas, saldoInicial, porMoneda }: 
     [filas, mesActual, saldoInicial, moneda, incluirCompromisos],
   );
 
-  // Ventana visible: los 6 meses cerrados previos + el horizonte elegido.
   const visibles = useMemo(() => {
     const iActual = proyectadas.findIndex((f) => f.mes === mesActual);
-    const desde = Math.max(0, iActual - 6);
+    const desde = Math.max(0, iActual - MESES_ATRAS_VISIBLES);
     return proyectadas.slice(desde, iActual + horizonte + 1);
   }, [proyectadas, mesActual, horizonte]);
 
@@ -68,7 +68,7 @@ export function CashFlowClient({ mesActual, monedas, saldoInicial, porMoneda }: 
   const pillInactive = "border-border text-muted-foreground hover:border-foreground/40";
 
   return (
-    <div className="flex flex-col gap-6 max-w-4xl">
+    <div className="flex flex-col gap-6">
       <div className="flex items-center gap-3">
         <Link href="/dashboard" className="text-muted-foreground hover:text-gold transition-colors">
           <ArrowLeft className="h-5 w-5" />
@@ -81,7 +81,6 @@ export function CashFlowClient({ mesActual, monedas, saldoInicial, porMoneda }: 
         </div>
       </div>
 
-      {/* Moneda */}
       <div className="flex gap-1.5">
         {monedas.map((mo) => (
           <button key={mo} type="button" onClick={() => setMoneda(mo)}
@@ -92,7 +91,7 @@ export function CashFlowClient({ mesActual, monedas, saldoInicial, porMoneda }: 
       </div>
 
       {/* KPI */}
-      <div className="mango-card p-[22px]">
+      <div className="mango-card p-[22px] max-w-md">
         <p className="text-xs text-muted-foreground">
           Saldo proyectado en {horizonte} {horizonte === 1 ? "mes" : "meses"}
         </p>
@@ -109,13 +108,12 @@ export function CashFlowClient({ mesActual, monedas, saldoInicial, porMoneda }: 
             {delta >= 0 ? "+" : ""}{fmt(delta, moneda)}
           </span>
         </p>
-        {base.meses > 0 && (
+        {base.mes && (
           <p className="text-xs text-muted-foreground mt-2">
-            Base recurrente ({base.meses} {base.meses === 1 ? "mes" : "meses"}):{" "}
+            Base recurrente ({labelMes(base.mes)}):{" "}
             <span className="text-success tabular-nums font-mono">{fmt(base.ingresos, moneda)}</span>
             {" / "}
             <span className="text-danger tabular-nums font-mono">{fmt(base.egresos, moneda)}</span>
-            {" por mes"}
           </p>
         )}
       </div>
@@ -139,6 +137,49 @@ export function CashFlowClient({ mesActual, monedas, saldoInicial, porMoneda }: 
           Incluir cuotas y gastos no corrientes ya cargados
         </label>
       </div>
+
+      {/* Tabla: meses en COLUMNAS, conceptos en filas */}
+      <div className="rounded-[var(--radius-card)] border border-border overflow-x-auto">
+        <table className="text-sm border-collapse">
+          <thead>
+            <tr className="bg-surface">
+              <th className="sticky left-0 z-10 bg-surface text-left px-3 py-2.5 font-medium text-muted-foreground border-b border-r border-border min-w-[190px]">
+                Concepto
+              </th>
+              {visibles.map((f) => (
+                <th
+                  key={f.mes}
+                  className={cn(
+                    "px-3 py-2.5 text-right font-medium border-b border-border whitespace-nowrap min-w-[110px]",
+                    f.mes === mesActual ? "text-navy border-b-2 border-b-navy" : "text-muted-foreground",
+                    f.esFuturo && "italic",
+                  )}
+                >
+                  {labelMes(f.mes)}
+                  {f.mes === mesActual && <span className="block text-[10px] font-normal">en curso</span>}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            <FilaTabla label="Ingresos corrientes" visibles={visibles} moneda={moneda} mesActual={mesActual} valor={(f) => f.ingresoCorriente} clase="text-success" />
+            <FilaTabla label="Ingresos no corrientes" visibles={visibles} moneda={moneda} mesActual={mesActual} valor={(f) => f.ingresoNoCorriente} />
+            <FilaTabla label="Total ingresos" visibles={visibles} moneda={moneda} mesActual={mesActual} valor={(f) => f.ingresos} clase="text-success" destacada />
+
+            <FilaTabla label="Gastos corrientes" visibles={visibles} moneda={moneda} mesActual={mesActual} valor={(f) => f.egresoCorriente} clase="text-danger" />
+            <FilaTabla label="Gastos no corrientes" visibles={visibles} moneda={moneda} mesActual={mesActual} valor={(f) => f.egresoNoCorriente} />
+            <FilaTabla label="de los cuales, cuotas" visibles={visibles} moneda={moneda} mesActual={mesActual} valor={(f) => f.egresoCuotas} clase="text-gold" sangria />
+            <FilaTabla label="Total gastos" visibles={visibles} moneda={moneda} mesActual={mesActual} valor={(f) => f.egresos} clase="text-danger" destacada />
+
+            <FilaTabla label="Neto" visibles={visibles} moneda={moneda} mesActual={mesActual} valor={(f) => f.neto} destacada coloreaSigno />
+            <FilaTabla label="Saldo acumulado" visibles={visibles} moneda={moneda} mesActual={mesActual} valor={(f) => f.saldo} destacada coloreaSigno />
+          </tbody>
+        </table>
+      </div>
+      <p className="text-xs text-muted-foreground -mt-3">
+        En itálica, meses proyectados: repiten lo corriente de {base.mes ? labelMes(base.mes) : "el último mes cerrado"} y
+        le suman las cuotas y gastos no corrientes ya cargados. La fila de cuotas es parte de los gastos, no se suma aparte.
+      </p>
 
       {/* Gráfico */}
       <div className="h-72 w-full mango-card p-3">
@@ -166,63 +207,53 @@ export function CashFlowClient({ mesActual, monedas, saldoInicial, porMoneda }: 
           </ComposedChart>
         </ResponsiveContainer>
       </div>
-
-      {/* Tabla mes a mes */}
-      <div className="space-y-2">
-        <h2 className="text-sm font-medium text-muted-foreground">Mes a mes</h2>
-        <div className="rounded-[var(--radius-card)] border border-border overflow-x-auto">
-          <table className="w-full text-sm min-w-[640px]">
-            <thead>
-              <tr className="border-b border-border bg-surface">
-                <th className="text-left px-3 py-2.5 font-medium text-muted-foreground">Mes</th>
-                <th className="text-right px-3 py-2.5 font-medium text-success">Ing. corr.</th>
-                <th className="text-right px-3 py-2.5 font-medium text-muted-foreground">Ing. no corr.</th>
-                <th className="text-right px-3 py-2.5 font-medium text-danger">Gasto corr.</th>
-                <th className="text-right px-3 py-2.5 font-medium text-muted-foreground">No corr.</th>
-                <th className="text-right px-3 py-2.5 font-medium text-gold">Cuotas</th>
-                <th className="text-right px-3 py-2.5 font-medium text-muted-foreground">Neto</th>
-                <th className="text-right px-3 py-2.5 font-medium text-muted-foreground">Saldo</th>
-              </tr>
-            </thead>
-            <tbody>
-              {visibles.map((f) => {
-                const esActual = f.mes === mesActual;
-                return (
-                  <tr
-                    key={f.mes}
-                    className={cn(
-                      "border-b border-border last:border-0",
-                      esActual && "bg-surface border-t-2 border-t-navy",
-                      f.esFuturo && "italic text-muted-foreground",
-                    )}
-                  >
-                    <td className={cn("px-3 py-2.5 whitespace-nowrap", esActual && "font-semibold text-navy not-italic")}>
-                      {labelMes(f.mes)}
-                    </td>
-                    <td className="px-3 py-2.5 text-right tabular-nums font-mono">{fmt(f.ingresoCorriente, moneda)}</td>
-                    <td className="px-3 py-2.5 text-right tabular-nums font-mono">{f.ingresoNoCorriente ? fmt(f.ingresoNoCorriente, moneda) : "—"}</td>
-                    <td className="px-3 py-2.5 text-right tabular-nums font-mono">{fmt(f.egresoCorriente, moneda)}</td>
-                    <td className="px-3 py-2.5 text-right tabular-nums font-mono">{f.egresoNoCorriente ? fmt(f.egresoNoCorriente, moneda) : "—"}</td>
-                    <td className={cn("px-3 py-2.5 text-right tabular-nums font-mono", f.egresoCuotas > 0 && "text-gold")}>
-                      {f.egresoCuotas ? fmt(f.egresoCuotas, moneda) : "—"}
-                    </td>
-                    <td className={cn("px-3 py-2.5 text-right tabular-nums font-mono", f.neto >= 0 ? "text-success" : "text-danger")}>
-                      {fmt(f.neto, moneda)}
-                    </td>
-                    <td className={cn("px-3 py-2.5 text-right tabular-nums font-mono", esActual && "font-semibold not-italic")}>
-                      {fmt(f.saldo, moneda)}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-        <p className="text-xs text-muted-foreground">
-          En itálica, meses proyectados: se les aplica la base recurrente y se suman las cuotas y
-          gastos no corrientes ya cargados. La columna Cuotas es parte de los gastos, no se suma aparte.
-        </p>
-      </div>
     </div>
+  );
+}
+
+function FilaTabla({
+  label, visibles, moneda, mesActual, valor, clase, destacada, sangria, coloreaSigno,
+}: {
+  label: string;
+  visibles: MesProyectado[];
+  moneda: string;
+  mesActual: string;
+  valor: (f: MesProyectado) => number;
+  clase?: string;
+  destacada?: boolean;
+  sangria?: boolean;
+  coloreaSigno?: boolean;
+}) {
+  return (
+    <tr className={cn("border-b border-border last:border-0", destacada && "bg-surface/60")}>
+      <th
+        scope="row"
+        className={cn(
+          "sticky left-0 z-10 text-left px-3 py-2 font-normal border-r border-border whitespace-nowrap",
+          destacada ? "bg-surface font-medium" : "bg-card",
+          sangria && "pl-6 text-xs text-muted-foreground italic",
+        )}
+      >
+        {label}
+      </th>
+      {visibles.map((f) => {
+        const v = valor(f);
+        const color = coloreaSigno ? (v >= 0 ? "text-success" : "text-danger") : clase;
+        return (
+          <td
+            key={f.mes}
+            className={cn(
+              "px-3 py-2 text-right tabular-nums font-mono whitespace-nowrap",
+              color,
+              destacada && "font-semibold",
+              f.esFuturo && "italic opacity-80",
+              f.mes === mesActual && "bg-surface/40",
+            )}
+          >
+            {v === 0 ? <span className="text-muted-foreground">—</span> : fmt(v, moneda)}
+          </td>
+        );
+      })}
+    </tr>
   );
 }
