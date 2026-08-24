@@ -10,7 +10,7 @@
   --font-sans: var(--font-manrope), system-ui, -apple-system, sans-serif;
   --font-mono: var(--font-space-grotesk), ui-monospace, monospace;
   --font-heading: var(--font-manrope), sans-serif;
-  --font-display: var(--font-manrope), sans-serif;
+  --font-display: var(--font-poppins), var(--font-manrope), sans-serif;
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -62,6 +62,22 @@
   --color-danger: var(--danger);
   --color-warning: var(--warning);
   --color-info: var(--info);
+  /* MANGO marca — escalas del handoff */
+  --color-navy-light: var(--navy-light);
+  --color-navy-dark: var(--navy-dark);
+  --color-gold-light: var(--gold-light);
+  --color-gold-lighter: var(--gold-lighter);
+  --color-leaf: var(--leaf);
+  --color-leaf-light: var(--leaf-light);
+  --color-alert-bg: var(--alert-bg);
+  --color-alert-border: var(--alert-border);
+  /* Radios del handoff: chips/inputs 11-12px · pills 20px · cards 22px · sheet 26px */
+  --radius-chip: 11px;
+  --radius-field: 12px;
+  --radius-pill: 20px;
+  --radius-card: 22px;
+  --radius-sheet: 26px;
+  --radius-mark: 14px;
 }
 
 /* MANGO V2 — light mode (flip completo dark→light). Paleta de marca en hex. */
@@ -116,6 +132,26 @@
   --danger: #ef4444;
   --warning: #f59e0b;
   --info: #3b82f6;
+
+  /* ── Handoff MANGO: escalas de marca ─────────────────────────────────── */
+  --navy-light: #2c5480;   /* degradé del hero */
+  --navy-dark:  #152a44;
+  --gold-light: #f0b74d;
+  --gold-lighter: #ffdf94;
+  --leaf: #284f33;         /* hoja del mango */
+  --leaf-light: #4a7a56;
+  --alert-bg: #fef6e7;     /* alerta ámbar silenciable */
+  --alert-border: #f6e2b8;
+
+  /* Superficies/degradés compuestos */
+  --navy-gradient: radial-gradient(130% 130% at 15% 0%, #2c5480, #1e3a5f 60%, #152a44);
+  --mango-fill: radial-gradient(ellipse at 30% 24%, #ffdf94, #f0b74d 40%, #d98f2b 80%);
+  --leaf-fill: linear-gradient(135deg, #4a7a56, #284f33);
+
+  /* Sombras del handoff */
+  --shadow-card: 0 8px 20px rgba(30, 58, 95, 0.06);
+  --shadow-raised: 0 10px 22px rgba(30, 58, 95, 0.28);
+  --shadow-sheet: 0 40px 90px rgba(0, 0, 0, 0.4);
 }
 
 @layer base {
@@ -134,3 +170,38 @@
     -webkit-tap-highlight-color: transparent;
   }
 }
+
+/* ── Lenguaje de cards MANGO (handoff) ───────────────────────────────────
+   Una sola definición para que todas las pantallas compartan el mismo
+   formato de card, en vez de repetir border+radius+shadow en cada archivo. */
+@layer components {
+  .mango-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-card);
+    box-shadow: var(--shadow-card);
+  }
+  /* Variante sobre fondo gris (cards mini: Cuentas, Inversiones) */
+  .mango-card-muted {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-card);
+  }
+  /* Card navy del hero, con el degradé de marca */
+  .mango-card-navy {
+    background: var(--navy-gradient);
+    border-radius: var(--radius-card);
+    color: var(--cream);
+    position: relative;
+    overflow: hidden;
+  }
+  /* Blob decorativo: la silueta del mango a baja opacidad como textura */
+  .mango-blob {
+    position: absolute;
+    border-radius: 57% 63% 55% 60% / 63% 67% 54% 56%;
+    transform: rotate(-12deg);
+    background: rgba(232, 217, 180, 0.14);
+    pointer-events: none;
+  }
+}
+

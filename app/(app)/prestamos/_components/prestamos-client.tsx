@@ -135,7 +135,7 @@ export function PrestamosClient({ prestamos, personas }: Props) {
               <button
                 key={p.id}
                 onClick={() => startTransition(() => router.push(`/prestamos/${p.id}`))}
-                className="text-left border border-border rounded-lg bg-card p-4 hover:bg-surface/50 transition-colors flex flex-col gap-3"
+                className="text-left mango-card p-4 hover:bg-surface/50 transition-colors flex flex-col gap-3"
               >
                 {/* Cabecera */}
                 <div className="flex items-start justify-between gap-2">

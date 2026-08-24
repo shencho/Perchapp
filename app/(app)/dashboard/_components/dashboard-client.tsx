@@ -12,6 +12,7 @@ import {
 import { categoriaNombreToLucide } from "@/lib/ui/category-icons";
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from "recharts";
 import { cn } from "@/lib/utils";
+import { MangoBlob } from "@/components/ui/mango-logo";
 import { GraficoEvolucion } from "./grafico-evolucion";
 import { silenciarAlerta } from "@/lib/supabase/actions/alertas";
 
@@ -170,7 +171,7 @@ function StatCard({
   label: React.ReactNode; value: React.ReactNode; valueClass?: string;
 }) {
   return (
-    <div className="border border-border rounded-[12px] p-4 bg-card">
+    <div className="mango-card-muted p-4">
       <div
         className="flex items-center justify-center rounded-[9px]"
         style={{ width: 30, height: 30, background: chipBg }}
@@ -216,23 +217,23 @@ function HeroFinanciero({ hero, perfil }: { hero: DashboardData["hero"]; perfil:
       </div>
 
       {/* Hero navy — Balance total (absorbe Patrimonio + Balance del mes) */}
-      <div className="relative overflow-hidden rounded-[16px] bg-navy p-6 text-white">
-        <div className="pointer-events-none absolute rounded-full" style={{ width: 220, height: 220, right: -60, top: -80, background: "#27476f" }} />
-        <div className="pointer-events-none absolute rounded-full" style={{ width: 160, height: 160, right: 90, bottom: -80, background: "#24426a" }} />
+      <div className="mango-card-navy p-[26px] text-white">
+        <MangoBlob size={260} style={{ right: -70, top: -90 }} />
+        <MangoBlob size={170} style={{ right: 110, bottom: -95 }} />
         <div className="relative">
           <p className="text-[13px] font-medium text-cream">Balance total</p>
-          <p className="mt-1 font-mono font-bold tracking-tight" style={{ fontSize: 34, lineHeight: 1.1 }}>
+          <p className="mt-1 font-mono font-semibold tracking-tight text-white" style={{ fontSize: 44, lineHeight: 1.05 }}>
             {fmt(hero.totalARS)}
           </p>
           <div className="mt-3 flex flex-wrap items-center gap-2">
             {delta !== null && (
-              <span className="inline-flex items-center gap-1 rounded-full bg-cream px-2.5 py-1 text-xs font-semibold text-navy">
+              <span className="inline-flex items-center gap-1 rounded-[20px] bg-cream px-2.5 py-1 text-xs font-semibold text-navy">
                 {delta > 0 ? <TrendingUp className="h-3.5 w-3.5" /> : delta < 0 ? <TrendingDown className="h-3.5 w-3.5" /> : <Minus className="h-3.5 w-3.5" />}
                 {delta > 0 ? "+" : ""}{delta}% vs mes anterior
               </span>
             )}
             {hero.totalUSD !== 0 && (
-              <span className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold text-white" style={{ background: "rgba(255,255,255,0.12)" }}>
+              <span className="inline-flex items-center gap-1 rounded-[20px] px-2.5 py-1 text-xs font-semibold text-white" style={{ background: "rgba(255,255,255,0.12)" }}>
                 {fmt(hero.totalUSD, "USD")} USD
               </span>
             )}
@@ -335,7 +336,7 @@ function BloqueCuentas({ cuentas, tarjetas }: { cuentas: CuentaConSaldo[]; tarje
 function BloqueCompartidos({ datos }: { datos: DashboardData["compartidos"] }) {
   return (
     <div className="space-y-3">
-      <div className="border border-border rounded-lg p-4 bg-card flex items-center justify-between">
+      <div className="mango-card p-[22px] flex items-center justify-between">
         <div>
           <p className="text-xs text-muted-foreground">Te deben en total</p>
           <p className="text-xl font-bold tabular-nums font-mono mt-0.5 text-success">{fmt(datos.totalPendiente)}</p>
@@ -372,11 +373,11 @@ function BloquePrestamos({ prestamos }: { prestamos: PrestamoResumen[] }) {
   return (
     <div className="space-y-3">
       <div className="grid grid-cols-2 gap-3">
-        <div className="border border-border rounded-lg p-3 bg-card">
+        <div className="mango-card p-4">
           <p className="text-xs text-muted-foreground">Te deben</p>
           <p className="text-lg font-bold tabular-nums font-mono mt-0.5 text-success">{fmt(totalTeDeban)}</p>
         </div>
-        <div className="border border-border rounded-lg p-3 bg-card">
+        <div className="mango-card p-4">
           <p className="text-xs text-muted-foreground">Debés</p>
           <p className="text-lg font-bold tabular-nums font-mono mt-0.5 text-danger">{fmt(totalDebas)}</p>
         </div>
@@ -422,13 +423,13 @@ function BloqueInversiones({ inversiones }: { inversiones: CuentaConSaldo[] }) {
     <div className="space-y-3">
       <div className="grid grid-cols-2 gap-3">
         {totalARS > 0 && (
-          <div className="border border-border rounded-lg p-3 bg-card">
+          <div className="mango-card p-4">
             <p className="text-xs text-muted-foreground">Total invertido ARS</p>
             <p className="text-lg font-bold tabular-nums font-mono mt-0.5 text-success">{fmt(totalARS)}</p>
           </div>
         )}
         {totalUSD > 0 && (
-          <div className="border border-border rounded-lg p-3 bg-card">
+          <div className="mango-card p-4">
             <p className="text-xs text-muted-foreground">Total invertido USD</p>
             <p className="text-lg font-bold tabular-nums font-mono mt-0.5 text-success">{fmt(totalUSD, "USD")}</p>
           </div>
@@ -569,16 +570,18 @@ function BloqueAlertas({
           !!a.referencia_id;
         return (
           <div key={a.id} className={cn(
-            "flex items-center rounded-lg border",
+            "flex items-center rounded-[var(--radius-card)] border",
             a.urgencia === "alta"
-              ? "border-danger/20 bg-danger/10"
-              : "border-warning/20 bg-warning/10",
+              ? "border-danger/25 bg-danger/[0.07]"
+              : "border-[var(--alert-border)] bg-[var(--alert-bg)]",
           )}>
-            <Link href={a.href} className="flex flex-1 items-start gap-3 p-3 transition-colors hover:bg-surface/50 min-w-0">
-              <AlertTriangle className={cn(
-                "h-4 w-4 mt-0.5 shrink-0",
-                a.urgencia === "alta" ? "text-danger" : "text-warning",
-              )} />
+            <Link href={a.href} className="flex flex-1 items-start gap-3 p-4 transition-colors hover:bg-black/[0.02] min-w-0 rounded-[var(--radius-card)]">
+              <span className={cn(
+                "grid place-items-center h-7 w-7 rounded-[9px] shrink-0",
+                a.urgencia === "alta" ? "bg-danger" : "bg-warning",
+              )}>
+                <AlertTriangle className="h-4 w-4 text-white" />
+              </span>
               <div className="min-w-0">
                 <p className="text-sm font-medium">{a.titulo}</p>
                 <p className="text-xs text-muted-foreground mt-0.5">{a.descripcion}</p>
@@ -587,11 +590,12 @@ function BloqueAlertas({
             </Link>
             {puedeSilenciar && (
               <button
-                className="px-3 py-3 text-muted-foreground hover:text-gold transition-colors shrink-0"
-                title="Silenciar esta alerta"
+                className="mr-3 shrink-0 inline-flex items-center gap-1 rounded-[var(--radius-chip)] border border-[var(--alert-border)] bg-white/70 px-2.5 py-1.5 text-[11px] font-medium text-muted-foreground transition-colors hover:text-gold"
+                title="Silenciar por este mes"
                 onClick={() => onSilenciar(a)}
               >
-                <X className="h-3.5 w-3.5" />
+                <X className="h-3 w-3" />
+                <span className="hidden sm:inline">Silenciar por este mes</span>
               </button>
             )}
           </div>

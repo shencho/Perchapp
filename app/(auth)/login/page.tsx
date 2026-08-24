@@ -73,13 +73,13 @@ export default function LoginPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      {/* Logo */}
-      <div className="flex flex-col items-center gap-2 text-center">
-        <MangoLogo size={40} />
-        <h1 className="text-2xl font-display font-extrabold tracking-tight text-navy">MANGO</h1>
-        <p className="text-sm text-muted-foreground">
-          Ingresá a tu cuenta
-        </p>
+      {/* Logo — solo en mobile; en desktop la marca vive en el panel izquierdo */}
+      <div className="flex flex-col items-center gap-2 text-center md:hidden">
+        <MangoLogo size={40} showWordmark />
+      </div>
+      <div>
+        <h1 className="text-2xl font-semibold tracking-tight">Bienvenido de nuevo</h1>
+        <p className="text-sm text-muted-foreground mt-1">Ingresá a tu cuenta</p>
       </div>
 
       {/* Form */}

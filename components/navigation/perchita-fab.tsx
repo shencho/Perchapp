@@ -22,12 +22,12 @@ export function PerchitaFAB() {
   return (
     <Sheet open={open} onOpenChange={setOpen}>
       <SheetTrigger
-        className="md:hidden fixed bottom-6 left-1/2 -translate-x-1/2 w-14 h-14 rounded-full flex items-center justify-center z-40 bg-navy shadow-lg hover:bg-navy-hover transition-colors"
+        className="md:hidden fixed bottom-[18px] left-1/2 -translate-x-1/2 rounded-full flex items-center justify-center z-40 shadow-[var(--shadow-raised)] transition-transform duration-150 active:scale-95"
         aria-label="MANGO AI — Capturar movimiento"
       >
-        <MangoMark variant="onNavy" size={30} />
+        <MangoMark size={58} />
       </SheetTrigger>
-      <SheetContent side="bottom" className="max-h-[90vh] overflow-y-auto">
+      <SheetContent side="bottom" className="max-h-[90dvh] overflow-y-auto rounded-t-[var(--radius-sheet)]">
         <CapturaSheetContent
           onSuccess={handleSuccess}
           cachedData={cachedData}
