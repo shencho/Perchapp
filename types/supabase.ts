@@ -563,6 +563,7 @@ export interface Database {
           es_reembolso: boolean
           cuota_numero: number | null
           cuota_grupo_id: string | null
+          fecha_compra: string | null
           prestamo_id: string | null
           prestamo_pago_id: string | null
           plantilla_recurrente_id: string | null
@@ -601,6 +602,7 @@ export interface Database {
           es_reembolso?: boolean
           cuota_numero?: number | null
           cuota_grupo_id?: string | null
+          fecha_compra?: string | null
           prestamo_id?: string | null
           prestamo_pago_id?: string | null
           plantilla_recurrente_id?: string | null
@@ -639,6 +641,7 @@ export interface Database {
           es_reembolso?: boolean
           cuota_numero?: number | null
           cuota_grupo_id?: string | null
+          fecha_compra?: string | null
           prestamo_id?: string | null
           prestamo_pago_id?: string | null
           plantilla_recurrente_id?: string | null

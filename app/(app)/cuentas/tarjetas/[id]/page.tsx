@@ -1,10 +1,11 @@
 import { createClient } from "@/lib/supabase/server";
 import { redirect, notFound } from "next/navigation";
 import Link from "next/link";
-import { ChevronLeft } from "lucide-react";
+import { ChevronLeft, CreditCard, Repeat } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { calcularConsumoTarjeta, getPeriodoCierre, getProximoVencimiento, getCicloDelProximoVencimiento } from "@/lib/domain/calcularConsumoTarjeta";
 import { GraficoTarjeta } from "./_components/grafico-tarjeta";
+import { categoriaNombreToLucide } from "@/lib/ui/category-icons";
 import { PagarResumen } from "./_components/pagar-resumen";
 import { getResumenTarjeta } from "@/lib/supabase/actions/pagos-tarjeta";
 
@@ -19,6 +20,37 @@ function fmt(n: number, moneda = "ARS") {
 
 function fmtFecha(d: string) {
   return new Date(d + "T12:00:00").toLocaleDateString("es-AR", { day: "2-digit", month: "short" });
+}
+
+/** Distingue de un vistazo débito automático, cuotas y gasto puntual. */
+function BadgeTipoGasto({
+  metodo, clasificacion, cuotaNumero, cuotas,
+}: {
+  metodo: string | null;
+  clasificacion: string | null;
+  cuotaNumero: number | null;
+  cuotas: number | null;
+}) {
+  if (metodo === "Débito automático") {
+    return (
+      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-warning/10 text-warning border border-warning/20 text-[10px] font-medium whitespace-nowrap">
+        <Repeat className="h-3 w-3" /> Débito automático
+      </span>
+    );
+  }
+  if (clasificacion === "Cuotas") {
+    return (
+      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-info/10 text-info border border-info/20 text-[10px] font-medium whitespace-nowrap">
+        <CreditCard className="h-3 w-3" />
+        {cuotaNumero ? `Cuota ${cuotaNumero}/${cuotas}` : `${cuotas} cuotas`}
+      </span>
+    );
+  }
+  return (
+    <span className="inline-flex items-center px-1.5 py-0.5 rounded-full bg-muted/50 text-muted-foreground border border-border text-[10px] font-medium whitespace-nowrap">
+      Puntual
+    </span>
+  );
 }
 
 interface Props {
@@ -57,7 +89,7 @@ export default async function TarjetaDetallePage({ params }: Props) {
   // Movimientos del período actual con esta tarjeta
   const { data: movPeriodo } = await supabase
     .from("movimientos")
-    .select("id, tipo, monto, moneda, concepto, descripcion, fecha, metodo, clasificacion, cuotas, fecha_vencimiento")
+    .select("id, tipo, monto, moneda, concepto, descripcion, fecha, metodo, clasificacion, cuotas, cuota_numero, fecha_compra, fecha_vencimiento, categorias ( id, nombre, parent_id )")
     .eq("user_id", user.id)
     .eq("tarjeta_id", id)
     .gte("fecha", inicio)
@@ -83,11 +115,10 @@ export default async function TarjetaDetallePage({ params }: Props) {
   const hasta = `${ahora.getFullYear() + 2}-${String(ahora.getMonth() + 1).padStart(2, "0")}-28`;
   const { data: movVentana } = await supabase
     .from("movimientos")
-    .select("fecha, monto")
+    .select("fecha, monto, moneda")
     .eq("user_id", user.id)
     .eq("tarjeta_id", id)
     .eq("tipo", "Egreso")
-    .eq("moneda", "ARS")
     .gte("fecha", desde)
     .lte("fecha", hasta);
 
@@ -98,8 +129,10 @@ export default async function TarjetaDetallePage({ params }: Props) {
     getResumenTarjeta(id),
   ]);
 
-  const consumoTotal = calcularConsumoTarjeta(id, (movPeriodo ?? []).map(m => ({
-    monto: m.monto, tarjeta_id: id, fecha: m.fecha,
+  // Por moneda y sólo Egresos: un pago de resumen es una Transferencia y
+  // antes se contaba como consumo, inflando el total.
+  const consumoPorMoneda = calcularConsumoTarjeta(id, (movPeriodo ?? []).map(m => ({
+    monto: m.monto, tarjeta_id: id, fecha: m.fecha, moneda: m.moneda, tipo: m.tipo,
   })), inicio, fin);
 
   return (
@@ -137,7 +170,17 @@ export default async function TarjetaDetallePage({ params }: Props) {
       <div className="grid grid-cols-2 gap-3">
         <div className="border border-border rounded-lg p-3 bg-card">
           <p className="text-xs text-muted-foreground">Consumo del período</p>
-          <p className="text-xl font-bold tabular-nums font-mono text-danger mt-0.5">{fmt(consumoTotal)}</p>
+          {Object.entries(consumoPorMoneda).filter(([, v]) => v > 0).length === 0 ? (
+            <p className="text-xl font-bold tabular-nums font-mono text-muted-foreground mt-0.5">$0</p>
+          ) : (
+            <div className="mt-0.5 space-y-0.5">
+              {Object.entries(consumoPorMoneda).filter(([, v]) => v > 0).map(([moneda, v]) => (
+                <p key={moneda} className="text-xl font-bold tabular-nums font-mono text-danger">
+                  {fmt(v, moneda)}
+                </p>
+              ))}
+            </div>
+          )}
           <p className="text-xs text-muted-foreground mt-1">{fmtFecha(inicio)} — {fmtFecha(fin)}</p>
         </div>
         <div className="border border-border rounded-lg p-3 bg-card">
@@ -147,7 +190,10 @@ export default async function TarjetaDetallePage({ params }: Props) {
           </p>
           {tarjeta.limite && (
             <p className="text-xs text-muted-foreground mt-1">
-              Límite: {fmt(tarjeta.limite_ars ?? tarjeta.limite)}
+              Límite: {tarjeta.limite_ars ? fmt(tarjeta.limite_ars) : ""}
+              {tarjeta.limite_ars && tarjeta.limite_usd ? " · " : ""}
+              {tarjeta.limite_usd ? fmt(tarjeta.limite_usd, "USD") : ""}
+              {!tarjeta.limite_ars && !tarjeta.limite_usd ? fmt(tarjeta.limite) : ""}
             </p>
           )}
         </div>
@@ -168,23 +214,52 @@ export default async function TarjetaDetallePage({ params }: Props) {
                 <tr className="border-b border-border bg-surface">
                   <th className="text-left px-4 py-2.5 font-medium text-muted-foreground">Fecha</th>
                   <th className="text-left px-4 py-2.5 font-medium text-muted-foreground">Concepto</th>
-                  <th className="text-left px-4 py-2.5 font-medium text-muted-foreground">Clasif.</th>
+                  <th className="text-left px-4 py-2.5 font-medium text-muted-foreground">Tipo</th>
                   <th className="text-right px-4 py-2.5 font-medium text-muted-foreground">Monto</th>
                 </tr>
               </thead>
               <tbody>
-                {movPeriodo.map((m) => (
-                  <tr key={m.id} className="border-b border-border last:border-0">
-                    <td className="px-4 py-3 text-muted-foreground whitespace-nowrap">{fmtFecha(m.fecha)}</td>
-                    <td className="px-4 py-3 font-medium truncate max-w-[200px]">{m.concepto || m.descripcion || "—"}</td>
-                    <td className="px-4 py-3 text-muted-foreground text-xs">
-                      {m.clasificacion === "Cuotas" ? `${m.cuotas} cuotas` : (m.clasificacion ?? "—")}
-                    </td>
-                    <td className="px-4 py-3 text-right font-semibold tabular-nums font-mono text-danger">
-                      {fmt(m.monto, m.moneda)}
-                    </td>
-                  </tr>
-                ))}
+                {movPeriodo.map((m) => {
+                  // El embed puede venir como objeto o como array según la inferencia.
+                  const rel = (m as unknown as { categorias?: { nombre: string } | { nombre: string }[] | null }).categorias;
+                  const cat = Array.isArray(rel) ? rel[0] : rel;
+                  const Icono = categoriaNombreToLucide(cat?.nombre);
+                  return (
+                    <tr key={m.id} className="border-b border-border last:border-0">
+                      <td className="px-4 py-3 text-muted-foreground whitespace-nowrap">{fmtFecha(m.fecha)}</td>
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          <span
+                            className="grid place-items-center rounded-[9px] shrink-0"
+                            style={{ width: 30, height: 30, background: "#f3ecdc" }}
+                          >
+                            <Icono className="h-4 w-4" style={{ color: "#1e3a5f" }} />
+                          </span>
+                          <span className="min-w-0">
+                            <span className="block font-medium truncate max-w-[220px]">
+                              {m.concepto || m.descripcion || "—"}
+                            </span>
+                            <span className="block text-xs text-muted-foreground truncate">
+                              {cat?.nombre ?? "Sin categoría"}
+                              {m.fecha_compra ? ` · compra ${fmtFecha(m.fecha_compra)}` : ""}
+                            </span>
+                          </span>
+                        </div>
+                      </td>
+                      <td className="px-4 py-3">
+                        <BadgeTipoGasto
+                          metodo={m.metodo}
+                          clasificacion={m.clasificacion}
+                          cuotaNumero={m.cuota_numero}
+                          cuotas={m.cuotas}
+                        />
+                      </td>
+                      <td className="px-4 py-3 text-right font-semibold tabular-nums font-mono text-danger whitespace-nowrap">
+                        {fmt(m.monto, m.moneda)}
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>

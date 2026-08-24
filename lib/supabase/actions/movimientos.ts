@@ -138,7 +138,12 @@ export async function createMovimiento(input: MovimientoInput): Promise<{ id: st
       monto:             c.monto,
       unitario:          c.monto,
       fecha:             c.fecha,
-      fecha_vencimiento: c.fecha_vencimiento ?? parsed.fecha_vencimiento ?? null,
+      // En una cuota el vencimiento ES su fecha. El fallback al valor del
+      // formulario desalineaba ambas columnas.
+      fecha_vencimiento: c.fecha_vencimiento ?? c.fecha,
+      // Se conserva la compra original: antes se usaba para calcular la
+      // primera cuota y se descartaba, así que no se podía auditar.
+      fecha_compra:      baseFecha,
       concepto:          `${baseConcepto} (cuota ${c.cuota_numero}/${parsed.cuotas})`,
       cuota_numero:      c.cuota_numero,
       cuota_grupo_id:    grupoId,
@@ -166,7 +171,7 @@ const COLUMNAS_MOVIMIENTO = new Set([
   "cuenta_destino_id", "cantidad", "unitario", "observaciones", "cliente_id",
   "servicio_id", "fecha", "es_compartido", "gc_mi_parte", "es_reembolso",
   "cuota_numero", "cuota_grupo_id", "prestamo_id", "prestamo_pago_id",
-  "plantilla_recurrente_id",
+  "plantilla_recurrente_id", "fecha_compra",
 ]);
 
 export async function updateMovimiento(id: string, input: Partial<MovimientoInput>) {

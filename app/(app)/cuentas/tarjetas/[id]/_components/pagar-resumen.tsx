@@ -30,43 +30,89 @@ function todayStr() {
 export function PagarResumen({ tarjetaId, tarjetaNombre, cuentas, cuentaPagoDefault, resumen }: Props) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
-  const [cuentaId, setCuentaId] = useState<string | null>(cuentaPagoDefault ?? cuentas[0]?.id ?? null);
   const [fecha, setFecha] = useState(todayStr());
-  const [ajuste, setAjuste] = useState<string>("");
   const [observacion, setObservacion] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const cuenta = cuentas.find((c) => c.id === cuentaId);
-  const moneda = cuenta?.moneda ?? "ARS";
-  const delCiclo = resumen.porMoneda[moneda] ?? { total: 0, yaDescontado: 0, aPagar: 0 };
+  // Un bloque por moneda con consumos. Cada una tiene su cuenta y su monto,
+  // para poder pagar una sola o las dos, total o parcial.
+  const bloques = useMemo(
+    () => Object.entries(resumen.porMoneda)
+      .filter(([, v]) => v.total > 0)
+      .sort(([a], [b]) => (a === "ARS" ? -1 : b === "ARS" ? 1 : a.localeCompare(b))),
+    [resumen.porMoneda],
+  );
 
-  const ajusteNum = useMemo(() => {
-    const n = parseFloat(ajuste.replace(",", "."));
-    return Number.isFinite(n) ? n : 0;
-  }, [ajuste]);
-  const montoFinal = Math.round((delCiclo.aPagar + ajusteNum) * 100) / 100;
+  const [cuentaPorMoneda, setCuentaPorMoneda] = useState<Record<string, string | null>>(() => {
+    const def = cuentas.find((c) => c.id === cuentaPagoDefault);
+    return Object.fromEntries(
+      Object.keys(resumen.porMoneda).map((moneda) => [
+        moneda,
+        def?.moneda === moneda ? def.id : (cuentas.find((c) => c.moneda === moneda)?.id ?? null),
+      ]),
+    );
+  });
+
+  const [montoPorMoneda, setMontoPorMoneda] = useState<Record<string, string>>(() =>
+    Object.fromEntries(
+      Object.entries(resumen.porMoneda).map(([m, v]) => [m, v.aPagar > 0 ? String(v.aPagar) : ""]),
+    ),
+  );
+
+  function montoDe(moneda: string) {
+    const n = parseFloat((montoPorMoneda[moneda] ?? "").replace(",", "."));
+    return Number.isFinite(n) && n > 0 ? n : 0;
+  }
+
+  const cuantosPagos = bloques.filter(([moneda]) => montoDe(moneda) > 0).length;
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
-    if (!cuentaId) { setError("Elegí la cuenta desde la que pagás."); return; }
-    if (!(montoFinal > 0)) { setError("El monto a pagar debe ser mayor a 0."); return; }
-    setSaving(true);
-    const obs = [
-      `Resumen ${fmt(delCiclo.aPagar, moneda)}`,
-      ajusteNum !== 0 ? `ajuste ${ajusteNum > 0 ? "+" : ""}${fmt(ajusteNum, moneda)}` : null,
-      observacion.trim() || null,
-    ].filter(Boolean).join(" · ");
 
-    const res = await pagarTarjeta({
-      tarjetaId, cuentaId, monto: montoFinal, moneda, fecha,
-      vencimiento: resumen.vencimiento, observacion: obs,
-    });
+    const aRegistrar = bloques
+      .map(([moneda]) => ({ moneda, monto: montoDe(moneda), cuentaId: cuentaPorMoneda[moneda] }))
+      .filter((x) => x.monto > 0);
+
+    if (aRegistrar.length === 0) {
+      setError("Ingresá cuánto pagás en al menos una moneda.");
+      return;
+    }
+    const sinCuenta = aRegistrar.find((x) => !x.cuentaId);
+    if (sinCuenta) {
+      setError(`Elegí la cuenta para el pago en ${sinCuenta.moneda}.`);
+      return;
+    }
+
+    setSaving(true);
+    // Un movimiento por moneda: los saldos de cada cuenta se mueven en la suya.
+    for (const x of aRegistrar) {
+      const pendiente = resumen.porMoneda[x.moneda]?.aPagar ?? 0;
+      const obs = [
+        `Resumen ${fmt(pendiente, x.moneda)}`,
+        x.monto < pendiente ? "pago parcial" : null,
+        observacion.trim() || null,
+      ].filter(Boolean).join(" · ");
+
+      const res = await pagarTarjeta({
+        tarjetaId,
+        cuentaId: x.cuentaId as string,
+        monto: x.monto,
+        moneda: x.moneda,
+        fecha,
+        vencimiento: resumen.vencimiento,
+        observacion: obs,
+      });
+      if ("error" in res) {
+        setSaving(false);
+        setError(res.error);
+        return;
+      }
+    }
+
     setSaving(false);
-    if ("error" in res) { setError(res.error); return; }
     setOpen(false);
-    setAjuste("");
     setObservacion("");
     router.refresh();
   }
@@ -86,71 +132,103 @@ export function PagarResumen({ tarjetaId, tarjetaNombre, cuentas, cuentaPagoDefa
           : undefined}
         onSubmit={handleSubmit}
         isSubmitting={saving}
-        submitLabel="Registrar pago"
+        submitLabel={cuantosPagos > 1 ? "Registrar pagos" : "Registrar pago"}
       >
-        <div className="space-y-1.5">
-          <Label>Cuenta desde la que pagás</Label>
-          <NamedSelect
-            options={cuentas.map((c) => ({ value: c.id, label: `${c.nombre} (${c.moneda})` }))}
-            value={cuentaId ?? ""}
-            onValueChange={(v) => setCuentaId(v || null)}
-            placeholder="Elegí una cuenta"
-          />
-        </div>
+        {bloques.length === 0 && (
+          <p className="text-sm text-muted-foreground">
+            Esta tarjeta no tiene consumos en el ciclo actual.
+          </p>
+        )}
 
-        {/* Resumen del ciclo */}
-        <div className="rounded-lg border border-border bg-surface p-3 space-y-1">
-          <div className="flex items-center justify-between text-sm">
-            <span className="text-muted-foreground">Consumos del ciclo</span>
-            <span className="tabular-nums font-mono">{fmt(delCiclo.total, moneda)}</span>
-          </div>
-          {delCiclo.yaDescontado > 0 && (
-            <div className="flex items-center justify-between text-xs text-muted-foreground">
-              <span>Ya descontado de cuentas</span>
-              <span className="tabular-nums font-mono">− {fmt(delCiclo.yaDescontado, moneda)}</span>
+        {bloques.map(([moneda, v]) => {
+          const cuentasMoneda = cuentas.filter((c) => c.moneda === moneda);
+          const monto = montoDe(moneda);
+          const dif = Math.round((monto - v.aPagar) * 100) / 100;
+          return (
+            <div key={moneda} className="rounded-[var(--radius-card)] border border-border p-3.5 space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-semibold">{moneda}</span>
+                <span className="text-xs text-muted-foreground">
+                  Consumos: <span className="tabular-nums font-mono">{fmt(v.total, moneda)}</span>
+                </span>
+              </div>
+
+              {(v.yaDescontado > 0 || v.yaPagado > 0) && (
+                <div className="space-y-0.5 text-xs text-muted-foreground">
+                  {v.yaDescontado > 0 && (
+                    <div className="flex justify-between">
+                      <span>Ya descontado de cuentas</span>
+                      <span className="tabular-nums font-mono">− {fmt(v.yaDescontado, moneda)}</span>
+                    </div>
+                  )}
+                  {v.yaPagado > 0 && (
+                    <div className="flex justify-between">
+                      <span>Ya pagado en este ciclo</span>
+                      <span className="tabular-nums font-mono">− {fmt(v.yaPagado, moneda)}</span>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              <div className="flex items-center justify-between text-sm font-medium border-t border-border pt-2">
+                <span>Pendiente</span>
+                <span className="tabular-nums font-mono">{fmt(v.aPagar, moneda)}</span>
+              </div>
+
+              {cuentasMoneda.length === 0 ? (
+                <p className="text-xs text-warning">
+                  No tenés ninguna cuenta en {moneda} para registrar este pago.
+                </p>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="space-y-1.5">
+                    <Label>Cuenta</Label>
+                    <NamedSelect
+                      options={cuentasMoneda.map((c) => ({ value: c.id, label: c.nombre }))}
+                      value={cuentaPorMoneda[moneda] ?? ""}
+                      onValueChange={(val) => setCuentaPorMoneda((s) => ({ ...s, [moneda]: val || null }))}
+                      placeholder="Elegí una cuenta"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label>Monto a pagar</Label>
+                    <Input
+                      type="number"
+                      step="0.01"
+                      inputMode="decimal"
+                      placeholder="0"
+                      value={montoPorMoneda[moneda] ?? ""}
+                      onChange={(e) => setMontoPorMoneda((s) => ({ ...s, [moneda]: e.target.value }))}
+                    />
+                  </div>
+                </div>
+              )}
+
+              {monto > 0 && dif !== 0 && (
+                <p className="text-xs text-muted-foreground">
+                  {dif > 0
+                    ? `${fmt(dif, moneda)} más que el pendiente.`
+                    : `Pago parcial: quedan ${fmt(Math.abs(dif), moneda)}.`}
+                </p>
+              )}
             </div>
-          )}
-          <div className="flex items-center justify-between text-sm font-medium border-t border-border pt-1 mt-1">
-            <span>Resumen a pagar</span>
-            <span className="tabular-nums font-mono">{fmt(delCiclo.aPagar, moneda)}</span>
-          </div>
-          {delCiclo.yaDescontado > 0 && (
-            <p className="text-xs text-muted-foreground pt-1">
-              Se excluyen los consumos cargados con una cuenta: esa plata ya salió del banco al comprarse.
-            </p>
-          )}
-        </div>
+          );
+        })}
 
-        <div className="grid grid-cols-2 gap-3">
-          <div className="space-y-1.5">
-            <Label>Ajuste (+ / −)</Label>
-            <Input
-              type="number" step="0.01" inputMode="decimal" placeholder="0"
-              value={ajuste} onChange={(e) => setAjuste(e.target.value)}
-            />
-            <p className="text-xs text-muted-foreground">Por consumos que falten cargar.</p>
-          </div>
-          <div className="space-y-1.5">
-            <Label>Fecha del pago</Label>
-            <Input type="date" value={fecha} onChange={(e) => setFecha(e.target.value)} />
-          </div>
-        </div>
-
-        <div className="flex items-center justify-between rounded-lg border border-border px-3 py-2">
-          <span className="text-sm font-medium">Total a pagar</span>
-          <span className="text-lg font-bold tabular-nums font-mono">{fmt(montoFinal, moneda)}</span>
+        <div className="space-y-1.5">
+          <Label>Fecha del pago</Label>
+          <Input type="date" value={fecha} onChange={(e) => setFecha(e.target.value)} className="w-full sm:w-44" />
         </div>
 
         <div className="space-y-1.5">
           <Label>Observación (opcional)</Label>
-          <Input value={observacion} onChange={(e) => setObservacion(e.target.value)} placeholder="Ej. incluye consumo no cargado" />
+          <Input
+            value={observacion}
+            onChange={(e) => setObservacion(e.target.value)}
+            placeholder="Ej. incluye consumo no cargado"
+          />
         </div>
 
-        {resumen.yaPagado.length > 0 && (
-          <p className="text-xs text-warning">
-            Ya registraste un pago para este ciclo ({resumen.yaPagado.map((p) => fmt(p.monto, p.moneda)).join(", ")}).
-          </p>
-        )}
         {error && <p className="text-sm text-danger">{error}</p>}
       </FormDialog>
     </>

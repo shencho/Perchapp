@@ -33,7 +33,7 @@ export type CuentaConSaldo = {
 
 export type TarjetaResumen = {
   id: string; nombre: string; tipo: string | null;
-  banco_emisor: string | null; consumo: number; proximoVto: string | null;
+  banco_emisor: string | null; consumo: Record<string, number>; proximoVto: string | null;
   cicloAbierto?: boolean;
 };
 
@@ -57,6 +57,7 @@ export interface DashboardData {
     ingresosDelMes: number; egresosDelMes: number;
     ingresosDelMesUSD: number; egresosDelMesUSD: number;
     balanceDelMes: number; balanceMesAnterior: number;
+    balanceDelMesUSD: number; balanceMesAnteriorUSD: number;
   };
   cuentasLiquidas: CuentaConSaldo[];
   inversiones: CuentaConSaldo[];
@@ -189,12 +190,34 @@ function StatCard({
 // ── Hero financiero ───────────────────────────────────────────────────────────
 
 function HeroFinanciero({ hero, perfil }: { hero: DashboardData["hero"]; perfil: DashboardData["perfil"] }) {
-  const delta = hero.balanceMesAnterior !== 0
-    ? Math.round((hero.balanceDelMes - hero.balanceMesAnterior) / Math.abs(hero.balanceMesAnterior) * 100)
-    : null;
-  const ahorroPct = hero.ingresosDelMes > 0
-    ? Math.round(((hero.ingresosDelMes - hero.egresosDelMes) / hero.ingresosDelMes) * 100)
-    : null;
+  // Un delta y un % de ahorro POR MONEDA: nunca se mezclan entre sí.
+  function deltaDe(actual: number, anterior: number) {
+    return anterior !== 0 ? Math.round(((actual - anterior) / Math.abs(anterior)) * 100) : null;
+  }
+  function ahorroDe(ingresos: number, egresos: number) {
+    return ingresos > 0 ? Math.round(((ingresos - egresos) / ingresos) * 100) : null;
+  }
+
+  const monedas = [
+    {
+      code: "ARS" as const,
+      label: "Pesos",
+      total: hero.totalARS,
+      ingresos: hero.ingresosDelMes,
+      egresos: hero.egresosDelMes,
+      delta: deltaDe(hero.balanceDelMes, hero.balanceMesAnterior),
+      ahorro: ahorroDe(hero.ingresosDelMes, hero.egresosDelMes),
+    },
+    {
+      code: "USD" as const,
+      label: "Dólares",
+      total: hero.totalUSD,
+      ingresos: hero.ingresosDelMesUSD,
+      egresos: hero.egresosDelMesUSD,
+      delta: deltaDe(hero.balanceDelMesUSD, hero.balanceMesAnteriorUSD),
+      ahorro: ahorroDe(hero.ingresosDelMesUSD, hero.egresosDelMesUSD),
+    },
+  ];
 
   return (
     <div className="space-y-4">
@@ -216,55 +239,107 @@ function HeroFinanciero({ hero, perfil }: { hero: DashboardData["hero"]; perfil:
         </Link>
       </div>
 
-      {/* Hero navy — Balance total (absorbe Patrimonio + Balance del mes) */}
+      {/* Hero navy — patrimonio por moneda, ambas del mismo tamaño */}
       <div className="mango-card-navy p-[26px] text-white">
         <MangoBlob size={260} style={{ right: -70, top: -90 }} />
         <MangoBlob size={170} style={{ right: 110, bottom: -95 }} />
-        <div className="relative">
-          <p className="text-[13px] font-medium text-cream">Balance total</p>
-          <p className="mt-1 font-mono font-semibold tracking-tight text-white" style={{ fontSize: 44, lineHeight: 1.05 }}>
-            {fmt(hero.totalARS)}
-          </p>
-          <div className="mt-3 flex flex-wrap items-center gap-2">
-            {delta !== null && (
-              <span className="inline-flex items-center gap-1 rounded-[20px] bg-cream px-2.5 py-1 text-xs font-semibold text-navy">
-                {delta > 0 ? <TrendingUp className="h-3.5 w-3.5" /> : delta < 0 ? <TrendingDown className="h-3.5 w-3.5" /> : <Minus className="h-3.5 w-3.5" />}
-                {delta > 0 ? "+" : ""}{delta}% vs mes anterior
-              </span>
-            )}
-            {hero.totalUSD !== 0 && (
-              <span className="inline-flex items-center gap-1 rounded-[20px] px-2.5 py-1 text-xs font-semibold text-white" style={{ background: "rgba(255,255,255,0.12)" }}>
-                {fmt(hero.totalUSD, "USD")} USD
-              </span>
-            )}
-          </div>
+        <div className="relative grid grid-cols-1 sm:grid-cols-2 gap-5 sm:gap-4">
+          {monedas.map((m) => (
+            <div key={m.code} className="min-w-0">
+              <p className="text-[13px] font-medium text-cream">{m.label}</p>
+              <p
+                className="mt-1 font-mono font-semibold tracking-tight text-white truncate"
+                style={{ fontSize: 36, lineHeight: 1.05 }}
+              >
+                {fmt(m.total, m.code)}
+              </p>
+              {m.delta !== null && (
+                <span className="mt-2 inline-flex items-center gap-1 rounded-[20px] bg-cream px-2.5 py-1 text-xs font-semibold text-navy">
+                  {m.delta > 0 ? <TrendingUp className="h-3.5 w-3.5" /> : m.delta < 0 ? <TrendingDown className="h-3.5 w-3.5" /> : <Minus className="h-3.5 w-3.5" />}
+                  {m.delta > 0 ? "+" : ""}{m.delta}% vs mes anterior
+                </span>
+              )}
+            </div>
+          ))}
         </div>
       </div>
 
-      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+      {/* KPIs del mes: cada tarjeta muestra las DOS monedas con el mismo peso */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         <StatCard
           icon={ArrowDownLeft} chipBg="#e6f6ef" iconColor="#0b7a52"
-          label="Ingresos del mes" value={fmt(hero.ingresosDelMes)} valueClass="text-success"
+          label="Ingresos del mes"
+          value={<DosMonedas ars={fmt(hero.ingresosDelMes)} usd={fmt(hero.ingresosDelMesUSD, "USD")} />}
+          valueClass="text-success"
         />
         <StatCard
           icon={ArrowUpRight} chipBg="#fdeaea" iconColor="#c0362f"
-          label="Gastos del mes" value={fmt(hero.egresosDelMes)} valueClass="text-danger"
+          label="Gastos del mes"
+          value={<DosMonedas ars={fmt(hero.egresosDelMes)} usd={fmt(hero.egresosDelMesUSD, "USD")} />}
+          valueClass="text-danger"
         />
         <StatCard
           icon={PiggyBank} chipBg="#f3ecdc" iconColor="#1e3a5f"
-          label={ahorroPct !== null ? "Ahorro del mes" : "Sin ingresos"}
-          value={ahorroPct !== null ? `${ahorroPct}%` : "—"}
+          label="Ahorro del mes"
+          value={
+            <DosMonedas
+              ars={monedas[0].ahorro !== null ? `${monedas[0].ahorro}%` : "—"}
+              usd={monedas[1].ahorro !== null ? `${monedas[1].ahorro}%` : "—"}
+            />
+          }
         />
       </div>
-      {(hero.ingresosDelMesUSD > 0 || hero.egresosDelMesUSD > 0) && (
-        <p className="text-xs text-muted-foreground">
-          En USD este mes:{" "}
-          {hero.ingresosDelMesUSD > 0 && <span className="text-success">+{fmt(hero.ingresosDelMesUSD, "USD")}</span>}
-          {hero.ingresosDelMesUSD > 0 && hero.egresosDelMesUSD > 0 && " · "}
-          {hero.egresosDelMesUSD > 0 && <span className="text-danger">-{fmt(hero.egresosDelMesUSD, "USD")}</span>}
-        </p>
-      )}
     </div>
+  );
+}
+
+/** Dos monedas en paralelo, mismo tamaño; la etiqueta ARS/USD las distingue. */
+function DosMonedas({ ars, usd }: { ars: string; usd: string }) {
+  return (
+    <span className="flex flex-col gap-0.5">
+      <span className="flex items-baseline gap-1.5">
+        <span className="text-[10px] font-sans font-medium text-muted-foreground w-7 shrink-0">ARS</span>
+        <span className="truncate">{ars}</span>
+      </span>
+      <span className="flex items-baseline gap-1.5">
+        <span className="text-[10px] font-sans font-medium text-muted-foreground w-7 shrink-0">USD</span>
+        <span className="truncate">{usd}</span>
+      </span>
+    </span>
+  );
+}
+
+/** Totales por moneda, del mismo tamaño; muestra $0 si no hay nada. */
+function TotalesMoneda({ totales, className }: { totales: Record<string, number>; className?: string }) {
+  const conSaldo = Object.entries(totales).filter(([, v]) => v !== 0);
+  if (conSaldo.length === 0) {
+    return <p className="text-lg font-bold tabular-nums font-mono mt-0.5 text-muted-foreground">$0</p>;
+  }
+  return (
+    <div className="mt-0.5 space-y-0.5">
+      {conSaldo.map(([moneda, v]) => (
+        <p key={moneda} className={cn("text-lg font-bold tabular-nums font-mono", className)}>
+          {fmt(v, moneda)}
+        </p>
+      ))}
+    </div>
+  );
+}
+
+/** Consumo de una tarjeta: una línea por moneda (ARS y USD no se suman). */
+function ConsumoPorMoneda({ consumo }: { consumo: Record<string, number> }) {
+  const conSaldo = Object.entries(consumo).filter(([, v]) => v > 0);
+  if (conSaldo.length === 0) {
+    return <span className="font-semibold tabular-nums font-mono text-sm text-muted-foreground">$0</span>;
+  }
+  return (
+    <span className="flex flex-col items-end">
+      {conSaldo.map(([moneda, v]) => (
+        <span key={moneda} className="font-semibold tabular-nums font-mono text-sm text-danger">
+          {fmt(v, moneda)}
+        </span>
+      ))}
+    </span>
   );
 }
 
@@ -316,9 +391,7 @@ function BloqueCuentas({ cuentas, tarjetas }: { cuentas: CuentaConSaldo[]; tarje
                   {t.proximoVto ? ` · vto ${fmtDate(t.proximoVto)}` : ""}
                 </p>
               </div>
-              <span className={cn("font-semibold tabular-nums font-mono text-sm", t.consumo > 0 ? "text-danger" : "text-muted-foreground")}>
-                {t.consumo > 0 ? fmt(t.consumo) : "$0"}
-              </span>
+              <ConsumoPorMoneda consumo={t.consumo} />
             </Link>
           ))}
         </div>
@@ -367,19 +440,25 @@ function BloqueCompartidos({ datos }: { datos: DashboardData["compartidos"] }) {
 function BloquePrestamos({ prestamos }: { prestamos: PrestamoResumen[] }) {
   const otorgados = prestamos.filter(p => p.tipo === "otorgado");
   const deudas = prestamos.filter(p => p.tipo !== "otorgado");
-  const totalTeDeban = otorgados.reduce((acc, p) => acc + (p.moneda === "ARS" ? p.saldoPendiente : 0), 0);
-  const totalDebas = deudas.reduce((acc, p) => acc + (p.moneda === "ARS" ? p.saldoPendiente : 0), 0);
+  // Antes los préstamos en USD se descartaban (se sumaba 0). Ahora van aparte.
+  const porMoneda = (arr: PrestamoResumen[]) =>
+    arr.reduce<Record<string, number>>((acc, p) => {
+      acc[p.moneda] = (acc[p.moneda] ?? 0) + p.saldoPendiente;
+      return acc;
+    }, {});
+  const totalTeDeban = porMoneda(otorgados);
+  const totalDebas = porMoneda(deudas);
 
   return (
     <div className="space-y-3">
       <div className="grid grid-cols-2 gap-3">
         <div className="mango-card p-4">
           <p className="text-xs text-muted-foreground">Te deben</p>
-          <p className="text-lg font-bold tabular-nums font-mono mt-0.5 text-success">{fmt(totalTeDeban)}</p>
+          <TotalesMoneda totales={totalTeDeban} className="text-success" />
         </div>
         <div className="mango-card p-4">
           <p className="text-xs text-muted-foreground">Debés</p>
-          <p className="text-lg font-bold tabular-nums font-mono mt-0.5 text-danger">{fmt(totalDebas)}</p>
+          <TotalesMoneda totales={totalDebas} className="text-danger" />
         </div>
       </div>
 

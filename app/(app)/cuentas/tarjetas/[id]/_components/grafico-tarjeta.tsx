@@ -7,23 +7,24 @@ import {
 import { cn } from "@/lib/utils";
 
 interface Props {
-  /** Movimientos de la tarjeta (ARS), ya acotados a la ventana de meses. */
-  movimientos: { fecha: string; monto: number }[];
+  /** Movimientos de la tarjeta, ya acotados a la ventana de meses. */
+  movimientos: { fecha: string; monto: number; moneda: string }[];
   /** Mes actual YYYY-MM: separa histórico de comprometido a futuro. */
   mesActual: string;
 }
 
-function fmt(n: number) {
+function fmt(n: number, moneda = "ARS") {
   return new Intl.NumberFormat("es-AR", {
-    style: "currency", currency: "ARS",
+    style: "currency", currency: moneda,
     minimumFractionDigits: 0, maximumFractionDigits: 0,
   }).format(n);
 }
 
-function fmtShort(n: number) {
-  if (Math.abs(n) >= 1_000_000) return `$${(n / 1_000_000).toFixed(1)}M`;
-  if (Math.abs(n) >= 1_000) return `$${Math.round(n / 1_000)}K`;
-  return `$${Math.round(n)}`;
+function fmtShort(n: number, moneda = "ARS") {
+  const sig = moneda === "USD" ? "US$" : "$";
+  if (Math.abs(n) >= 1_000_000) return `${sig}${(n / 1_000_000).toFixed(1)}M`;
+  if (Math.abs(n) >= 1_000) return `${sig}${Math.round(n / 1_000)}K`;
+  return `${sig}${Math.round(n)}`;
 }
 
 function labelMes(mesStr: string) {
@@ -39,6 +40,13 @@ const RANGOS = [
 
 export function GraficoTarjeta({ movimientos, mesActual }: Props) {
   const [rango, setRango] = useState(12);
+  // ARS y USD no comparten escala: se muestra una moneda por vez.
+  const monedas = useMemo(
+    () => Array.from(new Set(movimientos.map((m) => m.moneda))).sort(),
+    [movimientos],
+  );
+  const [moneda, setMoneda] = useState("ARS");
+  const monedaActiva = monedas.includes(moneda) ? moneda : (monedas[0] ?? "ARS");
 
   const data = useMemo(() => {
     // Ventana centrada en el mes actual: mitad atrás, mitad adelante (cuotas ya cargadas).
@@ -54,6 +62,7 @@ export function GraficoTarjeta({ movimientos, mesActual }: Props) {
 
     const porMes: Record<string, number> = {};
     for (const m of movimientos) {
+      if (m.moneda !== monedaActiva) continue;
       const k = m.fecha.slice(0, 7);
       porMes[k] = (porMes[k] ?? 0) + m.monto;
     }
@@ -73,7 +82,7 @@ export function GraficoTarjeta({ movimientos, mesActual }: Props) {
         esFuturo,
       };
     });
-  }, [movimientos, mesActual, rango]);
+  }, [movimientos, mesActual, rango, monedaActiva]);
 
   const totalFuturo = data.filter((d) => d.esFuturo).reduce((a, d) => a + d.gasto, 0);
   const hayDatos = data.some((d) => d.gasto > 0);
@@ -88,10 +97,24 @@ export function GraficoTarjeta({ movimientos, mesActual }: Props) {
         <div>
           <h2 className="text-sm font-medium text-muted-foreground">Gasto por mes y compromiso futuro</h2>
           <p className="text-xs text-muted-foreground mt-0.5">
-            Comprometido de acá en adelante: <span className="font-semibold text-foreground tabular-nums font-mono">{fmt(totalFuturo)}</span>
+            Comprometido de acá en adelante: <span className="font-semibold text-foreground tabular-nums font-mono">{fmt(totalFuturo, monedaActiva)}</span>
           </p>
         </div>
-        <div className="flex gap-1.5">
+        <div className="flex gap-1.5 flex-wrap">
+          {monedas.length > 1 && (
+            <div className="flex gap-1.5 mr-2">
+              {monedas.map((mo) => (
+                <button
+                  key={mo}
+                  type="button"
+                  onClick={() => setMoneda(mo)}
+                  className={cn(pillBase, monedaActiva === mo ? pillActive : pillInactive)}
+                >
+                  {mo}
+                </button>
+              ))}
+            </div>
+          )}
           {RANGOS.map((r) => (
             <button
               key={r.meses}
@@ -115,9 +138,9 @@ export function GraficoTarjeta({ movimientos, mesActual }: Props) {
             <ComposedChart data={data} margin={{ top: 4, right: 4, left: -12, bottom: 0 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" vertical={false} />
               <XAxis dataKey="label" tick={{ fontSize: 11 }} tickLine={false} axisLine={false} />
-              <YAxis tickFormatter={fmtShort} tick={{ fontSize: 11 }} tickLine={false} axisLine={false} width={56} />
+              <YAxis tickFormatter={(v) => fmtShort(v as number, monedaActiva)} tick={{ fontSize: 11 }} tickLine={false} axisLine={false} width={56} />
               <Tooltip
-                formatter={(v, name) => [fmt(v as number), name === "gasto" ? "Gasto del mes" : "Acumulado a pagar"]}
+                formatter={(v, name) => [fmt(v as number, monedaActiva), name === "gasto" ? "Gasto del mes" : "Acumulado a pagar"]}
                 labelFormatter={(l) => String(l)}
                 contentStyle={{
                   borderRadius: 8,
