@@ -12,6 +12,19 @@ import { calcularSaldoPrestamo } from "@/lib/domain/calcularSaldoPrestamo";
 import { DashboardClient } from "./_components/dashboard-client";
 import type { DashboardData, Alerta, MovGrafico } from "./_components/dashboard-client";
 
+/** Formatea un consumo por moneda sin sumarlas entre sí (p. ej. "$12.000 · US$ 80"). */
+function fmtMonedas(porMoneda: Record<string, number>) {
+  const partes = Object.entries(porMoneda)
+    .filter(([, v]) => v > 0)
+    .map(([moneda, v]) =>
+      new Intl.NumberFormat("es-AR", {
+        style: "currency", currency: moneda,
+        minimumFractionDigits: 0, maximumFractionDigits: 0,
+      }).format(v),
+    );
+  return partes.length > 0 ? partes.join(" · ") : "$0";
+}
+
 function fmtARS(n: number) {
   return new Intl.NumberFormat("es-AR", {
     style: "currency", currency: "ARS",
@@ -127,14 +140,20 @@ export default async function DashboardPage() {
   const movMesActualUSD = enMesActual.filter(m => m.moneda === "USD");
   const ingresosDelMesUSD = movMesActualUSD.filter(m => m.tipo === "Ingreso" && !m.es_reembolso).reduce((acc, m) => acc + m.monto, 0);
   const egresosDelMesUSD  = movMesActualUSD.filter(m => m.tipo === "Egreso").reduce((acc, m) => acc + montoPropio(m), 0);
+  const balanceDelMesUSD  = ingresosDelMesUSD - egresosDelMesUSD;
 
-  const movMesAnt = movimientos.filter(m =>
-    m.fecha >= inicioMesAnt && m.fecha <= finMesAnt && m.moneda === "ARS" &&
+  // Comparación contra el mes anterior, una por moneda (nunca se mezclan).
+  const enMesAnt = movimientos.filter(m =>
+    m.fecha >= inicioMesAnt && m.fecha <= finMesAnt &&
     !ajusteInversionIds.includes(m.categoria_id ?? "__")
   );
-  const balanceMesAnterior =
-    movMesAnt.filter(m => m.tipo === "Ingreso" && !m.es_reembolso).reduce((acc, m) => acc + m.monto, 0) -
-    movMesAnt.filter(m => m.tipo === "Egreso").reduce((acc, m) => acc + montoPropio(m), 0);
+  function balanceDe(movs: typeof enMesAnt) {
+    return movs.filter(m => m.tipo === "Ingreso" && !m.es_reembolso).reduce((acc, m) => acc + m.monto, 0)
+         - movs.filter(m => m.tipo === "Egreso").reduce((acc, m) => acc + montoPropio(m), 0);
+  }
+  const movMesAnt = enMesAnt.filter(m => m.moneda === "ARS");
+  const balanceMesAnterior    = balanceDe(movMesAnt);
+  const balanceMesAnteriorUSD = balanceDe(enMesAnt.filter(m => m.moneda === "USD"));
 
   // ── Tarjetas con consumo ───────────────────────────────────────────────────
   const tarjetasResumen = tarjetas.map(t => {
@@ -239,7 +258,7 @@ export default async function DashboardPage() {
         tipo: "tarjeta_vence",
         urgencia: dias <= 3 ? "alta" : "media",
         titulo: `Tarjeta ${t.nombre} vence ${dias === 0 ? "hoy" : `en ${dias}d`}`,
-        descripcion: `${fmtARS(t.consumo)} de consumo pendiente${t.cicloAbierto ? " (ciclo en curso)" : ""}`,
+        descripcion: `${fmtMonedas(t.consumo)} de consumo pendiente${t.cicloAbierto ? " (ciclo en curso)" : ""}`,
         href: `/cuentas/tarjetas/${t.id}`,
       });
     }
@@ -297,6 +316,7 @@ export default async function DashboardPage() {
       ingresosDelMes, egresosDelMes,
       ingresosDelMesUSD, egresosDelMesUSD,
       balanceDelMes, balanceMesAnterior,
+      balanceDelMesUSD, balanceMesAnteriorUSD,
     },
     cuentasLiquidas,
     inversiones,

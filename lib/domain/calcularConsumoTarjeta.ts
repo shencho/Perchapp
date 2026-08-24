@@ -93,15 +93,37 @@ export function getPeriodoCierre(
   return { inicio, fin };
 }
 
+export interface MovimientoConsumo {
+  monto: number;
+  tarjeta_id: string | null;
+  fecha: string;
+  moneda: string;
+  /** Sólo los Egresos son consumo: un pago de resumen es una Transferencia. */
+  tipo: string;
+}
+
+/**
+ * Consumo de una tarjeta en un período, SEPARADO POR MONEDA.
+ *
+ * Antes devolvía un único número sumando ARS y USD como si fueran lo mismo
+ * (un consumo de US$100 se sumaba como $100), y contaba cualquier movimiento
+ * de la tarjeta — incluidos los pagos de resumen, que son Transferencias y
+ * por lo tanto inflaban el consumo en vez de cancelarlo.
+ */
 export function calcularConsumoTarjeta(
   tarjetaId: string,
-  movimientos: { monto: number; tarjeta_id: string | null; fecha: string }[],
+  movimientos: MovimientoConsumo[],
   inicio: string,
   fin: string,
-): number {
-  return movimientos
-    .filter(m => m.tarjeta_id === tarjetaId && m.fecha >= inicio && m.fecha <= fin)
-    .reduce((acc, m) => acc + m.monto, 0);
+): Record<string, number> {
+  const porMoneda: Record<string, number> = {};
+  for (const m of movimientos) {
+    if (m.tarjeta_id !== tarjetaId) continue;
+    if (m.fecha < inicio || m.fecha > fin) continue;
+    if (m.tipo !== "Egreso") continue;
+    porMoneda[m.moneda] = (porMoneda[m.moneda] ?? 0) + m.monto;
+  }
+  return porMoneda;
 }
 
 export function getProximoVencimiento(
