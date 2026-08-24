@@ -27,9 +27,14 @@ export function UserSection({ userEmail }: { userEmail?: string }) {
   }
 
   return (
-    <div className="border-t border-border p-4 space-y-3">
+    <div className="border-t border-border p-3 space-y-2.5">
       {userEmail && (
-        <p className="text-xs text-muted-foreground truncate">{userEmail}</p>
+        <div className="flex items-center gap-2.5 min-w-0">
+          <span className="shrink-0 h-8 w-8 rounded-full bg-navy text-cream grid place-items-center text-[11px] font-semibold uppercase">
+            {userEmail.slice(0, 2)}
+          </span>
+          <p className="text-xs text-muted-foreground truncate min-w-0">{userEmail}</p>
+        </div>
       )}
       <AlertDialog>
         <AlertDialogTrigger

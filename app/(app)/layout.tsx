@@ -46,7 +46,7 @@ export default async function AppLayout({
           <NotificationsBell notificacionesPromise={notificacionesPromise} />
         </Suspense>
       </div>
-      <main className="flex-1 p-4 md:p-6 pb-20 md:pb-0">{children}</main>
+      <main className="flex-1 min-w-0 p-4 md:p-6 pb-20 md:pb-0">{children}</main>
       <MobileBottomNav userEmail={user.email} esAdmin={esAdmin} />
       <PerchitaFAB />
       <Suspense fallback={null}>

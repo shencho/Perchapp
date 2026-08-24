@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { CapturaForm } from "@/components/captura/captura-form";
+import { MangoMark } from "@/components/ui/mango-logo";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { Cuenta, Tarjeta, Categoria, Persona } from "@/types/supabase";
 import type { GrupoConMiembros } from "@/lib/supabase/actions/grupos-types";
@@ -127,7 +128,16 @@ export function CapturaSheetContent({ onSuccess, cachedData, onDataFetched }: Pr
   }
 
   return (
-    <div className="p-4">
+    <div className="p-5">
+      <div className="flex items-start gap-3 mb-5">
+        <MangoMark size={38} />
+        <div className="min-w-0">
+          <p className="text-base font-semibold leading-tight">MANGO AI</p>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            Escribí tu movimiento como si me lo contaras
+          </p>
+        </div>
+      </div>
       <CapturaForm
         variant="sheet"
         onSuccess={onSuccess}

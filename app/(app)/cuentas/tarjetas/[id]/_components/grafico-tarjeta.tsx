@@ -110,7 +110,7 @@ export function GraficoTarjeta({ movimientos, mesActual }: Props) {
           Todavía no hay consumos registrados con esta tarjeta.
         </p>
       ) : (
-        <div className="h-72 w-full rounded-lg border border-border bg-card p-3">
+        <div className="h-72 w-full mango-card p-3">
           <ResponsiveContainer width="100%" height="100%">
             <ComposedChart data={data} margin={{ top: 4, right: 4, left: -12, bottom: 0 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" vertical={false} />

@@ -54,7 +54,7 @@ function CustomTooltip({ active, payload, label, moneda }: {
 }) {
   if (!active || !payload?.length) return null;
   return (
-    <div className="rounded-lg border border-border bg-card px-3 py-2 shadow-lg text-sm">
+    <div className="mango-card px-3 py-2 shadow-lg text-sm">
       <p className="font-medium mb-1">{label}</p>
       {payload.map(p => (
         <p key={p.name} style={{ color: p.color }} className="tabular-nums">

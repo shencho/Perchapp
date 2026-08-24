@@ -22,13 +22,17 @@ export function MangoAIButton({ asistenteNombre }: Props) {
   return (
     <Sheet open={open} onOpenChange={setOpen}>
       <SheetTrigger
-        className="w-full flex items-center gap-2 px-3 py-2 rounded-[15px] text-sm font-medium bg-navy text-cream transition-colors hover:bg-navy-hover"
+        className="w-full flex items-center gap-2.5 pl-2.5 pr-3 py-2.5 rounded-[15px] bg-navy text-cream text-left shadow-[var(--shadow-raised)] transition-[transform,background-color] duration-150 hover:bg-navy-hover active:scale-[0.98]"
         aria-label={`Abrir ${asistenteNombre}`}
       >
-        <MangoMark variant="onNavy" size={22} />
-        <span>{asistenteNombre}</span>
+        <MangoMark size={36} />
+        <span className="min-w-0 flex-1 leading-tight">
+          <span className="block text-sm font-semibold truncate">{asistenteNombre}</span>
+          <span className="block text-[11px] text-cream/70">Cargar movimiento</span>
+        </span>
+        <span aria-hidden className="text-lg leading-none text-cream/80">+</span>
       </SheetTrigger>
-      <SheetContent side="bottom" className="max-h-[90vh] overflow-y-auto">
+      <SheetContent side="bottom" className="max-h-[90dvh] overflow-y-auto rounded-t-[var(--radius-sheet)]">
         <CapturaSheetContent
           onSuccess={handleSuccess}
           cachedData={cachedData}
