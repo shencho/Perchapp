@@ -1,9 +1,13 @@
 import { redirect } from "next/navigation";
-import Link from "next/link";
-import { ArrowLeft } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { calcularSaldoCuenta } from "@/lib/domain/calcularSaldoCuenta";
+import { idsAjusteInversion } from "@/lib/domain/finanzas";
+import { rangoMeses, resumenMensual } from "@/lib/domain/cashflow";
 import { CashFlowClient } from "./_components/cash-flow-client";
+
+const MONEDAS = ["ARS", "USD"];
+const MESES_ATRAS = 12;
+const MESES_ADELANTE = 12;
 
 export default async function CashFlowPage() {
   const supabase = await createClient();
@@ -13,108 +17,61 @@ export default async function CashFlowPage() {
   const now = new Date();
   const anio = now.getFullYear();
   const mes = now.getMonth();
+  const mesActual = `${anio}-${String(mes + 1).padStart(2, "0")}`;
 
-  const fechaDesde3m = new Date(anio, mes - 3, 1).toISOString().slice(0, 10);
-  const finMesActual = new Date(anio, mes + 1, 0).toISOString().slice(0, 10);
-  // Ventana de futuros: desde el mes que viene hasta +12 meses (cuotas, no corrientes).
-  const futuroDesde = new Date(anio, mes + 1, 1).toISOString().slice(0, 10);
-  const futuroHasta = new Date(anio, mes + 13, 0).toISOString().slice(0, 10);
+  const desde = new Date(anio, mes - MESES_ATRAS, 1).toISOString().slice(0, 10);
+  const hasta = new Date(anio, mes + MESES_ADELANTE + 1, 0).toISOString().slice(0, 10);
 
-  const [cuentasRes, movimientosRes, categoriasRes, futurosRes] = await Promise.all([
+  const [cuentasRes, ventanaRes, saldosRes, categoriasRes] = await Promise.all([
     supabase.from("cuentas")
       .select("id, tipo, moneda, saldo")
       .eq("user_id", user.id).eq("archivada", false),
+    // Ventana amplia: histórico + compromisos futuros ya cargados (cuotas).
     supabase.from("movimientos")
-      .select("tipo, monto, monto_destino, moneda, fecha, cuenta_id, cuenta_destino_id, categoria_id")
+      .select("tipo, monto, moneda, fecha, categoria_id, frecuencia, clasificacion, cuota_grupo_id, es_compartido, gc_mi_parte, es_reembolso")
       .eq("user_id", user.id)
-      .gte("fecha", fechaDesde3m)
-      .lte("fecha", finMesActual),
+      .gte("fecha", desde).lte("fecha", hasta),
+    // El saldo de una cuenta depende de TODA su historia: acotarlo a la
+    // ventana daba un saldo inicial equivocado.
+    supabase.from("movimientos")
+      .select("tipo, monto, monto_destino, cuenta_id, cuenta_destino_id")
+      .eq("user_id", user.id),
     supabase.from("categorias")
       .select("id, nombre")
       .eq("user_id", user.id).eq("archivada", false),
-    supabase.from("movimientos")
-      .select("tipo, monto, moneda, fecha, categoria_id")
-      .eq("user_id", user.id)
-      .eq("moneda", "ARS")
-      .gte("fecha", futuroDesde)
-      .lte("fecha", futuroHasta),
   ]);
 
-  const cuentas     = cuentasRes.data ?? [];
-  const movimientos = movimientosRes.data ?? [];
-  const categorias  = categoriasRes.data ?? [];
-  const futuros     = futurosRes.data ?? [];
+  const cuentas = cuentasRes.data ?? [];
+  const ventana = ventanaRes.data ?? [];
+  const movSaldo = saldosRes.data ?? [];
+  const excluir = idsAjusteInversion(categoriasRes.data ?? []);
 
-  const ajusteInversionIds = categorias
-    .filter(c => c.nombre === "Ajuste de inversión")
-    .map(c => c.id);
+  const meses = rangoMeses(
+    `${new Date(anio, mes - MESES_ATRAS, 1).getFullYear()}-${String(new Date(anio, mes - MESES_ATRAS, 1).getMonth() + 1).padStart(2, "0")}`,
+    `${new Date(anio, mes + MESES_ADELANTE, 1).getFullYear()}-${String(new Date(anio, mes + MESES_ADELANTE, 1).getMonth() + 1).padStart(2, "0")}`,
+  );
 
-  // Saldo actual de cuentas líquidas en ARS
-  const movSaldo = movimientos.map(m => ({
-    tipo: m.tipo, monto: m.monto, monto_destino: m.monto_destino,
-    cuenta_id: m.cuenta_id, cuenta_destino_id: m.cuenta_destino_id,
-  }));
-
-  const cuentasLiquidasARS = cuentas
-    .filter(c => ["Banco", "Billetera virtual", "Efectivo"].includes(c.tipo) && c.moneda === "ARS")
-    .map(c => calcularSaldoCuenta(c.id, c.saldo ?? 0, movSaldo));
-
-  const saldoInicial = cuentasLiquidasARS.reduce((acc, s) => acc + s, 0);
-
-  // Promedios de los últimos 3 meses completos
-  const meses3 = [0, 1, 2].map(i => {
-    const d = new Date(anio, mes - 1 - i, 1);
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
-  });
-
-  let ingCorriente = 0, egCorriente = 0;
-
-  for (const mesStr of meses3) {
-    const movMes = movimientos.filter(m =>
-      m.fecha.slice(0, 7) === mesStr &&
-      m.moneda === "ARS" &&
-      !ajusteInversionIds.includes(m.categoria_id ?? "__")
-    );
-    ingCorriente += movMes.filter(m => m.tipo === "Ingreso").reduce((acc, m) => acc + m.monto, 0);
-    egCorriente  += movMes.filter(m => m.tipo === "Egreso").reduce((acc, m) => acc + m.monto, 0);
+  // Saldo líquido inicial por moneda.
+  const saldoInicial: Record<string, number> = {};
+  for (const moneda of MONEDAS) {
+    saldoInicial[moneda] = cuentas
+      .filter(c => ["Banco", "Billetera virtual", "Efectivo"].includes(c.tipo) && c.moneda === moneda)
+      .reduce((acc, c) => acc + calcularSaldoCuenta(c.id, c.saldo ?? 0, movSaldo), 0);
   }
 
-  const promedios = {
-    ingCorriente: ingCorriente / 3,
-    egCorriente:  egCorriente / 3,
-    ingNoCorriente: 0,
-    egNoCorriente:  0,
-  };
-
-  // Movimientos reales YA cargados en meses futuros (cuotas, no corrientes),
-  // agregados por mes YYYY-MM. Se suman a la proyección para reflejarlos.
-  const futurosPorMes: Record<string, { ing: number; eg: number }> = {};
-  for (const m of futuros) {
-    if (ajusteInversionIds.includes(m.categoria_id ?? "__")) continue;
-    const key = m.fecha.slice(0, 7);
-    if (!futurosPorMes[key]) futurosPorMes[key] = { ing: 0, eg: 0 };
-    if (m.tipo === "Ingreso") futurosPorMes[key].ing += m.monto;
-    else if (m.tipo === "Egreso") futurosPorMes[key].eg += m.monto;
-  }
+  const porMoneda = Object.fromEntries(
+    MONEDAS.map(moneda => [
+      moneda,
+      resumenMensual(ventana, { meses, moneda, mesActual, excluirCategorias: excluir }),
+    ]),
+  );
 
   return (
-    <div className="max-w-2xl mx-auto px-4 py-6 space-y-6">
-      <div className="flex items-center gap-3">
-        <Link href="/dashboard" className="text-muted-foreground hover:text-gold transition-colors">
-          <ArrowLeft className="h-5 w-5" />
-        </Link>
-        <div>
-          <h1 className="text-xl font-bold">Proyección de cash flow</h1>
-          <p className="text-sm text-muted-foreground">Cuentas líquidas en ARS · promedio 3 meses</p>
-        </div>
-      </div>
-
-      <CashFlowClient
-        saldoInicial={saldoInicial}
-        promedios={promedios}
-        futurosPorMes={futurosPorMes}
-        moneda="ARS"
-      />
-    </div>
+    <CashFlowClient
+      mesActual={mesActual}
+      monedas={MONEDAS}
+      saldoInicial={saldoInicial}
+      porMoneda={porMoneda}
+    />
   );
 }

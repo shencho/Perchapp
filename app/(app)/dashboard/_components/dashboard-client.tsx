@@ -3,12 +3,7 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import {
-  TrendingUp, TrendingDown, Minus, X, AlertTriangle,
-  Clock, Landmark, Wallet, ChevronRight,
-  CircleDollarSign, PieChart as PieChartIcon, BarChart3,
-  ArrowDownLeft, ArrowUpRight, PiggyBank, type LucideIcon,
-} from "lucide-react";
+import { AlertTriangle, ArrowDownLeft, ArrowUpRight, BarChart3, ChevronDown, ChevronRight, CircleDollarSign, Clock, Landmark, Minus, PieChart as PieChartIcon, PiggyBank, TrendingDown, TrendingUp, Wallet, X, type LucideIcon } from "lucide-react";
 import { categoriaNombreToLucide } from "@/lib/ui/category-icons";
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from "recharts";
 import { cn } from "@/lib/utils";
@@ -68,7 +63,10 @@ export interface DashboardData {
   prestamos: PrestamoResumen[];
   compartidos: { totalPendiente: number; porPersona: { nombre: string; total: number }[] };
   analisis: {
-    topCategorias: { id: string; nombre: string; monto: number; porcentaje: number }[];
+    topCategorias: {
+      id: string; nombre: string; monto: number; porcentaje: number;
+      hijos: { id: string; nombre: string; monto: number; porcentaje: number }[];
+    }[];
     porNecesidad: { nivel: number; monto: number }[];
   };
   presupuestos?: { categoriaId: string; nombre: string; presupuesto: number; gastado: number }[];
@@ -562,34 +560,71 @@ function BloqueInversiones({ inversiones }: { inversiones: CuentaConSaldo[] }) {
 
 function BloqueAnalisis({ analisis }: { analisis: DashboardData["analisis"] }) {
   const { topCategorias, porNecesidad } = analisis;
+  const [abierta, setAbierta] = useState<string | null>(null);
 
   return (
     <div className="space-y-4">
-      {/* Gastos por categoría */}
+      {/* Gastos por categoría — desplegable a subcategorías */}
       {topCategorias.length > 0 && (
         <div className="space-y-3">
           <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Gastos por categoría</p>
           {topCategorias.map(cat => {
             const Icon = categoriaNombreToLucide(cat.nombre);
-            const maxMonto = topCategorias[0].monto || 1;
-            const barPct = Math.round((cat.monto / maxMonto) * 100);
+            const tieneHijos = cat.hijos.length > 0;
+            const abiertaEsta = abierta === cat.id;
             return (
-              <div key={cat.id} className="flex items-center gap-3">
-                <div
-                  className="flex items-center justify-center rounded-[10px] shrink-0"
-                  style={{ width: 34, height: 34, background: "#f3ecdc" }}
+              <div key={cat.id}>
+                <button
+                  type="button"
+                  disabled={!tieneHijos}
+                  onClick={() => setAbierta(abiertaEsta ? null : cat.id)}
+                  className={cn(
+                    "w-full flex items-center gap-3 text-left rounded-lg transition-colors",
+                    tieneHijos && "hover:bg-surface active:bg-surface-2",
+                  )}
                 >
-                  <Icon className="h-[17px] w-[17px]" style={{ color: "#1e3a5f" }} />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="text-sm font-medium truncate">{cat.nombre}</span>
-                    <span className="text-sm font-bold tabular-nums font-mono shrink-0">{fmt(cat.monto)}</span>
+                  <div
+                    className="flex items-center justify-center rounded-[10px] shrink-0"
+                    style={{ width: 34, height: 34, background: "#f3ecdc" }}
+                  >
+                    <Icon className="h-[17px] w-[17px]" style={{ color: "#1e3a5f" }} />
                   </div>
-                  <div className="mt-1 h-[5px] bg-surface-2 rounded-full overflow-hidden">
-                    <div className="h-full bg-navy rounded-full" style={{ width: `${barPct}%` }} />
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-sm font-medium truncate flex items-center gap-1">
+                        {cat.nombre}
+                        {tieneHijos && (
+                          <ChevronDown
+                            className={cn(
+                              "h-3.5 w-3.5 text-muted-foreground transition-transform duration-150",
+                              !abiertaEsta && "-rotate-90",
+                            )}
+                          />
+                        )}
+                      </span>
+                      <span className="flex items-baseline gap-2 shrink-0">
+                        {/* El % es sobre el total del mes: la barra anterior era
+                            relativa a la categoría más grande y confundía. */}
+                        <span className="text-xs text-muted-foreground tabular-nums">{cat.porcentaje}%</span>
+                        <span className="text-sm font-bold tabular-nums font-mono">{fmt(cat.monto)}</span>
+                      </span>
+                    </div>
                   </div>
-                </div>
+                </button>
+
+                {abiertaEsta && (
+                  <div className="mt-1 ml-[46px] space-y-1">
+                    {cat.hijos.map(h => (
+                      <div key={h.id} className="flex items-center justify-between gap-2">
+                        <span className="text-xs text-muted-foreground truncate">{h.nombre}</span>
+                        <span className="flex items-baseline gap-2 shrink-0">
+                          <span className="text-[11px] text-muted-foreground tabular-nums">{h.porcentaje}%</span>
+                          <span className="text-xs tabular-nums font-mono">{fmt(h.monto)}</span>
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             );
           })}

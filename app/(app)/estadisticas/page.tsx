@@ -1,7 +1,17 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { montoPropio } from "@/lib/domain/_utils/movimiento";
+import { idsAjusteInversion } from "@/lib/domain/finanzas";
+import { buildJerarquia, agruparPorCategoria, agruparPorDimension } from "@/lib/domain/categorias";
 import { EstadisticasClient } from "./_components/estadisticas-client";
+
+const MONEDAS = ["ARS", "USD"];
+const NECESIDAD_LABEL: Record<number, string> = {
+  1: "1 · Imprescindible",
+  2: "2 · Necesario",
+  3: "3 · Conveniente",
+  4: "4 · Prescindible",
+  5: "5 · Superfluo",
+};
 
 interface Props {
   searchParams: Promise<{ mes?: string }>;
@@ -19,54 +29,61 @@ export default async function EstadisticasPage({ searchParams }: Props) {
   const inicio = `${anioMes}-01`;
   const fin = `${anioMes}-${String(new Date(y, m, 0).getDate()).padStart(2, "0")}`;
 
-  const [{ data: movRaw }, { data: categoriasRaw }] = await Promise.all([
+  const [{ data: movRaw }, { data: categoriasRaw }, { data: cuentasRaw }] = await Promise.all([
     supabase.from("movimientos")
-      .select("tipo, monto, moneda, categoria_id, es_compartido, gc_mi_parte")
+      .select("tipo, monto, moneda, categoria_id, metodo, cuenta_id, necesidad, es_compartido, gc_mi_parte, es_reembolso")
       .eq("user_id", user.id)
-      .eq("moneda", "ARS")
       .neq("tipo", "Transferencia")
       .gte("fecha", inicio).lte("fecha", fin),
     supabase.from("categorias")
       .select("id, nombre, parent_id")
       .eq("user_id", user.id),
+    supabase.from("cuentas")
+      .select("id, nombre")
+      .eq("user_id", user.id),
   ]);
 
   const movimientos = movRaw ?? [];
   const categorias = categoriasRaw ?? [];
-  const nombreDe = new Map(categorias.map((c) => [c.id, c.nombre]));
-  // Las subcategorías se agrupan bajo su categoría padre.
-  const padreDe = new Map(categorias.map((c) => [c.id, c.parent_id ?? c.id]));
+  const cuentas = cuentasRaw ?? [];
+  const excluir = idsAjusteInversion(categorias);
+  const jerarquia = buildJerarquia(categorias);
+  const nombreCuenta = new Map(cuentas.map((c) => [c.id, c.nombre]));
 
-  function agrupar(tipo: "Ingreso" | "Egreso") {
-    const delTipo = movimientos.filter((mv) => mv.tipo === tipo);
-    // Para egresos se usa la parte propia (en gastos compartidos, no el total).
-    const montoDe = (mv: (typeof delTipo)[number]) =>
-      tipo === "Egreso" ? montoPropio(mv) : mv.monto;
-
-    const porCat: Record<string, number> = {};
-    for (const mv of delTipo) {
-      const padre = mv.categoria_id ? (padreDe.get(mv.categoria_id) ?? mv.categoria_id) : "__sin__";
-      porCat[padre] = (porCat[padre] ?? 0) + montoDe(mv);
-    }
-    const total = delTipo.reduce((acc, mv) => acc + montoDe(mv), 0);
-
-    const categoriasOrdenadas = Object.entries(porCat)
-      .map(([id, monto]) => ({
-        id,
-        nombre: id === "__sin__" ? "Sin categoría" : (nombreDe.get(id) ?? "Sin categoría"),
-        monto,
-        porcentaje: total > 0 ? Math.round((monto / total) * 100) : 0,
-      }))
-      .sort((a, b) => b.monto - a.monto);
-
-    return { total, categorias: categoriasOrdenadas };
-  }
+  // Mismo dinero, cuatro agrupaciones: el total debe coincidir entre cortes.
+  const porMoneda = Object.fromEntries(
+    MONEDAS.map((moneda) => {
+      const delMes = movimientos.filter((mv) => mv.moneda === moneda);
+      const cortes = (tipo: "Ingreso" | "Egreso") => ({
+        categoria: agruparPorCategoria(delMes, jerarquia, { tipo, excluirCategorias: excluir }),
+        metodo: agruparPorDimension(delMes, {
+          tipo, excluirCategorias: excluir,
+          clave: (mv) => mv.metodo,
+          nombre: (id) => id,
+          etiquetaVacia: "Sin medio de pago",
+        }),
+        cuenta: agruparPorDimension(delMes, {
+          tipo, excluirCategorias: excluir,
+          clave: (mv) => mv.cuenta_id,
+          nombre: (id) => nombreCuenta.get(id) ?? "Cuenta",
+          etiquetaVacia: "Sin cuenta",
+        }),
+        necesidad: agruparPorDimension(delMes, {
+          tipo, excluirCategorias: excluir,
+          clave: (mv) => (mv.necesidad != null ? String(mv.necesidad) : null),
+          nombre: (id) => NECESIDAD_LABEL[Number(id)] ?? id,
+          etiquetaVacia: "Sin necesidad",
+        }),
+      });
+      return [moneda, { ingresos: cortes("Ingreso"), egresos: cortes("Egreso") }];
+    }),
+  );
 
   return (
     <EstadisticasClient
       anioMes={anioMes}
-      ingresos={agrupar("Ingreso")}
-      egresos={agrupar("Egreso")}
+      monedas={MONEDAS}
+      porMoneda={porMoneda}
     />
   );
 }

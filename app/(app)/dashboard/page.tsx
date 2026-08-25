@@ -3,6 +3,8 @@ import { createClient } from "@/lib/supabase/server";
 import { getPrestamos } from "@/lib/supabase/actions/prestamos";
 import { calcularSaldoCuenta } from "@/lib/domain/calcularSaldoCuenta";
 import { montoPropio } from "@/lib/domain/_utils/movimiento";
+import { totalesPorMoneda, idsAjusteInversion } from "@/lib/domain/finanzas";
+import { buildJerarquia, agruparPorCategoria } from "@/lib/domain/categorias";
 import { calcularConsumoTarjeta, getPeriodoCierre, getProximoVencimiento, getCicloDelProximoVencimiento } from "@/lib/domain/calcularConsumoTarjeta";
 import { getPlantillas } from "@/lib/supabase/actions/plantillas";
 import { getPlantillasParaAlerta } from "@/lib/domain/plantillas";
@@ -121,39 +123,30 @@ export default async function DashboardPage() {
   const totalUSD = cuentasConSaldo.filter(c => c.moneda === "USD").reduce((acc, c) => acc + c.saldo, 0);
 
   // ── IDs de "Ajuste de inversión" (excluir de gráfico y KPIs) ──────────────
-  const ajusteInversionIds = categorias
-    .filter(c => c.nombre === "Ajuste de inversión")
-    .map(c => c.id);
+  const ajusteInversionIds = idsAjusteInversion(categorias);
 
   // ── Hero KPIs ──────────────────────────────────────────────────────────────
-  // Los KPIs del mes y el análisis se calculan SOLO en ARS (mezclar ARS+USD
-  // daba totales/gráficos erróneos). El movimiento en USD del mes se resume aparte.
-  const enMesActual = movimientos.filter(m =>
-    m.fecha >= inicioMesActual && m.fecha <= finMesActual &&
-    !ajusteInversionIds.includes(m.categoria_id ?? "__")
-  );
-  const movMesActual = enMesActual.filter(m => m.moneda === "ARS");
-  const ingresosDelMes = movMesActual.filter(m => m.tipo === "Ingreso" && !m.es_reembolso).reduce((acc, m) => acc + m.monto, 0);
-  const egresosDelMes  = movMesActual.filter(m => m.tipo === "Egreso").reduce((acc, m) => acc + montoPropio(m), 0);
-  const balanceDelMes  = ingresosDelMes - egresosDelMes;
+  // Criterio ÚNICO y por moneda (lib/domain/finanzas.ts): mismo número que
+  // estadísticas, cash-flow y presupuestos.
+  const enMesActual = movimientos.filter(m => m.fecha >= inicioMesActual && m.fecha <= finMesActual);
+  const enMesAnt    = movimientos.filter(m => m.fecha >= inicioMesAnt && m.fecha <= finMesAnt);
 
-  const movMesActualUSD = enMesActual.filter(m => m.moneda === "USD");
-  const ingresosDelMesUSD = movMesActualUSD.filter(m => m.tipo === "Ingreso" && !m.es_reembolso).reduce((acc, m) => acc + m.monto, 0);
-  const egresosDelMesUSD  = movMesActualUSD.filter(m => m.tipo === "Egreso").reduce((acc, m) => acc + montoPropio(m), 0);
-  const balanceDelMesUSD  = ingresosDelMesUSD - egresosDelMesUSD;
+  const totMes    = totalesPorMoneda(enMesActual, { excluirCategorias: ajusteInversionIds });
+  const totMesAnt = totalesPorMoneda(enMesAnt,    { excluirCategorias: ajusteInversionIds });
 
-  // Comparación contra el mes anterior, una por moneda (nunca se mezclan).
-  const enMesAnt = movimientos.filter(m =>
-    m.fecha >= inicioMesAnt && m.fecha <= finMesAnt &&
-    !ajusteInversionIds.includes(m.categoria_id ?? "__")
+  const ingresosDelMes = totMes.ARS.ingresos;
+  const egresosDelMes  = totMes.ARS.egresos;
+  const balanceDelMes  = totMes.ARS.balance;
+  const ingresosDelMesUSD = totMes.USD.ingresos;
+  const egresosDelMesUSD  = totMes.USD.egresos;
+  const balanceDelMesUSD  = totMes.USD.balance;
+  const balanceMesAnterior    = totMesAnt.ARS.balance;
+  const balanceMesAnteriorUSD = totMesAnt.USD.balance;
+
+  // Para el análisis por categoría/necesidad (una moneda por vez).
+  const movMesActual = enMesActual.filter(m =>
+    m.moneda === "ARS" && !ajusteInversionIds.includes(m.categoria_id ?? "__")
   );
-  function balanceDe(movs: typeof enMesAnt) {
-    return movs.filter(m => m.tipo === "Ingreso" && !m.es_reembolso).reduce((acc, m) => acc + m.monto, 0)
-         - movs.filter(m => m.tipo === "Egreso").reduce((acc, m) => acc + montoPropio(m), 0);
-  }
-  const movMesAnt = enMesAnt.filter(m => m.moneda === "ARS");
-  const balanceMesAnterior    = balanceDe(movMesAnt);
-  const balanceMesAnteriorUSD = balanceDe(enMesAnt.filter(m => m.moneda === "USD"));
 
   // ── Tarjetas con consumo ───────────────────────────────────────────────────
   const tarjetasResumen = tarjetas.map(t => {
@@ -202,22 +195,14 @@ export default async function DashboardPage() {
     .slice(0, 3);
 
   // ── Análisis del mes ───────────────────────────────────────────────────────
-  const categoriaMap = Object.fromEntries(categorias.map(c => [c.id, c.nombre]));
+  const jerarquia = buildJerarquia(categorias);
   const movEgresoMes = movMesActual.filter(m => m.tipo === "Egreso");
-  const totalEgMes = movEgresoMes.reduce((acc, m) => acc + montoPropio(m), 0);
-
-  const byCat = movEgresoMes.reduce((acc, m) => {
-    const k = m.categoria_id ?? "__sin__";
-    return { ...acc, [k]: (acc[k] ?? 0) + montoPropio(m) };
-  }, {} as Record<string, number>);
-
-  const topCategorias = Object.entries(byCat)
-    .map(([id, monto]) => ({
-      id, nombre: categoriaMap[id] ?? "Sin categoría", monto,
-      porcentaje: totalEgMes > 0 ? Math.round((monto / totalEgMes) * 100) : 0,
-    }))
-    .sort((a, b) => b.monto - a.monto)
-    .slice(0, 5);
+  // Agrupa por categoría padre y conserva las subcategorías para desplegar.
+  const resumenCats = agruparPorCategoria(movMesActual, jerarquia, {
+    tipo: "Egreso", excluirCategorias: ajusteInversionIds,
+  });
+  const totalEgMes = resumenCats.total;
+  const topCategorias = resumenCats.filas.slice(0, 6);
 
   const porNecesidad = [1, 2, 3, 4, 5]
     .map(nivel => ({
@@ -227,17 +212,15 @@ export default async function DashboardPage() {
     .filter(n => n.monto > 0);
 
   // ── Presupuesto vs gastado por categoría (mes actual, ARS) ─────────────────
-  const parentDe = new Map<string, string>();
-  for (const c of categorias) parentDe.set(c.id, (c as { parent_id: string | null }).parent_id ?? c.id);
-  const gastadoPorPadre: Record<string, number> = {};
-  for (const mv of movEgresoMes) {
-    const padre = mv.categoria_id ? (parentDe.get(mv.categoria_id) ?? mv.categoria_id) : "__sin__";
-    gastadoPorPadre[padre] = (gastadoPorPadre[padre] ?? 0) + montoPropio(mv);
-  }
+  // El gasto por categoría padre sale del mismo resumen que el bloque de
+  // categorías, así presupuesto y análisis no pueden divergir.
+  const gastadoPorPadre: Record<string, number> = Object.fromEntries(
+    resumenCats.filas.map(f => [f.id, f.monto]),
+  );
   const presupuestos = (presupuestosMes as { categoria_id: string; monto: number }[])
     .map(p => ({
       categoriaId: p.categoria_id,
-      nombre: categoriaMap[p.categoria_id] ?? "Categoría",
+      nombre: jerarquia.nombreDe.get(p.categoria_id) ?? "Categoría",
       presupuesto: p.monto,
       gastado: gastadoPorPadre[p.categoria_id] ?? 0,
     }))
