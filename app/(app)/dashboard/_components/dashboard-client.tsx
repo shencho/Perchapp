@@ -137,14 +137,14 @@ function useBlockToggle() {
 // ── DashBlock wrapper ─────────────────────────────────────────────────────────
 
 function DashBlock({
-  id, title, hiddenBlocks, onToggle, children,
+  id, title, hiddenBlocks, onToggle, className, children,
 }: {
   id: string; title: string; hiddenBlocks: string[];
-  onToggle: (id: string) => void; children: React.ReactNode;
+  onToggle: (id: string) => void; className?: string; children: React.ReactNode;
 }) {
   if (hiddenBlocks.includes(id)) return null;
   return (
-    <section className="space-y-3">
+    <section className={cn("space-y-3", className)}>
       <div className="flex items-center justify-between">
         <h2 className="text-base font-semibold">{title}</h2>
         <button
@@ -785,8 +785,12 @@ export function DashboardClient({ data }: { data: DashboardData }) {
         </section>
       )}
 
-      {/* Gráfico evolución */}
-      <DashBlock id="grafico" title="Evolución mensual" hiddenBlocks={hiddenBlocks} onToggle={toggleBlock}>
+      {/* Tablero: los bloques se acomodan en grilla y cada uno ocupa sólo su
+          alto natural (items-start), en vez de apilarse a ancho completo. */}
+      <div className="grid gap-6 lg:grid-cols-2 items-start">
+
+      {/* Gráfico evolución — a lo ancho: necesita el eje largo */}
+      <DashBlock id="grafico" title="Evolución mensual" hiddenBlocks={hiddenBlocks} onToggle={toggleBlock} className="lg:col-span-2">
         <GraficoEvolucion
           movimientos={data.movimientosGrafico}
           cuentas={data.cuentasParaFiltro}
@@ -798,6 +802,13 @@ export function DashboardClient({ data }: { data: DashboardData }) {
       <DashBlock id="cuentas" title="Cuentas y tarjetas" hiddenBlocks={hiddenBlocks} onToggle={toggleBlock}>
         <BloqueCuentas cuentas={data.cuentasLiquidas} tarjetas={data.tarjetas} />
       </DashBlock>
+
+      {/* Análisis — al lado de Cuentas: son los dos que más se miran */}
+      {(data.analisis.topCategorias.length > 0 || data.analisis.porNecesidad.length > 0) && (
+        <DashBlock id="analisis" title="Análisis del mes" hiddenBlocks={hiddenBlocks} onToggle={toggleBlock}>
+          <BloqueAnalisis analisis={data.analisis} />
+        </DashBlock>
+      )}
 
       {/* Préstamos */}
       {data.prestamos.length > 0 && (
@@ -817,13 +828,6 @@ export function DashboardClient({ data }: { data: DashboardData }) {
       {data.compartidos.totalPendiente > 0 && (
         <DashBlock id="compartidos" title="Gastos compartidos" hiddenBlocks={hiddenBlocks} onToggle={toggleBlock}>
           <BloqueCompartidos datos={data.compartidos} />
-        </DashBlock>
-      )}
-
-      {/* Análisis */}
-      {(data.analisis.topCategorias.length > 0 || data.analisis.porNecesidad.length > 0) && (
-        <DashBlock id="analisis" title="Análisis del mes" hiddenBlocks={hiddenBlocks} onToggle={toggleBlock}>
-          <BloqueAnalisis analisis={data.analisis} />
         </DashBlock>
       )}
 
@@ -857,6 +861,8 @@ export function DashboardClient({ data }: { data: DashboardData }) {
           </div>
         </div>
       )}
+
+      </div>
     </div>
   );
 }

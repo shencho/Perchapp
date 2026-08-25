@@ -57,13 +57,52 @@ function CustomTooltip({ active, payload, label, moneda }: {
     <div className="mango-card px-3 py-2 shadow-lg text-sm">
       <p className="font-medium mb-1">{label}</p>
       {payload.map(p => (
-        <p key={p.name} style={{ color: p.color }} className="tabular-nums">
+        <p key={p.name} style={{ color: COLOR_SERIE[p.name] ?? p.color }} className="tabular-nums">
           {p.name}: {fmt(p.value, moneda === "consolidado" ? "ARS" : moneda)}
         </p>
       ))}
     </div>
   );
 }
+
+/**
+ * Color solido de cada serie. Las barras se pintan con un degrade
+ * (`url(#...)`), que NO es un color CSS valido: la leyenda y el tooltip
+ * necesitan el color plano equivalente.
+ */
+const COLOR_SERIE: Record<string, string> = {
+  Ingresos: "var(--color-success)",
+  Egresos: "var(--color-gold)",
+  Balance: "var(--color-navy)",
+};
+
+/**
+ * Leyenda propia. Recharts pinta el swatch con el `fill` de la serie, que acá
+ * es un degrade (`url(#...)`) y no un color CSS: el swatch quedaria en negro.
+ */
+function LeyendaMarca() {
+  return (
+    <div className="flex items-center justify-center gap-4 pt-2 text-xs text-muted-foreground">
+      {Object.entries(COLOR_SERIE).map(([nombre, color]) => (
+        <span key={nombre} className="flex items-center gap-1.5">
+          <span
+            className="h-2 w-2 rounded-full shrink-0"
+            style={{ background: color }}
+          />
+          {nombre}
+        </span>
+      ))}
+    </div>
+  );
+}
+
+/**
+ * Geometria de las barras, tomada del diseno: barras finas con las esquinas
+ * redondeadas arriba Y abajo (en el diseno son divs con border-radius:7px
+ * uniforme apoyados sobre la linea de base).
+ */
+const RADIO_BARRA: [number, number, number, number] = [6, 6, 6, 6];
+const ANCHO_BARRA = 14;
 
 export function GraficoEvolucion({ movimientos, cuentas, ajusteInversionIds }: Props) {
   const router = useRouter();
@@ -157,42 +196,54 @@ export function GraficoEvolucion({ movimientos, cuentas, ajusteInversionIds }: P
           onClick={handleChartClick}
           margin={{ top: 4, right: 4, bottom: 0, left: 0 }}
         >
-          <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" vertical={false} />
+          {/* Degradés de marca: el diseno pinta las barras con un gradiente
+              vertical claro->oscuro, no con un color plano. */}
+          <defs>
+            <linearGradient id="gradIngresos" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="var(--color-leaf-light)" />
+              <stop offset="100%" stopColor="var(--color-success)" />
+            </linearGradient>
+            <linearGradient id="gradEgresos" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="var(--color-gold-light)" />
+              <stop offset="100%" stopColor="var(--color-gold)" />
+            </linearGradient>
+          </defs>
+          <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" vertical={false} />
           <XAxis
             dataKey="label"
-            tick={{ fill: "#6b7280", fontSize: 11 }}
+            tick={{ fill: "var(--color-muted-foreground)", fontSize: 11 }}
             axisLine={false} tickLine={false}
           />
           <YAxis
             tickFormatter={fmtShort}
-            tick={{ fill: "#6b7280", fontSize: 11 }}
+            tick={{ fill: "var(--color-muted-foreground)", fontSize: 11 }}
             axisLine={false} tickLine={false}
             width={52}
           />
           <Tooltip
             content={<CustomTooltip moneda={moneda} />}
-            cursor={{ fill: "#e5e7eb", opacity: 0.8 }}
+            cursor={{ fill: "var(--color-surface-2)", opacity: 0.6 }}
           />
           <Legend
             wrapperStyle={{ fontSize: "12px", paddingTop: "8px" }}
-            formatter={(value) => <span style={{ color: "#6b7280" }}>{value}</span>}
+            content={<LeyendaMarca />}
           />
           <Bar
-            dataKey="ingresos" name="Ingresos" fill="#10b981" opacity={0.85}
-            radius={[3, 3, 0, 0]} style={{ cursor: "pointer" }}
+            dataKey="ingresos" name="Ingresos" fill="url(#gradIngresos)"
+            radius={RADIO_BARRA} maxBarSize={ANCHO_BARRA} style={{ cursor: "pointer" }}
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             onClick={(data: any) => data?.mes && router.push(`/movimientos?mes=${data.mes}`)}
           />
           <Bar
-            dataKey="egresos" name="Egresos" fill="#ef4444" opacity={0.85}
-            radius={[3, 3, 0, 0]} style={{ cursor: "pointer" }}
+            dataKey="egresos" name="Egresos" fill="url(#gradEgresos)"
+            radius={RADIO_BARRA} maxBarSize={ANCHO_BARRA} style={{ cursor: "pointer" }}
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             onClick={(data: any) => data?.mes && router.push(`/movimientos?mes=${data.mes}`)}
           />
           <Line
             type="monotone" dataKey="balance" name="Balance"
-            stroke="#3b82f6" strokeWidth={2}
-            dot={{ r: 3, fill: "#3b82f6", strokeWidth: 0 }}
+            stroke="var(--color-navy)" strokeWidth={2}
+            dot={{ r: 3, fill: "var(--color-navy)", strokeWidth: 0 }}
             activeDot={{ r: 5 }}
           />
         </ComposedChart>
