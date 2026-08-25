@@ -84,7 +84,7 @@
 
 /* MANGO V2 — light mode (flip completo dark→light). Paleta de marca en hex. */
 :root {
-  --background: #f6f1e6;
+  --background: #fbfaf7;
   --foreground: #111827;
   --card: #ffffff;
   --card-foreground: #111827;
@@ -92,15 +92,15 @@
   --popover-foreground: #111827;
   --primary: #1e3a5f;
   --primary-foreground: #ffffff;
-  --secondary: #f1ebdc;
+  --secondary: #f4f0e6;
   --secondary-foreground: #1e3a5f;
-  --muted: #f1ebdc;
-  --muted-foreground: #9c9074;
-  --accent: #efe8d8;
+  --muted: #f4f0e6;
+  --muted-foreground: #6b6046;
+  --accent: #efeadd;
   --accent-foreground: #1e3a5f;
   --destructive: #ef4444;
-  --border: #eee4d0;
-  --input: #eee4d0;
+  --border: #e3dcce;
+  --input: #e3dcce;
   --ring: #1e3a5f;
   --radius: 0.625rem;
   /* Charts — paleta MANGO */
@@ -110,18 +110,18 @@
   --chart-4: #ef4444;
   --chart-5: #3b82f6;
   /* Sidebar */
-  --sidebar: #f1ebdc;
+  --sidebar: #f7f4ed;
   --sidebar-foreground: #111827;
   --sidebar-primary: #1e3a5f;
   --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent: #e6dcc4;
+  --sidebar-accent: #eee7d8;
   --sidebar-accent-foreground: #1e3a5f;
-  --sidebar-border: #eee4d0;
+  --sidebar-border: #e3dcce;
   --sidebar-ring: #1e3a5f;
   /* MANGO custom tokens */
-  --surface: #f1ebdc;
-  --surface-2: #e6dcc4;
-  --subtle: #b5aa8c;
+  --surface: #f4f0e6;
+  --surface-2: #ebe5d6;
+  --subtle: #94886c;
   /* MANGO marca */
   --navy: #1e3a5f;
   --cream: #e8d9b4;
