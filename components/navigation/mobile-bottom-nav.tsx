@@ -11,22 +11,23 @@ interface Props {
 }
 
 export function MobileBottomNav({ userEmail, esAdmin = false }: Props) {
-  const allItems = getNavItems();
-
-  const inicio = allItems.find((i) => i.href === "/dashboard")!;
-  const movimientos = allItems.find((i) => i.href === "/movimientos")!;
-  const rightPrimary = allItems.find((i) => i.href === "/balances")!;
+  // Se arma desde el flag: antes buscaba 3 hrefs a mano con `!`, así que
+  // renombrar cualquiera de esas rutas rompía la barra en runtime.
+  const items = getNavItems().filter((i) => i.bottomNav).slice(0, 3);
 
   return (
     <nav className="md:hidden fixed bottom-0 left-0 right-0 h-16 border-t border-[#eee4d0] bg-background z-30 pb-[env(safe-area-inset-bottom)]">
       <div className="h-full grid grid-cols-5 [&>*]:min-w-0">
-        <NavItemComponent item={inicio} variant="bottom" />
-        <NavItemComponent item={movimientos} variant="bottom" />
+        {items.slice(0, 2).map((item) => (
+          <NavItemComponent key={item.href} item={item} variant="bottom" />
+        ))}
 
-        {/* Center gap — FAB sits above this slot */}
+        {/* Hueco central — el mango (PerchitaFAB) se apoya acá */}
         <div aria-hidden="true" />
 
-        <NavItemComponent item={rightPrimary} variant="bottom" />
+        {items.slice(2).map((item) => (
+          <NavItemComponent key={item.href} item={item} variant="bottom" />
+        ))}
 
         <NavigationDrawer
           trigger={

@@ -380,7 +380,7 @@ function BloqueCuentas({ cuentas, tarjetas }: { cuentas: CuentaConSaldo[]; tarje
       {tarjetas.length > 0 && (
         <div className="rounded-lg border border-border divide-y divide-border">
           {tarjetas.map(t => (
-            <Link key={t.id} href={`/cuentas/tarjetas/${t.id}`}
+            <Link key={t.id} href={`/tarjetas/${t.id}`}
               className="flex items-center justify-between px-4 py-3 hover:bg-surface/50 transition-colors">
               <div>
                 <p className="text-sm font-medium">{t.nombre}</p>

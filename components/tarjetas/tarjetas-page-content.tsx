@@ -45,9 +45,22 @@ const EMPTY: FormData = {
 interface Props {
   tarjetas: Tarjeta[];
   cuentas: Cuenta[];
+  /** Ciclo actual por tarjeta: consumo por moneda, cierre y vencimiento. */
+  resumen?: Record<string, { consumo: Record<string, number>; cierre: string; vencimiento: string | null }>;
 }
 
-export function TarjetasPageContent({ tarjetas, cuentas }: Props) {
+function fmtMonto(n: number, moneda = "ARS") {
+  return new Intl.NumberFormat("es-AR", {
+    style: "currency", currency: moneda,
+    minimumFractionDigits: 0, maximumFractionDigits: 0,
+  }).format(n);
+}
+
+function fmtDia(iso: string) {
+  return new Date(iso + "T12:00:00").toLocaleDateString("es-AR", { day: "2-digit", month: "short" }).replace(".", "");
+}
+
+export function TarjetasPageContent({ tarjetas, cuentas, resumen = {} }: Props) {
   const router = useRouter();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
@@ -155,13 +168,31 @@ export function TarjetasPageContent({ tarjetas, cuentas }: Props) {
                   <span className="text-xs text-muted-foreground">
                     {t.tipo ?? "—"}
                     {t.banco_emisor ? ` · ${t.banco_emisor}` : ""}
-                    {t.cierre_dia ? ` · Cierre día ${t.cierre_dia}` : ""}
-                    {t.vencimiento_dia ? ` · Vto. día ${t.vencimiento_dia}` : ""}
                   </span>
+                  {(() => {
+                    const r = resumen[t.id];
+                    if (!r || t.tipo === "Débito") return null;
+                    const conConsumo = Object.entries(r.consumo).filter(([, v]) => v > 0);
+                    return (
+                      <span className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5 mt-1">
+                        {conConsumo.length === 0 ? (
+                          <span className="text-sm font-semibold tabular-nums font-mono text-muted-foreground">$0</span>
+                        ) : conConsumo.map(([moneda, v]) => (
+                          <span key={moneda} className="text-sm font-semibold tabular-nums font-mono text-danger">
+                            {fmtMonto(v, moneda)}
+                          </span>
+                        ))}
+                        <span className="text-[11px] text-muted-foreground">
+                          cierra {fmtDia(r.cierre)}
+                          {r.vencimiento ? ` · vence ${fmtDia(r.vencimiento)}` : ""}
+                        </span>
+                      </span>
+                    );
+                  })()}
                 </div>
                 <div className="flex items-center gap-1">
                   <Link
-                    href={`/cuentas/tarjetas/${t.id}`}
+                    href={`/tarjetas/${t.id}`}
                     title="Ver consumos"
                     className="inline-flex items-center justify-center h-7 w-7 rounded-md text-muted-foreground hover:bg-surface hover:text-foreground transition-colors"
                   >

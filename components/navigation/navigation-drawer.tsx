@@ -17,8 +17,10 @@ export function NavigationDrawer({ trigger, userEmail, esAdmin = false }: Props)
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
 
+  // Sólo drawerOnly: antes incluía también los desktopOnly, así que en
+  // escritorio Préstamos y Cash flow aparecían dos veces (sidebar + "Más").
   const drawerItems = getNavItems().filter(
-    (item) => (item.drawerOnly || item.desktopOnly) && (!item.adminOnly || esAdmin)
+    (item) => item.drawerOnly && (!item.adminOnly || esAdmin)
   );
 
   // Cerrar el drawer al navegar (cambia el pathname).

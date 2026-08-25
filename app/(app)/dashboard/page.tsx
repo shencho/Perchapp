@@ -242,7 +242,7 @@ export default async function DashboardPage() {
         urgencia: dias <= 3 ? "alta" : "media",
         titulo: `Tarjeta ${t.nombre} vence ${dias === 0 ? "hoy" : `en ${dias}d`}`,
         descripcion: `${fmtMonedas(t.consumo)} de consumo pendiente${t.cicloAbierto ? " (ciclo en curso)" : ""}`,
-        href: `/cuentas/tarjetas/${t.id}`,
+        href: `/tarjetas/${t.id}`,
       });
     }
   });

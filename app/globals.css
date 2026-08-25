@@ -71,6 +71,8 @@
   --color-leaf-light: var(--leaf-light);
   --color-alert-bg: var(--alert-bg);
   --color-alert-border: var(--alert-border);
+  --color-border-suave: var(--border-suave);
+  --color-texto-secundario: var(--texto-secundario);
   /* Radios del handoff: chips/inputs 11-12px · pills 20px · cards 22px · sheet 26px */
   --radius-chip: 11px;
   --radius-field: 12px;
@@ -82,7 +84,7 @@
 
 /* MANGO V2 — light mode (flip completo dark→light). Paleta de marca en hex. */
 :root {
-  --background: #ffffff;
+  --background: #f6f1e6;
   --foreground: #111827;
   --card: #ffffff;
   --card-foreground: #111827;
@@ -90,15 +92,15 @@
   --popover-foreground: #111827;
   --primary: #1e3a5f;
   --primary-foreground: #ffffff;
-  --secondary: #f9fafb;
+  --secondary: #f1ebdc;
   --secondary-foreground: #1e3a5f;
-  --muted: #f9fafb;
-  --muted-foreground: #6b7280;
-  --accent: #f3f4f6;
+  --muted: #f1ebdc;
+  --muted-foreground: #9c9074;
+  --accent: #efe8d8;
   --accent-foreground: #1e3a5f;
   --destructive: #ef4444;
-  --border: #e5e7eb;
-  --input: #e5e7eb;
+  --border: #eee4d0;
+  --input: #eee4d0;
   --ring: #1e3a5f;
   --radius: 0.625rem;
   /* Charts — paleta MANGO */
@@ -108,18 +110,18 @@
   --chart-4: #ef4444;
   --chart-5: #3b82f6;
   /* Sidebar */
-  --sidebar: #fbfaf7;
+  --sidebar: #f1ebdc;
   --sidebar-foreground: #111827;
   --sidebar-primary: #1e3a5f;
   --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent: #eef2f7;
+  --sidebar-accent: #e6dcc4;
   --sidebar-accent-foreground: #1e3a5f;
-  --sidebar-border: #e5e7eb;
+  --sidebar-border: #eee4d0;
   --sidebar-ring: #1e3a5f;
   /* MANGO custom tokens */
-  --surface: #f9fafb;
-  --surface-2: #f3f4f6;
-  --subtle: #9ca3af;
+  --surface: #f1ebdc;
+  --surface-2: #e6dcc4;
+  --subtle: #b5aa8c;
   /* MANGO marca */
   --navy: #1e3a5f;
   --cream: #e8d9b4;
@@ -128,7 +130,7 @@
   --gold-hover: rgba(201, 138, 43, 0.85);
   --card-shadow: rgba(30, 58, 95, 0.06);
   /* MANGO semánticos */
-  --success: #10b981;
+  --success: #2f9e5f;
   --danger: #ef4444;
   --warning: #f59e0b;
   --info: #3b82f6;
@@ -142,6 +144,8 @@
   --leaf-light: #4a7a56;
   --alert-bg: #fef6e7;     /* alerta ámbar silenciable */
   --alert-border: #f6e2b8;
+  --border-suave: #f0e9d8;   /* separadores dentro de una card blanca */
+  --texto-secundario: #6b6046;
 
   /* Superficies/degradés compuestos */
   --navy-gradient: radial-gradient(130% 130% at 15% 0%, #2c5480, #1e3a5f 60%, #152a44);
