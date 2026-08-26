@@ -16,9 +16,11 @@ export interface CategoriaBase {
 }
 
 export interface Jerarquia {
-  /** id (de cualquier nivel) → id de su categoría padre (o sí misma si es padre). */
+  /** id (de cualquier nivel) → id de su categoría RAÍZ (o sí misma si ya lo es). */
   padreDe: Map<string, string>;
   nombreDe: Map<string, string>;
+  /** id → todos sus descendientes, incluyéndose. Para filtrar por un subárbol. */
+  descendientesDe: (id: string) => string[];
 }
 
 export const SIN_CATEGORIA = "__sin__";
@@ -28,9 +30,59 @@ export const DIRECTO_EN_PADRE = "__directo__";
 export const SIN_ESPECIFICAR = "__na__";
 
 export function buildJerarquia(categorias: CategoriaBase[]): Jerarquia {
+  const parentDe = new Map(categorias.map((c) => [c.id, c.parent_id]));
+
+  // `padreDe` mapeaba UN solo salto (`c.parent_id ?? c.id`). Con tres niveles el
+  // rollup se partía: un movimiento en "Casa > Servicios > Luz" se agrupaba bajo
+  // "Servicios", que aparecía como fila de primer nivel al lado de "Casa", y el
+  // gasto de Casa quedaba dividido en dos. Tres niveles son alcanzables desde el
+  // ABM: creás "Servicios" como raíz, le colgás "Luz", y después movés
+  // "Servicios" bajo "Casa" — nada valida la profundidad.
+  const memo = new Map<string, string>();
+  function raizDe(id: string): string {
+    const cacheado = memo.get(id);
+    if (cacheado) return cacheado;
+
+    const camino: string[] = [];
+    const vistos = new Set<string>();
+    let actual = id;
+    // El guard de ciclos no es teórico: updateCategoria deja reparentar libremente,
+    // así que A→B y B→A es un estado alcanzable y colgaría el bucle.
+    while (!vistos.has(actual)) {
+      vistos.add(actual);
+      camino.push(actual);
+      const padre = parentDe.get(actual);
+      if (!padre || !parentDe.has(padre)) break;
+      actual = padre;
+    }
+    for (const paso of camino) memo.set(paso, actual);
+    return actual;
+  }
+
+  const hijosDe = new Map<string, string[]>();
+  for (const c of categorias) {
+    if (!c.parent_id) continue;
+    hijosDe.set(c.parent_id, [...(hijosDe.get(c.parent_id) ?? []), c.id]);
+  }
+
+  function descendientesDe(id: string): string[] {
+    const out: string[] = [];
+    const vistos = new Set<string>();
+    const pila = [id];
+    while (pila.length) {
+      const actual = pila.pop()!;
+      if (vistos.has(actual)) continue;
+      vistos.add(actual);
+      out.push(actual);
+      pila.push(...(hijosDe.get(actual) ?? []));
+    }
+    return out;
+  }
+
   return {
-    padreDe: new Map(categorias.map((c) => [c.id, c.parent_id ?? c.id])),
+    padreDe: new Map(categorias.map((c) => [c.id, raizDe(c.id)])),
     nombreDe: new Map(categorias.map((c) => [c.id, c.nombre])),
+    descendientesDe,
   };
 }
 

@@ -568,6 +568,8 @@ export interface Database {
           prestamo_pago_id: string | null
           plantilla_recurrente_id: string | null
           created_at: string
+          /** Generada por la base (migración 034): texto libre sin acentos, para buscar. Sólo lectura. */
+          busqueda: string | null
         }
         Insert: {
           id?: string

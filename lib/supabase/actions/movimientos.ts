@@ -240,13 +240,20 @@ export async function duplicateMovimiento(id: string) {
 
   if (fetchError || !data) throw new Error("Movimiento no encontrado");
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const { id: _id, created_at: _c, ...rest } = data;
+  // Copiar sólo columnas escribibles. Antes se hacía `...rest` sacando id y
+  // created_at a mano, lo que rompe en cuanto la tabla gana una columna que
+  // Postgres no deja escribir: `busqueda` (migración 034) es generada y un
+  // insert que la incluya falla con "cannot insert a non-DEFAULT value".
+  // La whitelist ya existe y es la misma que usa updateMovimiento.
+  const campos: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(data)) {
+    if (COLUMNAS_MOVIMIENTO.has(k)) campos[k] = v;
+  }
   const hoy = new Date().toISOString().slice(0, 10);
 
   const { data: nuevo, error } = await supabase
     .from("movimientos")
-    .insert({ ...rest, fecha: hoy })
+    .insert({ ...campos, user_id: userId, fecha: hoy })
     .select("id")
     .single();
   if (error || !nuevo) throw new Error(error?.message ?? "Error al duplicar");

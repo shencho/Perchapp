@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useState, useTransition, Fragment } from "react";
-import { useRouter } from "next/navigation";
-import { Plus, Pencil, Copy, Trash2, Search, ChevronDown, ChevronLeft, ChevronRight, RefreshCw, Users, Landmark, ArrowRight } from "lucide-react";
+import { useEffect, useState, useTransition, useCallback, Fragment } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Plus, Pencil, Copy, Trash2, Search, ChevronDown, ChevronLeft, ChevronRight, RefreshCw, Users, Landmark, ArrowRight, X, SlidersHorizontal } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
@@ -15,7 +15,7 @@ import {
   getBalanceGasto,
 } from "@/lib/supabase/actions/gastos-compartidos";
 import type { ResultadoBalanceGrupal } from "@/lib/domain/calcularBalanceGrupal";
-import { TIPOS_MOV, METODOS } from "@/lib/supabase/actions/movimientos-types";
+import { TIPOS_MOV, METODOS, CLASIFICACIONES, FRECUENCIAS } from "@/lib/supabase/actions/movimientos-types";
 import { MovimientoEditor } from "./movimiento-editor";
 import { GenerarPendientesModal } from "./generar-pendientes-modal";
 import type { Movimiento, Cuenta, Tarjeta, Categoria, Persona, GastoCompartidoParticipante } from "@/types/supabase";
@@ -44,6 +44,12 @@ interface Props {
   metodoInicial?: string;
   cuentaInicial?: string;
   categoriaInicial?: string;
+  tarjetaInicial?: string;
+  necesidadInicial?: string;
+  clasificacionInicial?: string;
+  frecuenciaInicial?: string;
+  monedaInicial?: string;
+  monedas?: string[];
   cuentas: Cuenta[];
   tarjetas: Tarjeta[];
   categorias: Categoria[];
@@ -455,8 +461,12 @@ function getMeses(seleccionado?: string) {
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
-export function MovimientosClient({ movimientos, total, totales = {}, pagina = 0, porPagina = 25, busquedaInicial = "", tipoInicial = "todos", metodoInicial = "todos", cuentaInicial = "todas", categoriaInicial = "todas", cuentas, tarjetas, categorias, personas, grupos, mesActual, compartidoInicial, nombreUsuario, plantillasPendientes = [], generarInicialId }: Props) {
+/** Marcador para "no tiene" en los filtros que aceptan nulo (igual que en page.tsx). */
+const SIN_ASIGNAR = "__sin__";
+
+export function MovimientosClient({ movimientos, total, totales = {}, pagina = 0, porPagina = 25, busquedaInicial = "", tipoInicial = "todos", metodoInicial = "todos", cuentaInicial = "todas", categoriaInicial = "todas", tarjetaInicial = "todas", necesidadInicial = "todas", clasificacionInicial = "todas", frecuenciaInicial = "todas", monedaInicial = "todas", monedas = ["ARS", "USD"], cuentas, tarjetas, categorias, personas, grupos, mesActual, compartidoInicial, nombreUsuario, plantillasPendientes = [], generarInicialId }: Props) {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [, startTransition] = useTransition();
 
   const [editorOpen, setEditorOpen]     = useState(false);
@@ -473,10 +483,58 @@ export function MovimientosClient({ movimientos, total, totales = {}, pagina = 0
   const filtroMetodo = metodoInicial;
   const filtroCuenta = cuentaInicial;
   const filtroCategoria = categoriaInicial;
+  const filtroTarjeta = tarjetaInicial;
+  const filtroNecesidad = necesidadInicial;
+  const filtroClasificacion = clasificacionInicial;
+  const filtroFrecuencia = frecuenciaInicial;
+  const filtroMoneda = monedaInicial;
   const filtroCompartido = compartidoInicial ?? false;
 
+  const [masFiltros, setMasFiltros] = useState(
+    filtroTarjeta !== "todas" || filtroNecesidad !== "todas" ||
+    filtroClasificacion !== "todas" || filtroFrecuencia !== "todas" || filtroMoneda !== "todas",
+  );
+
+  // Los catálogos llegan COMPLETOS (con archivadas) para poder rotular un filtro
+  // que apunta a algo archivado. Para dar de alta o editar sólo valen las activas.
+  const cuentasActivas    = cuentas.filter((c) => !c.archivada);
+  const tarjetasActivas   = tarjetas.filter((t) => !t.archivada);
+  const categoriasActivas = categorias.filter((c) => !c.archivada);
+
   const meses = getMeses(mesActual);
-  const catsPadre = categorias.filter((c) => !c.parent_id);
+
+  // Opciones de categoría: cada padre seguido de sus subcategorías indentadas.
+  // Antes el selector sólo listaba padres, así que una subcategoría como "Cine"
+  // era directamente infiltrable (el 75% de los movimientos vive en subs).
+  // Una opción archivada sólo se ofrece si es la que está filtrada: si no, el
+  // select se veía vacío (NamedSelect cae al placeholder cuando no encuentra el
+  // value) y era indistinguible de "sin filtro", mientras el server seguía
+  // filtrando igual. Un filtro invisible que de todos modos se aplica.
+  const NBSP = "\u00A0"; // espacio duro, para indentar las subcategorias
+  const visible = (c: { id: string; archivada?: boolean | null }, filtrada: string) =>
+    !c.archivada || c.id === filtrada;
+  const rotulo = (c: { nombre: string; archivada?: boolean | null }) =>
+    c.archivada ? `${c.nombre} (archivada)` : c.nombre;
+
+  const opcionesCategoria = (() => {
+    const out: { value: string; label: string }[] = [
+      { value: "todas", label: "Todas las categorías" },
+      { value: SIN_ASIGNAR, label: "Sin categoría" },
+    ];
+    for (const p of categorias.filter((c) => !c.parent_id && visible(c, filtroCategoria))) {
+      out.push({ value: p.id, label: rotulo(p) });
+      for (const h of categorias.filter((c) => c.parent_id === p.id && visible(c, filtroCategoria))) {
+        out.push({ value: h.id, label: `${NBSP.repeat(3)}· ${rotulo(h)}` });
+      }
+    }
+    return out;
+  })();
+
+  const hayFiltros =
+    busqueda.trim() !== "" || filtroTipo !== "todos" || filtroMetodo !== "todos" ||
+    filtroCuenta !== "todas" || filtroCategoria !== "todas" || filtroCompartido ||
+    filtroTarjeta !== "todas" || filtroNecesidad !== "todas" ||
+    filtroClasificacion !== "todas" || filtroFrecuencia !== "todas" || filtroMoneda !== "todas";
 
   // El servidor ya aplica todos los filtros (mes, búsqueda, tipo, método, cuenta,
   // categoría, compartido) sobre TODA la lista → acá solo mostramos la página.
@@ -484,24 +542,45 @@ export function MovimientosClient({ movimientos, total, totales = {}, pagina = 0
   const totalPaginas = Math.max(1, Math.ceil(total / porPagina));
 
   // Setea/borra searchParams (por defecto resetea la página).
-  function setParam(updates: Record<string, string | null>, resetPagina = true) {
-    const url = new URL(window.location.href);
+  //
+  // La base sale de useSearchParams(), NO de window.location.href. Con
+  // router.push dentro de startTransition el App Router recién hace pushState
+  // cuando vuelve el servidor, así que window.location queda congelada: elegir
+  // dos filtros seguidos partía del estado viejo y el primero desaparecía.
+  const setParam = useCallback((updates: Record<string, string | null>, resetPagina = true) => {
+    const sp = new URLSearchParams(searchParams.toString());
     for (const [k, v] of Object.entries(updates)) {
-      if (v === null || v === "") url.searchParams.delete(k);
-      else url.searchParams.set(k, v);
+      if (v === null || v === "") sp.delete(k);
+      else sp.set(k, v);
     }
-    if (resetPagina) url.searchParams.delete("pagina");
-    startTransition(() => router.push(url.toString()));
+    if (resetPagina) sp.delete("pagina");
+    startTransition(() => router.push(`?${sp.toString()}`));
+  }, [searchParams, router, startTransition]);
+
+  // La URL es la fuente de verdad del input: sin esto, volver atrás dejaba el
+  // buscador diciendo "cine" sobre una lista sin filtrar.
+  //
+  // Se ajusta durante el render (patrón "adjusting state when a prop changes"),
+  // no en un efecto: así React lo resuelve en la misma pasada y no hay un
+  // frame intermedio mostrando el valor viejo.
+  const [qSincronizada, setQSincronizada] = useState(busquedaInicial);
+  if (qSincronizada !== busquedaInicial) {
+    setQSincronizada(busquedaInicial);
+    setBusqueda(busquedaInicial);
   }
 
   // Debounce de la búsqueda hacia el searchParam.
+  //
+  // Se compara contra el searchParam actual y no contra el prop capturado en la
+  // clausura: "Limpiar" hace setBusqueda("") y eso volvía a disparar este
+  // efecto, que 400 ms más tarde pusheaba con la URL vieja y resucitaba todos
+  // los filtros recién borrados.
   useEffect(() => {
-    const t = setTimeout(() => {
-      if (busqueda.trim() !== busquedaInicial) setParam({ q: busqueda.trim() || null });
-    }, 400);
+    const qActual = searchParams.get("q") ?? "";
+    if (busqueda.trim() === qActual) return;
+    const t = setTimeout(() => setParam({ q: busqueda.trim() || null }), 400);
     return () => clearTimeout(t);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [busqueda]);
+  }, [busqueda, searchParams, setParam]);
 
   function handleNuevo() {
     setDuplicando(null);
@@ -648,7 +727,11 @@ export function MovimientosClient({ movimientos, total, totales = {}, pagina = 0
 
         {/* Método */}
         <NamedSelect
-          options={[{ value: "todos", label: "Todos los métodos" }, ...METODOS.map(m => ({ value: m, label: m }))]}
+          options={[
+            { value: "todos", label: "Todos los métodos" },
+            { value: SIN_ASIGNAR, label: "Sin método" },
+            ...METODOS.map(m => ({ value: m, label: m })),
+          ]}
           value={filtroMetodo !== "todos" ? filtroMetodo : ""}
           onValueChange={(v) => setParam({ metodo: v && v !== "todos" ? v : null })}
           placeholder="Método"
@@ -657,7 +740,11 @@ export function MovimientosClient({ movimientos, total, totales = {}, pagina = 0
 
         {/* Cuenta — usa UUIDs como valores */}
         <NamedSelect
-          options={[{ value: "todas", label: "Todas las cuentas" }, ...cuentas.map(c => ({ value: c.id, label: c.nombre }))]}
+          options={[
+            { value: "todas", label: "Todas las cuentas" },
+            { value: SIN_ASIGNAR, label: "Sin cuenta" },
+            ...cuentas.filter(c => visible(c, filtroCuenta)).map(c => ({ value: c.id, label: rotulo(c) })),
+          ]}
           value={filtroCuenta !== "todas" ? filtroCuenta : ""}
           onValueChange={(v) => setParam({ cuenta: v && v !== "todas" ? v : null })}
           placeholder="Cuenta"
@@ -666,7 +753,7 @@ export function MovimientosClient({ movimientos, total, totales = {}, pagina = 0
 
         {/* Categoría — usa UUIDs como valores */}
         <NamedSelect
-          options={[{ value: "todas", label: "Todas las categorías" }, ...catsPadre.map(c => ({ value: c.id, label: c.nombre }))]}
+          options={opcionesCategoria}
           value={filtroCategoria !== "todas" ? filtroCategoria : ""}
           onValueChange={(v) => setParam({ categoria: v && v !== "todas" ? v : null })}
           placeholder="Categoría"
@@ -686,7 +773,86 @@ export function MovimientosClient({ movimientos, total, totales = {}, pagina = 0
           <Users className="h-3.5 w-3.5" />
           Compartidos
         </button>
+
+        {/* Más filtros: el resto de las dimensiones que la base ya tiene y la
+            fila ya muestra (necesidad, cuotas, tarjeta…). Van plegadas para no
+            convertir la barra en una pared de selects. */}
+        <button
+          onClick={() => setMasFiltros(v => !v)}
+          className={cn(
+            "h-8 flex items-center gap-1.5 px-3 text-sm rounded-md border transition-colors",
+            masFiltros
+              ? "border-primary bg-primary/10 text-primary ring-1 ring-primary/50"
+              : "border-border text-muted-foreground hover:text-foreground hover:bg-surface",
+          )}
+        >
+          <SlidersHorizontal className="h-3.5 w-3.5" />
+          Más filtros
+        </button>
+
+        {/* Limpiar: con tantos filtros combinables hace falta una salida rápida */}
+        {hayFiltros && (
+          <button
+            onClick={() => {
+              setBusqueda("");
+              setParam({ q: null, tipo: null, metodo: null, cuenta: null, categoria: null, compartido: null,
+                tarjeta: null, necesidad: null, clasificacion: null, frecuencia: null, moneda: null });
+            }}
+            className="h-8 flex items-center gap-1.5 px-3 text-sm rounded-md border border-border text-muted-foreground hover:text-foreground hover:bg-surface transition-colors"
+          >
+            <X className="h-3.5 w-3.5" />
+            Limpiar
+          </button>
+        )}
       </div>
+
+      {masFiltros && (
+        <div className="flex flex-wrap gap-2 min-w-0">
+          <NamedSelect
+            options={[
+              { value: "todas", label: "Todas las tarjetas" },
+              { value: SIN_ASIGNAR, label: "Sin tarjeta" },
+              ...tarjetas.filter(t => visible(t, filtroTarjeta)).map(t => ({ value: t.id, label: rotulo(t) })),
+            ]}
+            value={filtroTarjeta !== "todas" ? filtroTarjeta : ""}
+            onValueChange={(v) => setParam({ tarjeta: v && v !== "todas" ? v : null })}
+            placeholder="Tarjeta"
+            className={cn("h-8 text-sm w-40", filtroTarjeta !== "todas" && "ring-1 ring-primary/50 border-primary/50")}
+          />
+          <NamedSelect
+            options={[
+              { value: "todas", label: "Toda necesidad" },
+              { value: SIN_ASIGNAR, label: "Sin necesidad" },
+              ...["1", "2", "3", "4", "5"].map(n => ({ value: n, label: `Necesidad ${n}` })),
+            ]}
+            value={filtroNecesidad !== "todas" ? filtroNecesidad : ""}
+            onValueChange={(v) => setParam({ necesidad: v && v !== "todas" ? v : null })}
+            placeholder="Necesidad"
+            className={cn("h-8 text-sm w-40", filtroNecesidad !== "todas" && "ring-1 ring-primary/50 border-primary/50")}
+          />
+          <NamedSelect
+            options={[{ value: "todas", label: "Toda clasificación" }, ...CLASIFICACIONES.map(c => ({ value: c, label: c }))]}
+            value={filtroClasificacion !== "todas" ? filtroClasificacion : ""}
+            onValueChange={(v) => setParam({ clasificacion: v && v !== "todas" ? v : null })}
+            placeholder="Clasificación"
+            className={cn("h-8 text-sm w-40", filtroClasificacion !== "todas" && "ring-1 ring-primary/50 border-primary/50")}
+          />
+          <NamedSelect
+            options={[{ value: "todas", label: "Toda frecuencia" }, ...FRECUENCIAS.map(f => ({ value: f, label: f }))]}
+            value={filtroFrecuencia !== "todas" ? filtroFrecuencia : ""}
+            onValueChange={(v) => setParam({ frecuencia: v && v !== "todas" ? v : null })}
+            placeholder="Frecuencia"
+            className={cn("h-8 text-sm w-40", filtroFrecuencia !== "todas" && "ring-1 ring-primary/50 border-primary/50")}
+          />
+          <NamedSelect
+            options={[{ value: "todas", label: "Toda moneda" }, ...monedas.map(m => ({ value: m, label: m }))]}
+            value={filtroMoneda !== "todas" ? filtroMoneda : ""}
+            onValueChange={(v) => setParam({ moneda: v && v !== "todas" ? v : null })}
+            placeholder="Moneda"
+            className={cn("h-8 text-sm w-32", filtroMoneda !== "todas" && "ring-1 ring-primary/50 border-primary/50")}
+          />
+        </div>
+      )}
 
       {/* Totales del set filtrado, por moneda (#10) */}
       {Object.keys(totales).length > 0 && (
@@ -708,10 +874,31 @@ export function MovimientosClient({ movimientos, total, totales = {}, pagina = 0
       {/* Lista */}
       {filtrados.length === 0 ? (
         <div className="text-center py-16 text-muted-foreground">
-          <p className="text-sm">No hay movimientos para este período.</p>
-          <Button variant="ghost" size="sm" className="mt-2" onClick={handleNuevo}>
-            <Plus className="h-4 w-4 mr-1" /> Agregar el primero
-          </Button>
+          {/* Culpar siempre al período mandaba a cargar un movimiento cuando en
+              realidad el vacío lo causaba un filtro. Ahora la salida que se
+              ofrece es la que corresponde al motivo real. */}
+          {hayFiltros ? (
+            <>
+              <p className="text-sm">Ningún movimiento coincide con estos filtros.</p>
+              <Button
+                variant="ghost" size="sm" className="mt-2"
+                onClick={() => {
+                  setBusqueda("");
+                  setParam({ q: null, tipo: null, metodo: null, cuenta: null, categoria: null, compartido: null,
+                    tarjeta: null, necesidad: null, clasificacion: null, frecuencia: null, moneda: null });
+                }}
+              >
+                <X className="h-4 w-4 mr-1" /> Limpiar filtros
+              </Button>
+            </>
+          ) : (
+            <>
+              <p className="text-sm">No hay movimientos para este período.</p>
+              <Button variant="ghost" size="sm" className="mt-2" onClick={handleNuevo}>
+                <Plus className="h-4 w-4 mr-1" /> Agregar el primero
+              </Button>
+            </>
+          )}
         </div>
       ) : (
         <>
@@ -841,7 +1028,7 @@ export function MovimientosClient({ movimientos, total, totales = {}, pagina = 0
                             concepto={m.concepto}
                             moneda={m.moneda ?? "ARS"}
                             montoGasto={m.monto}
-                            cuentas={cuentas}
+                            cuentas={cuentasActivas}
                             nombreUsuario={nombreUsuario}
                           />
                         </td>
@@ -961,7 +1148,7 @@ export function MovimientosClient({ movimientos, total, totales = {}, pagina = 0
                         concepto={m.concepto}
                         moneda={m.moneda ?? "ARS"}
                         montoGasto={m.monto}
-                        cuentas={cuentas}
+                        cuentas={cuentasActivas}
                         nombreUsuario={nombreUsuario}
                       />
                     </div>
@@ -971,7 +1158,14 @@ export function MovimientosClient({ movimientos, total, totales = {}, pagina = 0
             })}
           </div>
 
-          {/* Paginación real + tamaño de página (#12) */}
+        </>
+      )}
+
+      {/* Paginación real + tamaño de página (#12)
+          Vivía dentro de la rama "hay filas": si la página actual quedaba vacía
+          —por ejemplo al borrar las últimas filas— desaparecían "Anterior",
+          "Siguiente" y el indicador, y no había forma de volver. */}
+      {total > 0 && (
           <div className="flex flex-wrap items-center justify-between gap-3 py-2">
             <div className="flex items-center gap-2 text-xs text-muted-foreground">
               <span>Por página:</span>
@@ -1003,7 +1197,6 @@ export function MovimientosClient({ movimientos, total, totales = {}, pagina = 0
               </Button>
             </div>
           </div>
-        </>
       )}
 
       {/* Editor modal */}
@@ -1012,9 +1205,9 @@ export function MovimientosClient({ movimientos, total, totales = {}, pagina = 0
         onClose={() => setEditorOpen(false)}
         editing={editing}
         duplicando={duplicando}
-        cuentas={cuentas}
-        tarjetas={tarjetas}
-        categorias={categorias}
+        cuentas={cuentasActivas}
+        tarjetas={tarjetasActivas}
+        categorias={categoriasActivas}
         personas={personas}
         grupos={grupos}
       />

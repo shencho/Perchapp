@@ -73,9 +73,13 @@ export default async function DashboardPage() {
       .select("tipo, monto, monto_destino, moneda, fecha, cuenta_id, cuenta_destino_id, tarjeta_id, categoria_id, necesidad, plantilla_recurrente_id, es_compartido, gc_mi_parte, es_reembolso")
       .eq("user_id", user.id)
       .gte("fecha", fechaDesde24m),
+    // Sin filtrar por archivada: este catálogo se usa para RESOLVER nombres y
+    // jerarquía de movimientos ya guardados, no para ofrecer opciones. Con el
+    // filtro puesto, archivar una subcategoría hacía que sus gastos cayeran al
+    // fallback y aparecieran como una fila "Sin categoría".
     supabase.from("categorias")
       .select("id, nombre, parent_id")
-      .eq("user_id", user.id).eq("archivada", false),
+      .eq("user_id", user.id),
     getPrestamos(),
     supabase.from("gastos_compartidos_participantes")
       .select("persona_nombre, monto")
@@ -222,7 +226,10 @@ export default async function DashboardPage() {
       categoriaId: p.categoria_id,
       nombre: jerarquia.nombreDe.get(p.categoria_id) ?? "Categoría",
       presupuesto: p.monto,
-      gastado: gastadoPorPadre[p.categoria_id] ?? 0,
+      // El índice está armado por categoría RAÍZ, así que la clave del
+      // presupuesto hay que resolverla igual. Si no, presupuestar una categoría
+      // y después moverla como subcategoría dejaba la barra en $0 para siempre.
+      gastado: gastadoPorPadre[jerarquia.padreDe.get(p.categoria_id) ?? p.categoria_id] ?? 0,
     }))
     .sort((a, b) => (b.gastado / (b.presupuesto || 1)) - (a.gastado / (a.presupuesto || 1)));
 

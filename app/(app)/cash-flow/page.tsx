@@ -36,9 +36,14 @@ export default async function CashFlowPage() {
     supabase.from("movimientos")
       .select("tipo, monto, monto_destino, cuenta_id, cuenta_destino_id")
       .eq("user_id", user.id),
+    // Sin filtrar por archivada: se usa para EXCLUIR "Ajuste de inversión", que
+    // es una categoría autogenerada y por lo tanto la primera candidata a
+    // archivarse. Si se archivaba, cash-flow dejaba de excluirla y las
+    // revaluaciones entraban como ingreso o egreso real, contaminando además la
+    // base de la proyección.
     supabase.from("categorias")
       .select("id, nombre")
-      .eq("user_id", user.id).eq("archivada", false),
+      .eq("user_id", user.id),
   ]);
 
   const cuentas = cuentasRes.data ?? [];
