@@ -10,7 +10,7 @@ import { MangoAIButton } from "@/components/navigation/mango-ai-button";
 import { MangoLogo } from "@/components/ui/mango-logo";
 import { NotificationsBell } from "@/components/notificaciones/notifications-bell";
 import { UserSection } from "@/components/navigation/user-section";
-import { getNavItems } from "@/lib/navigation/get-nav-items";
+import { itemsSidebar } from "@/lib/navigation/get-nav-items";
 import type { Notificacion } from "@/types/supabase";
 
 interface Props {
@@ -21,7 +21,7 @@ interface Props {
 }
 
 export function DesktopSidebar({ asistenteNombre, userEmail, notificacionesPromise, esAdmin = false }: Props) {
-  const sidebarItems = getNavItems().filter((item) => !item.drawerOnly);
+  const sidebarItems = itemsSidebar();
 
   return (
     <aside className="hidden md:flex flex-col w-[250px] border-r border-border h-screen sticky top-0 bg-sidebar shrink-0">
@@ -56,6 +56,7 @@ export function DesktopSidebar({ asistenteNombre, userEmail, notificacionesPromi
           }
           userEmail={userEmail}
           esAdmin={esAdmin}
+          superficie="desktop"
         />
       </div>
 

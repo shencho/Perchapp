@@ -65,3 +65,39 @@ export function getNavItems(): NavItem[] {
 
   return [...main, ...drawer];
 }
+
+// ── Qué muestra cada superficie ──────────────────────────────────────────────
+//
+// Los tres filtros viven acá y no en cada componente. Cuando cada uno tenía el
+// suyo, el drawer quedó filtrando por `drawerOnly` en las DOS superficies: en
+// escritorio estaba bien (el sidebar ya muestra el resto), pero en mobile la
+// barra sólo muestra 3, así que Cuentas, Cash flow, Estadísticas, Balances y
+// Préstamos no aparecían en ningún lado. Eran inalcanzables desde el teléfono.
+
+/** Los 3 lugares de la barra inferior (el 4º es "Más", el central el mango). */
+export function itemsBarraInferior(): NavItem[] {
+  return getNavItems().filter((i) => i.bottomNav).slice(0, 3);
+}
+
+/** Sidebar de escritorio: todo lo que no es configuración. */
+export function itemsSidebar(): NavItem[] {
+  return getNavItems().filter((i) => !i.drawerOnly);
+}
+
+/**
+ * El drawer "Más" COMPLETA lo que su barra hermana no muestra.
+ *
+ * Definirlo por resta —y no con una lista propia— es lo que garantiza que
+ * ninguna pantalla pueda quedar sin acceso: si no está en la barra, está acá.
+ */
+export function itemsDrawer(
+  superficie: "mobile" | "desktop",
+  esAdmin: boolean,
+): NavItem[] {
+  const enLaBarra = new Set(
+    (superficie === "mobile" ? itemsBarraInferior() : itemsSidebar()).map((i) => i.href),
+  );
+  return getNavItems().filter(
+    (i) => !enLaBarra.has(i.href) && (!i.adminOnly || esAdmin),
+  );
+}

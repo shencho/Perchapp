@@ -3,7 +3,7 @@
 import { MoreHorizontal } from "lucide-react";
 import { NavItemComponent } from "@/components/navigation/nav-item";
 import { NavigationDrawer } from "@/components/navigation/navigation-drawer";
-import { getNavItems } from "@/lib/navigation/get-nav-items";
+import { itemsBarraInferior } from "@/lib/navigation/get-nav-items";
 
 interface Props {
   userEmail?: string;
@@ -13,7 +13,7 @@ interface Props {
 export function MobileBottomNav({ userEmail, esAdmin = false }: Props) {
   // Se arma desde el flag: antes buscaba 3 hrefs a mano con `!`, así que
   // renombrar cualquiera de esas rutas rompía la barra en runtime.
-  const items = getNavItems().filter((i) => i.bottomNav).slice(0, 3);
+  const items = itemsBarraInferior();
 
   return (
     <nav className="md:hidden fixed bottom-0 left-0 right-0 h-16 border-t border-[#eee4d0] bg-background z-30 pb-[env(safe-area-inset-bottom)]">
@@ -38,6 +38,7 @@ export function MobileBottomNav({ userEmail, esAdmin = false }: Props) {
           }
           userEmail={userEmail}
           esAdmin={esAdmin}
+          superficie="mobile"
         />
       </div>
     </nav>
