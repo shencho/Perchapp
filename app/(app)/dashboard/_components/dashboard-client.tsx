@@ -28,7 +28,7 @@ export type CuentaConSaldo = {
 
 export type TarjetaResumen = {
   id: string; nombre: string; tipo: string | null;
-  banco_emisor: string | null; consumo: Record<string, number>; proximoVto: string | null;
+  banco_emisor: string | null; consumo: Record<string, number>; pagado?: boolean; proximoVto: string | null;
   cicloAbierto?: boolean;
 };
 
@@ -62,13 +62,15 @@ export interface DashboardData {
   ajusteInversionIds: string[];
   prestamos: PrestamoResumen[];
   compartidos: { totalPendiente: number; porPersona: { nombre: string; total: number }[] };
-  analisis: {
+  /** Una entrada por moneda con movimientos. Las monedas no se suman entre sí. */
+  analisis: Record<string, {
+    total: number;
     topCategorias: {
       id: string; nombre: string; monto: number; porcentaje: number;
       hijos: { id: string; nombre: string; monto: number; porcentaje: number }[];
     }[];
     porNecesidad: { nivel: number; monto: number }[];
-  };
+  }>;
   presupuestos?: { categoriaId: string; nombre: string; presupuesto: number; gastado: number }[];
   alertas: Alerta[];
 }
@@ -325,8 +327,18 @@ function TotalesMoneda({ totales, className }: { totales: Record<string, number>
 }
 
 /** Consumo de una tarjeta: una línea por moneda (ARS y USD no se suman). */
-function ConsumoPorMoneda({ consumo }: { consumo: Record<string, number> }) {
+function ConsumoPorMoneda({ consumo, pagado }: { consumo: Record<string, number>; pagado?: boolean }) {
   const conSaldo = Object.entries(consumo).filter(([, v]) => v > 0);
+  // El número es lo que FALTA pagar. Sin saldo y con consumo en el ciclo, el
+  // resumen está saldado: decirlo explícitamente evita leer el cero como "no
+  // gastaste nada".
+  if (pagado && conSaldo.length === 0) {
+    return (
+      <span className="text-xs font-medium text-success whitespace-nowrap">
+        Pagado
+      </span>
+    );
+  }
   if (conSaldo.length === 0) {
     return <span className="font-semibold tabular-nums font-mono text-sm text-muted-foreground">$0</span>;
   }
@@ -389,7 +401,7 @@ function BloqueCuentas({ cuentas, tarjetas }: { cuentas: CuentaConSaldo[]; tarje
                   {t.proximoVto ? ` · vto ${fmtDate(t.proximoVto)}` : ""}
                 </p>
               </div>
-              <ConsumoPorMoneda consumo={t.consumo} />
+              <ConsumoPorMoneda consumo={t.consumo} pagado={t.pagado} />
             </Link>
           ))}
         </div>
@@ -559,11 +571,37 @@ function BloqueInversiones({ inversiones }: { inversiones: CuentaConSaldo[] }) {
 // ── Bloque Análisis ───────────────────────────────────────────────────────────
 
 function BloqueAnalisis({ analisis }: { analisis: DashboardData["analisis"] }) {
-  const { topCategorias, porNecesidad } = analisis;
+  const monedas = Object.keys(analisis);
+  const [moneda, setMoneda] = useState(monedas[0] ?? "ARS");
   const [abierta, setAbierta] = useState<string | null>(null);
+
+  // La moneda elegida puede desaparecer al cambiar de mes.
+  const activa = analisis[moneda] ?? analisis[monedas[0] ?? ""] ;
+  if (!activa) return null;
+  const { topCategorias, porNecesidad } = activa;
 
   return (
     <div className="space-y-4">
+      {/* Antes este bloque filtraba ARS en silencio y los gastos en dólares no
+          aparecían en ningún lado. El selector sólo se muestra si de verdad hay
+          más de una moneda en el mes. */}
+      {monedas.length > 1 && (
+        <div className="flex gap-1.5">
+          {monedas.map(m => (
+            <button
+              key={m} type="button" onClick={() => { setMoneda(m); setAbierta(null); }}
+              className={cn(
+                "px-2.5 py-1 rounded-[var(--radius-pill)] text-xs font-medium border transition-colors",
+                m === moneda
+                  ? "bg-navy text-white border-navy"
+                  : "border-border text-muted-foreground hover:border-foreground/40",
+              )}
+            >
+              {m}
+            </button>
+          ))}
+        </div>
+      )}
       {/* Gastos por categoría — desplegable a subcategorías */}
       {topCategorias.length > 0 && (
         <div className="space-y-3">
@@ -606,7 +644,7 @@ function BloqueAnalisis({ analisis }: { analisis: DashboardData["analisis"] }) {
                         {/* El % es sobre el total del mes: la barra anterior era
                             relativa a la categoría más grande y confundía. */}
                         <span className="text-xs text-muted-foreground tabular-nums">{cat.porcentaje}%</span>
-                        <span className="text-sm font-bold tabular-nums font-mono">{fmt(cat.monto)}</span>
+                        <span className="text-sm font-bold tabular-nums font-mono">{fmt(cat.monto, moneda)}</span>
                       </span>
                     </div>
                   </div>
@@ -619,7 +657,7 @@ function BloqueAnalisis({ analisis }: { analisis: DashboardData["analisis"] }) {
                         <span className="text-xs text-muted-foreground truncate">{h.nombre}</span>
                         <span className="flex items-baseline gap-2 shrink-0">
                           <span className="text-[11px] text-muted-foreground tabular-nums">{h.porcentaje}%</span>
-                          <span className="text-xs tabular-nums font-mono">{fmt(h.monto)}</span>
+                          <span className="text-xs tabular-nums font-mono">{fmt(h.monto, moneda)}</span>
                         </span>
                       </div>
                     ))}
@@ -804,7 +842,7 @@ export function DashboardClient({ data }: { data: DashboardData }) {
       </DashBlock>
 
       {/* Análisis — al lado de Cuentas: son los dos que más se miran */}
-      {(data.analisis.topCategorias.length > 0 || data.analisis.porNecesidad.length > 0) && (
+      {Object.keys(data.analisis).length > 0 && (
         <DashBlock id="analisis" title="Análisis del mes" hiddenBlocks={hiddenBlocks} onToggle={toggleBlock}>
           <BloqueAnalisis analisis={data.analisis} />
         </DashBlock>

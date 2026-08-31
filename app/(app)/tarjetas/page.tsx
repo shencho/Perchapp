@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { TarjetasPageContent } from "@/components/tarjetas/tarjetas-page-content";
 import {
-  calcularConsumoTarjeta, getCicloDelProximoVencimiento, getPeriodoCierre, getProximoVencimiento,
+  calcularSaldoTarjeta, getCicloDelProximoVencimiento, getPeriodoCierre, getProximoVencimiento,
 } from "@/lib/domain/calcularConsumoTarjeta";
 
 export default async function TarjetasPage() {
@@ -13,10 +13,12 @@ export default async function TarjetasPage() {
   const [{ data: tarjetas }, { data: cuentas }, { data: movs }] = await Promise.all([
     supabase.from("tarjetas").select("*").eq("user_id", user.id).eq("archivada", false).order("created_at"),
     supabase.from("cuentas").select("*").eq("user_id", user.id).eq("archivada", false).order("orden"),
-    // Sólo lo necesario para el consumo del ciclo de cada tarjeta.
+    // Consumos Y pagos: filtrar por tipo="Egreso" dejaba los pagos del resumen
+    // fuera de la consulta, así que el listado mostraba el total del ciclo
+    // aunque la tarjeta ya estuviera paga.
     supabase.from("movimientos")
-      .select("tipo, monto, moneda, fecha, tarjeta_id")
-      .eq("user_id", user.id).eq("tipo", "Egreso").not("tarjeta_id", "is", null),
+      .select("tipo, monto, moneda, fecha, tarjeta_id, cuenta_id, cuenta_destino_id")
+      .eq("user_id", user.id).not("tarjeta_id", "is", null),
   ]);
 
   const movimientos = movs ?? [];
@@ -36,8 +38,17 @@ export default async function TarjetasPage() {
       ? getCicloDelProximoVencimiento(t.cierre_dia, t.vencimiento_dia).inicio
       : getPeriodoCierre(t.cierre_dia).inicio;
 
+    const saldo = calcularSaldoTarjeta(t.id, movimientos, inicio, fin, vencimiento);
+    const aPagar = Object.fromEntries(
+      Object.entries(saldo).map(([moneda, s]) => [moneda, s.aPagar]),
+    );
+    // "Pagado" = hubo consumo en el ciclo y no queda nada por pagar.
+    const huboConsumo = Object.values(saldo).some((s) => s.total > 0);
+    const quedaAlgo = Object.values(saldo).some((s) => s.aPagar > 0);
+
     return [t.id, {
-      consumo: calcularConsumoTarjeta(t.id, movimientos, inicio, fin),
+      consumo: aPagar,
+      pagado: huboConsumo && !quedaAlgo,
       cierre: fin,
       vencimiento,
     }];

@@ -5,7 +5,7 @@ import { calcularSaldoCuenta } from "@/lib/domain/calcularSaldoCuenta";
 import { montoPropio } from "@/lib/domain/_utils/movimiento";
 import { totalesPorMoneda, idsAjusteInversion } from "@/lib/domain/finanzas";
 import { buildJerarquia, agruparPorCategoria } from "@/lib/domain/categorias";
-import { calcularConsumoTarjeta, getPeriodoCierre, getProximoVencimiento, getCicloDelProximoVencimiento } from "@/lib/domain/calcularConsumoTarjeta";
+import { calcularSaldoTarjeta, getPeriodoCierre, getProximoVencimiento, getCicloDelProximoVencimiento } from "@/lib/domain/calcularConsumoTarjeta";
 import { getPlantillas } from "@/lib/supabase/actions/plantillas";
 import { getPlantillasParaAlerta } from "@/lib/domain/plantillas";
 import { getAlertasSilenciadasVigentes } from "@/lib/supabase/actions/alertas";
@@ -33,6 +33,9 @@ function fmtARS(n: number) {
     minimumFractionDigits: 0, maximumFractionDigits: 0,
   }).format(n);
 }
+
+/** Monedas para las que se calcula el análisis del mes. */
+const MONEDAS_ANALISIS = ["ARS", "USD"] as const;
 
 export default async function DashboardPage() {
   const supabase = await createClient();
@@ -147,28 +150,41 @@ export default async function DashboardPage() {
   const balanceMesAnterior    = totMesAnt.ARS.balance;
   const balanceMesAnteriorUSD = totMesAnt.USD.balance;
 
-  // Para el análisis por categoría/necesidad (una moneda por vez).
+  // Para el análisis por categoría/necesidad.
+  //
+  // Filtraba `moneda === "ARS"`, así que los gastos en dólares no aparecían en
+  // "Gastos por categoría" ni en el corte por necesidad, y no había ningún
+  // aviso de que faltaban. Ahora se calcula UNA VEZ POR MONEDA y el bloque
+  // ofrece elegir cuál mirar; las monedas siguen sin sumarse entre sí.
   const movMesActual = enMesActual.filter(m =>
-    m.moneda === "ARS" && !ajusteInversionIds.includes(m.categoria_id ?? "__")
+    !ajusteInversionIds.includes(m.categoria_id ?? "__")
   );
 
-  // ── Tarjetas con consumo ───────────────────────────────────────────────────
+  // ── Tarjetas: lo que falta pagar, no el consumo bruto ──────────────────────
+  // Mostraba el total del ciclo con `calcularConsumoTarjeta`, que sólo suma
+  // Egresos: registrabas el pago y el número no se movía. Y la alerta de
+  // vencimiento seguía avisando por una tarjeta ya paga.
   const tarjetasResumen = tarjetas.map(t => {
-    if (!t.cierre_dia || !t.vencimiento_dia) {
-      const periodo = getPeriodoCierre(t.cierre_dia);
-      return {
-        id: t.id, nombre: t.nombre, tipo: t.tipo, banco_emisor: t.banco_emisor,
-        consumo: calcularConsumoTarjeta(t.id, movimientos, periodo.inicio, periodo.fin),
-        proximoVto: getProximoVencimiento(t.vencimiento_dia),
-        cicloAbierto: false,
-      };
-    }
-    const ciclo = getCicloDelProximoVencimiento(t.cierre_dia, t.vencimiento_dia);
+    const tieneCiclo = Boolean(t.cierre_dia && t.vencimiento_dia);
+    const ciclo = tieneCiclo
+      ? getCicloDelProximoVencimiento(t.cierre_dia!, t.vencimiento_dia!)
+      : null;
+    const periodo = ciclo ?? getPeriodoCierre(t.cierre_dia);
+    const vencimiento = ciclo ? ciclo.fechaVencimiento : getProximoVencimiento(t.vencimiento_dia);
+
+    const saldo = calcularSaldoTarjeta(t.id, movimientos, periodo.inicio, periodo.fin, vencimiento);
+    const aPagar = Object.fromEntries(
+      Object.entries(saldo).map(([moneda, s]) => [moneda, s.aPagar]),
+    );
+    const huboConsumo = Object.values(saldo).some(s => s.total > 0);
+    const quedaAlgo = Object.values(saldo).some(s => s.aPagar > 0);
+
     return {
       id: t.id, nombre: t.nombre, tipo: t.tipo, banco_emisor: t.banco_emisor,
-      consumo: calcularConsumoTarjeta(t.id, movimientos, ciclo.inicio, ciclo.fin),
-      proximoVto: ciclo.fechaVencimiento,
-      cicloAbierto: ciclo.cicloAbierto,
+      consumo: aPagar,
+      pagado: huboConsumo && !quedaAlgo,
+      proximoVto: vencimiento,
+      cicloAbierto: ciclo ? ciclo.cicloAbierto : false,
     };
   });
 
@@ -200,20 +216,43 @@ export default async function DashboardPage() {
 
   // ── Análisis del mes ───────────────────────────────────────────────────────
   const jerarquia = buildJerarquia(categorias);
-  const movEgresoMes = movMesActual.filter(m => m.tipo === "Egreso");
-  // Agrupa por categoría padre y conserva las subcategorías para desplegar.
-  const resumenCats = agruparPorCategoria(movMesActual, jerarquia, {
-    tipo: "Egreso", excluirCategorias: ajusteInversionIds,
-  });
-  const totalEgMes = resumenCats.total;
-  const topCategorias = resumenCats.filas.slice(0, 6);
 
-  const porNecesidad = [1, 2, 3, 4, 5]
-    .map(nivel => ({
-      nivel,
-      monto: movEgresoMes.filter(m => m.necesidad === nivel).reduce((acc, m) => acc + montoPropio(m), 0),
-    }))
-    .filter(n => n.monto > 0);
+  const analisisPorMoneda = Object.fromEntries(MONEDAS_ANALISIS.map(moneda => {
+    const delMes = movMesActual.filter(m => m.moneda === moneda);
+    const egresos = delMes.filter(m => m.tipo === "Egreso");
+    // Agrupa por categoría padre y conserva las subcategorías para desplegar.
+    const resumen = agruparPorCategoria(delMes, jerarquia, {
+      tipo: "Egreso", excluirCategorias: ajusteInversionIds,
+    });
+    return [moneda, {
+      total: resumen.total,
+      // `filas` completo: el cruce con presupuestos necesita TODAS las
+      // categorías, no sólo las 6 que se muestran.
+      filas: resumen.filas,
+      topCategorias: resumen.filas.slice(0, 6),
+      porNecesidad: [1, 2, 3, 4, 5].map(nivel => ({
+        nivel,
+        monto: egresos.filter(m => m.necesidad === nivel).reduce((acc, m) => acc + montoPropio(m), 0),
+      })),
+    }];
+  }));
+
+  // Los presupuestos hoy son sólo en pesos, así que su cruce sigue saliendo de
+  // la moneda ARS.
+  const resumenCats = { total: analisisPorMoneda.ARS.total, filas: analisisPorMoneda.ARS.filas };
+  const totalEgMes = resumenCats.total;
+
+  // Lo que viaja al cliente: una entrada por moneda, sin las que están vacías,
+  // para que el selector no ofrezca una moneda sin movimientos.
+  const analisis = Object.fromEntries(
+    Object.entries(analisisPorMoneda)
+      .filter(([, a]) => a.total > 0)
+      .map(([moneda, a]) => [moneda, {
+        total: a.total,
+        topCategorias: a.topCategorias,
+        porNecesidad: a.porNecesidad.filter(n => n.monto > 0),
+      }]),
+  );
 
   // ── Presupuesto vs gastado por categoría (mes actual, ARS) ─────────────────
   // El gasto por categoría padre sale del mismo resumen que el bloque de
@@ -239,6 +278,8 @@ export default async function DashboardPage() {
   // Tarjetas con vto en los próximos 7 días
   tarjetasResumen.forEach(t => {
     if (!t.proximoVto) return;
+    // Si el resumen ya está pago no hay nada que avisar.
+    if (t.pagado || !Object.values(t.consumo).some(v => v > 0)) return;
     const dias = Math.ceil(
       (new Date(t.proximoVto + "T12:00:00").getTime() - Date.now()) / 86400000
     );
@@ -248,7 +289,7 @@ export default async function DashboardPage() {
         tipo: "tarjeta_vence",
         urgencia: dias <= 3 ? "alta" : "media",
         titulo: `Tarjeta ${t.nombre} vence ${dias === 0 ? "hoy" : `en ${dias}d`}`,
-        descripcion: `${fmtMonedas(t.consumo)} de consumo pendiente${t.cicloAbierto ? " (ciclo en curso)" : ""}`,
+        descripcion: `${fmtMonedas(t.consumo)} por pagar${t.cicloAbierto ? " (ciclo en curso)" : ""}`,
         href: `/tarjetas/${t.id}`,
       });
     }
@@ -322,7 +363,7 @@ export default async function DashboardPage() {
     ajusteInversionIds,
     prestamos: prestamosResumen,
     compartidos: { totalPendiente: totalCompartidoPendiente, porPersona: compartidosPorPersona },
-    analisis: { topCategorias, porNecesidad },
+    analisis,
     presupuestos,
     alertas,
   };

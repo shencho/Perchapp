@@ -12,6 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { NamedSelect } from "@/components/ui/named-select";
 import { FormDialog } from "@/components/shared/form-dialog";
+import { cn } from "@/lib/utils";
 import { DeleteConfirm } from "@/components/shared/delete-confirm";
 import {
   createTarjeta,
@@ -46,7 +47,7 @@ interface Props {
   tarjetas: Tarjeta[];
   cuentas: Cuenta[];
   /** Ciclo actual por tarjeta: consumo por moneda, cierre y vencimiento. */
-  resumen?: Record<string, { consumo: Record<string, number>; cierre: string; vencimiento: string | null }>;
+  resumen?: Record<string, { consumo: Record<string, number>; pagado?: boolean; cierre: string; vencimiento: string | null }>;
 }
 
 function fmtMonto(n: number, moneda = "ARS") {
@@ -176,7 +177,14 @@ export function TarjetasPageContent({ tarjetas, cuentas, resumen = {} }: Props) 
                     return (
                       <span className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5 mt-1">
                         {conConsumo.length === 0 ? (
-                          <span className="text-sm font-semibold tabular-nums font-mono text-muted-foreground">$0</span>
+                          // El monto es lo que FALTA pagar. Un cero con consumo
+                          // en el ciclo significa "saldado", no "no gastaste".
+                          <span className={cn(
+                            "text-sm font-semibold",
+                            r.pagado ? "text-success" : "tabular-nums font-mono text-muted-foreground",
+                          )}>
+                            {r.pagado ? "Pagado" : "$0"}
+                          </span>
                         ) : conConsumo.map(([moneda, v]) => (
                           <span key={moneda} className="text-sm font-semibold tabular-nums font-mono text-danger">
                             {fmtMonto(v, moneda)}

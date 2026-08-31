@@ -3,12 +3,14 @@ import { redirect, notFound } from "next/navigation";
 import Link from "next/link";
 import { ChevronLeft, CreditCard, Repeat } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { calcularConsumoTarjeta, getPeriodoCierre, getProximoVencimiento, getCicloDelProximoVencimiento } from "@/lib/domain/calcularConsumoTarjeta";
+import { getPeriodoCierre, getProximoVencimiento, getCicloDelProximoVencimiento } from "@/lib/domain/calcularConsumoTarjeta";
 import { GraficoTarjeta } from "./_components/grafico-tarjeta";
 import { categoriaNombreToLucide } from "@/lib/ui/category-icons";
 import { PagarResumen } from "./_components/pagar-resumen";
 import { MangoBlob } from "@/components/ui/mango-logo";
 import { getResumenTarjeta } from "@/lib/supabase/actions/pagos-tarjeta";
+import { getPlantillasPendientesDelMes } from "@/lib/domain/plantillas";
+import type { PlantillaRecurrente } from "@/types/supabase";
 
 function fmt(n: number, moneda = "ARS") {
   return new Intl.NumberFormat("es-AR", {
@@ -123,12 +125,31 @@ export default async function TarjetaDetallePage({ params }: Props) {
     .gte("fecha", desde)
     .lte("fecha", hasta);
 
-  // Cuentas + resumen del ciclo, para el pago del resumen.
-  const [{ data: cuentas }, resumen] = await Promise.all([
-    supabase.from("cuentas").select("id, nombre, moneda")
-      .eq("user_id", user.id).eq("archivada", false).order("orden"),
-    getResumenTarjeta(id),
-  ]);
+  // Cuentas + resumen del ciclo + los débitos automáticos de ESTA tarjeta.
+  //
+  // Las plantillas recurrentes ya tenían `tarjeta_id`, pero no se mostraban en
+  // ningún lado por tarjeta: no se podía ver qué se le debita a cada una ni
+  // cuáles faltaban aplicar este mes.
+  const inicioMes = `${mesActual}-01`;
+  const finMes = new Date(ahora.getFullYear(), ahora.getMonth() + 1, 0).toISOString().slice(0, 10);
+  const [{ data: cuentas }, resumen, { data: plantillasTarjeta }, { data: generadosMes }] =
+    await Promise.all([
+      supabase.from("cuentas").select("id, nombre, moneda")
+        .eq("user_id", user.id).eq("archivada", false).order("orden"),
+      getResumenTarjeta(id),
+      supabase.from("plantillas_recurrentes").select("*")
+        .eq("user_id", user.id).eq("tarjeta_id", id).eq("activo", true)
+        .order("dia_mes"),
+      supabase.from("movimientos").select("plantilla_recurrente_id, fecha")
+        .eq("user_id", user.id).not("plantilla_recurrente_id", "is", null)
+        .gte("fecha", inicioMes).lte("fecha", finMes),
+    ]);
+
+  // Mismo helper que usan el inicio (alertas) y Movimientos (pendientes), así
+  // las tres superficies no pueden discrepar sobre qué está pendiente.
+  const debitos = (plantillasTarjeta ?? []) as PlantillaRecurrente[];
+  const pendientesDeEsta = getPlantillasPendientesDelMes(debitos, generadosMes ?? [], ahora);
+  const idsPendientes = new Set(pendientesDeEsta.map(p => p.plantilla.id));
 
   // Días que faltan para el cierre y el vencimiento (como los muestra un banco).
   const hoyDate = new Date(); hoyDate.setHours(0, 0, 0, 0);
@@ -146,12 +167,16 @@ export default async function TarjetaDetallePage({ params }: Props) {
   if (tarjeta.limite_usd) limites.push(["USD", tarjeta.limite_usd]);
   if (limites.length === 0 && tarjeta.limite) limites.push(["ARS", tarjeta.limite]);
 
-  // Por moneda y sólo Egresos: un pago de resumen es una Transferencia y
-  // antes se contaba como consumo, inflando el total.
-  const consumoPorMoneda = calcularConsumoTarjeta(id, (movPeriodo ?? []).map(m => ({
-    monto: m.monto, tarjeta_id: id, fecha: m.fecha, moneda: m.moneda, tipo: m.tipo,
-  })), inicio, fin);
-  const totalCiclo = Object.entries(consumoPorMoneda).filter(([, v]) => v > 0);
+  // El número grande es lo que FALTA pagar, no el consumo bruto. Salía de
+  // `calcularConsumoTarjeta`, que sólo suma Egresos: registrabas el pago del
+  // resumen y el total seguía igual. `resumen` ya trae el desglose con los
+  // pagos descontados, así que se usa esa única fuente.
+  const saldoPorMoneda = resumen?.porMoneda ?? {};
+  const totalCiclo = Object.entries(saldoPorMoneda)
+    .map(([moneda, s]) => [moneda, s.aPagar] as const)
+    .filter(([, v]) => v > 0);
+  const huboConsumo = Object.values(saldoPorMoneda).some(s => s.total > 0);
+  const cicloPagado = huboConsumo && totalCiclo.length === 0;
 
   return (
     <div className="flex flex-col gap-6">
@@ -188,9 +213,17 @@ export default async function TarjetaDetallePage({ params }: Props) {
       <div className="mango-card-navy p-[26px] text-white">
         <MangoBlob size={220} style={{ right: -60, top: -80 }} />
         <div className="relative">
-          <p className="text-[13px] font-medium text-cream">Total del ciclo a pagar</p>
+          <p className="text-[13px] font-medium text-cream">
+            {cicloPagado ? "Resumen del ciclo" : "Total del ciclo a pagar"}
+          </p>
           {totalCiclo.length === 0 ? (
-            <p className="mt-1 font-mono font-semibold text-white" style={{ fontSize: 40, lineHeight: 1.05 }}>$0</p>
+            cicloPagado ? (
+              <p className="mt-1 font-semibold text-white" style={{ fontSize: 34, lineHeight: 1.1 }}>
+                Pagado
+              </p>
+            ) : (
+              <p className="mt-1 font-mono font-semibold text-white" style={{ fontSize: 40, lineHeight: 1.05 }}>$0</p>
+            )
           ) : (
             <div className="mt-1 flex flex-wrap items-baseline gap-x-5 gap-y-1">
               {totalCiclo.map(([moneda, v]) => (
@@ -294,6 +327,53 @@ export default async function TarjetaDetallePage({ params }: Props) {
           </div>
         )}
       </div>
+
+      {/* Débitos automáticos y suscripciones de esta tarjeta */}
+      {debitos.length > 0 && (
+        <div className="space-y-3">
+          <div className="flex items-center justify-between gap-2">
+            <h2 className="text-sm font-medium text-muted-foreground">
+              Débitos automáticos y suscripciones
+            </h2>
+            {pendientesDeEsta.length > 0 && (
+              <Link
+                href="/movimientos?generar=1"
+                className="text-xs font-medium text-gold hover:underline"
+              >
+                Aplicar {pendientesDeEsta.length} pendiente{pendientesDeEsta.length === 1 ? "" : "s"}
+              </Link>
+            )}
+          </div>
+          <div className="rounded-[var(--radius-card)] border border-border divide-y divide-border">
+            {debitos.map((d) => {
+              const pendiente = idsPendientes.has(d.id);
+              return (
+                <div key={d.id} className="flex items-center justify-between gap-3 px-4 py-2.5">
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium truncate">{d.nombre}</p>
+                    <p className="text-xs text-muted-foreground">
+                      Día {d.dia_mes} de cada mes
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-3 shrink-0">
+                    <span className="text-sm tabular-nums font-mono">
+                      {fmt(d.monto_estimado, d.moneda)}
+                    </span>
+                    <span className={cn(
+                      "text-[11px] px-2 py-0.5 rounded-[var(--radius-chip)] border whitespace-nowrap",
+                      pendiente
+                        ? "bg-warning/10 text-warning border-warning/20"
+                        : "bg-success/10 text-success border-success/20",
+                    )}>
+                      {pendiente ? "Pendiente" : "Aplicado"}
+                    </span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* Cuotas pendientes */}
       {cuotasPendientes && cuotasPendientes.length > 0 && (

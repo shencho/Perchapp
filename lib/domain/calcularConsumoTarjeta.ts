@@ -100,6 +100,21 @@ export interface MovimientoConsumo {
   moneda: string;
   /** Sólo los Egresos son consumo: un pago de resumen es una Transferencia. */
   tipo: string;
+  /** Un consumo con cuenta ya salió del banco al comprarse. */
+  cuenta_id?: string | null;
+  /** Un pago de resumen es Transferencia con tarjeta y SIN cuenta destino. */
+  cuenta_destino_id?: string | null;
+}
+
+export interface SaldoMoneda {
+  /** Total consumido en el ciclo. */
+  total: number;
+  /** Parte que ya descontó de una cuenta al comprarse: no se vuelve a pagar. */
+  yaDescontado: number;
+  /** Pagos del resumen ya registrados para este ciclo. */
+  yaPagado: number;
+  /** Lo que realmente falta pagar. Nunca negativo. */
+  aPagar: number;
 }
 
 /**
@@ -124,6 +139,58 @@ export function calcularConsumoTarjeta(
     porMoneda[m.moneda] = (porMoneda[m.moneda] ?? 0) + m.monto;
   }
   return porMoneda;
+}
+
+/**
+ * Saldo del ciclo de una tarjeta: lo consumido MENOS lo ya pagado, por moneda.
+ *
+ * Existía sólo dentro de `getResumenTarjeta`, que hace sus propias queries y va
+ * de a una tarjeta. Las otras tres pantallas (listado, inicio y la alerta de
+ * vencimiento) usaban `calcularConsumoTarjeta`, que suma únicamente Egresos y
+ * por lo tanto NUNCA baja al pagar: registrabas el pago y la tarjeta seguía
+ * mostrando el total del ciclo como si no hubieras pagado nada.
+ *
+ * Acá la lógica es pura y trabaja sobre un array ya cargado, así el inicio y el
+ * listado la aplican a todas las tarjetas sin una query por tarjeta.
+ *
+ * `finPagos` suele ser el vencimiento del ciclo, no su cierre: el pago se hace
+ * después de que cerró.
+ */
+export function calcularSaldoTarjeta(
+  tarjetaId: string,
+  movimientos: MovimientoConsumo[],
+  inicio: string,
+  fin: string,
+  finPagos?: string | null,
+): Record<string, SaldoMoneda> {
+  const out: Record<string, SaldoMoneda> = {};
+  const dame = (moneda: string) =>
+    (out[moneda] ??= { total: 0, yaDescontado: 0, yaPagado: 0, aPagar: 0 });
+
+  const topePagos = finPagos ?? fin;
+
+  for (const m of movimientos) {
+    if (m.tarjeta_id !== tarjetaId) continue;
+
+    if (m.tipo === "Egreso") {
+      if (m.fecha < inicio || m.fecha > fin) continue;
+      const acc = dame(m.moneda);
+      acc.total += m.monto;
+      if (m.cuenta_id) acc.yaDescontado += m.monto;
+      continue;
+    }
+
+    // Pago del resumen: Transferencia de la tarjeta sin cuenta destino.
+    if (m.tipo === "Transferencia" && !m.cuenta_destino_id) {
+      if (m.fecha < inicio || m.fecha > topePagos) continue;
+      dame(m.moneda).yaPagado += m.monto;
+    }
+  }
+
+  for (const acc of Object.values(out)) {
+    acc.aPagar = Math.max(0, Math.round((acc.total - acc.yaDescontado - acc.yaPagado) * 100) / 100);
+  }
+  return out;
 }
 
 export function getProximoVencimiento(

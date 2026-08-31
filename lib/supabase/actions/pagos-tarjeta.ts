@@ -2,7 +2,8 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
-import { getCicloDelProximoVencimiento, getPeriodoCierre, getProximoVencimiento } from "@/lib/domain/calcularConsumoTarjeta";
+import type { SaldoMoneda } from "@/lib/domain/calcularConsumoTarjeta";
+import { calcularSaldoTarjeta, getCicloDelProximoVencimiento, getPeriodoCierre, getProximoVencimiento } from "@/lib/domain/calcularConsumoTarjeta";
 
 /**
  * El pago del resumen NO es un gasto nuevo: el gasto ya quedó registrado al
@@ -11,16 +12,8 @@ import { getCicloDelProximoVencimiento, getPeriodoCierre, getProximoVencimiento 
  * Un pago de tarjeta = Transferencia con tarjeta_id y sin cuenta_destino_id.
  */
 
-export interface ResumenMoneda {
-  /** Total consumido en el ciclo. */
-  total: number;
-  /** Parte que ya descontó de una cuenta al comprarse (criterio viejo): no se vuelve a pagar. */
-  yaDescontado: number;
-  /** Ya pagado en este ciclo (pagos parciales incluidos). */
-  yaPagado: number;
-  /** total - yaDescontado - yaPagado (nunca negativo) */
-  aPagar: number;
-}
+/** El desglose vive en el dominio, compartido con el listado y el inicio. */
+export type ResumenMoneda = SaldoMoneda;
 
 export interface ResumenTarjeta {
   inicio: string;
@@ -50,43 +43,24 @@ export async function getResumenTarjeta(tarjetaId: string): Promise<ResumenTarje
     inicio = p.inicio; fin = p.fin; vencimiento = getProximoVencimiento(tarjeta.vencimiento_dia);
   }
 
-  const { data: consumos } = await supabase
-    .from("movimientos")
-    .select("monto, moneda, cuenta_id")
-    .eq("user_id", user.id).eq("tarjeta_id", tarjetaId).eq("tipo", "Egreso")
-    .gte("fecha", inicio).lte("fecha", fin);
-
-  const porMoneda: Record<string, ResumenMoneda> = {};
-  for (const c of consumos ?? []) {
-    const m = (porMoneda[c.moneda] ??= { total: 0, yaDescontado: 0, aPagar: 0, yaPagado: 0 });
-    m.total += c.monto;
-    // Consumos cargados con cuenta ya salieron del banco al comprarse: si se
-    // incluyeran en el pago, esa plata se descontaría dos veces.
-    if (c.cuenta_id) m.yaDescontado += c.monto;
-  }
-
-  // Pagos ya hechos para este ciclo (Transferencia con tarjeta y sin destino).
-  // Se acota por el vencimiento del ciclo: sin tope, los pagos de ciclos
-  // siguientes se contaban como si fueran de éste.
+  // Una sola consulta con consumos Y pagos; el reparto lo hace la función pura
+  // de dominio, la misma que usan el listado, el inicio y la alerta. Antes esta
+  // lógica vivía sólo acá y las otras tres pantallas tenían la suya, que no
+  // restaba los pagos.
   const topePagos = vencimiento ?? fin;
-  const { data: pagos } = await supabase
+  const { data: movs } = await supabase
     .from("movimientos")
-    .select("id, monto, moneda, fecha")
-    .eq("user_id", user.id).eq("tarjeta_id", tarjetaId).eq("tipo", "Transferencia")
-    .is("cuenta_destino_id", null)
+    .select("id, tipo, monto, moneda, fecha, tarjeta_id, cuenta_id, cuenta_destino_id")
+    .eq("user_id", user.id).eq("tarjeta_id", tarjetaId)
     .gte("fecha", inicio).lte("fecha", topePagos);
 
-  // Lo ya pagado se descuenta del pendiente, POR MONEDA: así el monto que se
-  // propone es lo que realmente falta y los pagos parciales se acumulan bien.
-  for (const p of pagos ?? []) {
-    const m = (porMoneda[p.moneda] ??= { total: 0, yaDescontado: 0, aPagar: 0, yaPagado: 0 });
-    m.yaPagado += p.monto;
-  }
-  for (const m of Object.values(porMoneda)) {
-    m.aPagar = Math.max(0, Math.round((m.total - m.yaDescontado - m.yaPagado) * 100) / 100);
-  }
+  const porMoneda = calcularSaldoTarjeta(tarjetaId, movs ?? [], inicio, fin, topePagos);
 
-  return { inicio, fin, vencimiento, porMoneda, yaPagado: pagos ?? [] };
+  const pagos = (movs ?? [])
+    .filter((m) => m.tipo === "Transferencia" && !m.cuenta_destino_id)
+    .map((m) => ({ id: m.id, monto: m.monto, moneda: m.moneda, fecha: m.fecha }));
+
+  return { inicio, fin, vencimiento, porMoneda, yaPagado: pagos };
 }
 
 export async function pagarTarjeta(input: {
