@@ -153,12 +153,18 @@ export function PagarResumen({ tarjetaId, tarjetaNombre, cuentas, cuentaPagoDefa
                 </span>
               </div>
 
-              {(v.yaDescontado > 0 || v.yaPagado > 0) && (
+              {(v.yaDescontado > 0 || v.devoluciones > 0 || v.yaPagado > 0) && (
                 <div className="space-y-0.5 text-xs text-muted-foreground">
                   {v.yaDescontado > 0 && (
                     <div className="flex justify-between">
                       <span>Ya descontado de cuentas</span>
                       <span className="tabular-nums font-mono">− {fmt(v.yaDescontado, moneda)}</span>
+                    </div>
+                  )}
+                  {v.devoluciones > 0 && (
+                    <div className="flex justify-between text-success">
+                      <span>Devoluciones y reintegros</span>
+                      <span className="tabular-nums font-mono">− {fmt(v.devoluciones, moneda)}</span>
                     </div>
                   )}
                   {v.yaPagado > 0 && (

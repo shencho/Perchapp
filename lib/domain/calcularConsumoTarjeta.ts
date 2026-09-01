@@ -111,6 +111,11 @@ export interface SaldoMoneda {
   total: number;
   /** Parte que ya descontó de una cuenta al comprarse: no se vuelve a pagar. */
   yaDescontado: number;
+  /**
+   * Créditos a favor en el ciclo: devoluciones de percepciones, reintegros,
+   * anulaciones. Se cargan como Ingreso con la tarjeta.
+   */
+  devoluciones: number;
   /** Pagos del resumen ya registrados para este ciclo. */
   yaPagado: number;
   /** Lo que realmente falta pagar. Nunca negativo. */
@@ -165,7 +170,7 @@ export function calcularSaldoTarjeta(
 ): Record<string, SaldoMoneda> {
   const out: Record<string, SaldoMoneda> = {};
   const dame = (moneda: string) =>
-    (out[moneda] ??= { total: 0, yaDescontado: 0, yaPagado: 0, aPagar: 0 });
+    (out[moneda] ??= { total: 0, yaDescontado: 0, devoluciones: 0, yaPagado: 0, aPagar: 0 });
 
   const topePagos = finPagos ?? fin;
 
@@ -180,6 +185,16 @@ export function calcularSaldoTarjeta(
       continue;
     }
 
+    // Un Ingreso con la tarjeta es un crédito a favor: devolución de
+    // percepciones, reintegro, anulación. Antes se ignoraba por completo, así
+    // que no bajaba lo que había que pagar; el banco sí lo descuenta del
+    // resumen.
+    if (m.tipo === "Ingreso") {
+      if (m.fecha < inicio || m.fecha > fin) continue;
+      dame(m.moneda).devoluciones += m.monto;
+      continue;
+    }
+
     // Pago del resumen: Transferencia de la tarjeta sin cuenta destino.
     if (m.tipo === "Transferencia" && !m.cuenta_destino_id) {
       if (m.fecha < inicio || m.fecha > topePagos) continue;
@@ -188,7 +203,10 @@ export function calcularSaldoTarjeta(
   }
 
   for (const acc of Object.values(out)) {
-    acc.aPagar = Math.max(0, Math.round((acc.total - acc.yaDescontado - acc.yaPagado) * 100) / 100);
+    acc.aPagar = Math.max(
+      0,
+      Math.round((acc.total - acc.yaDescontado - acc.devoluciones - acc.yaPagado) * 100) / 100,
+    );
   }
   return out;
 }

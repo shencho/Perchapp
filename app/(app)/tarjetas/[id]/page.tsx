@@ -234,6 +234,17 @@ export default async function TarjetaDetallePage({ params }: Props) {
             </div>
           )}
 
+          {(() => {
+            const dev = Object.entries(saldoPorMoneda).filter(([, v]) => v.devoluciones > 0);
+            if (dev.length === 0) return null;
+            return (
+              <p className="mt-2 text-[13px] text-cream/80">
+                Incluye devoluciones por{" "}
+                {dev.map(([moneda, v]) => fmt(v.devoluciones, moneda)).join(" · ")}
+              </p>
+            );
+          })()}
+
           <div className="mt-6 grid grid-cols-3 gap-3 border-t border-white/15 pt-4">
             <div>
               <p className="text-[11px] text-cream/70">Cierre</p>
@@ -266,9 +277,9 @@ export default async function TarjetaDetallePage({ params }: Props) {
 
       {/* Consumos del período */}
       <div className="space-y-2">
-        <h2 className="text-sm font-medium text-muted-foreground">Consumos del período actual</h2>
+        <h2 className="text-sm font-medium text-muted-foreground">Movimientos del período actual</h2>
         {!movPeriodo || movPeriodo.length === 0 ? (
-          <p className="text-sm text-muted-foreground py-6 text-center">Sin consumos en este período.</p>
+          <p className="text-sm text-muted-foreground py-6 text-center">Sin movimientos en este período.</p>
         ) : (
           <div className="rounded-lg border border-border overflow-hidden">
             <table className="w-full text-sm">
@@ -286,6 +297,12 @@ export default async function TarjetaDetallePage({ params }: Props) {
                   const rel = (m as unknown as { categorias?: { nombre: string } | { nombre: string }[] | null }).categorias;
                   const cat = Array.isArray(rel) ? rel[0] : rel;
                   const Icono = categoriaNombreToLucide(cat?.nombre);
+                  // La tabla pintaba TODAS las filas en rojo y sin signo, así
+                  // que una devolución de percepciones (Ingreso) y hasta el
+                  // pago del resumen (Transferencia) se leían como un consumo
+                  // más. Son créditos a favor: van en verde y con signo.
+                  const esCredito = m.tipo === "Ingreso";
+                  const esPago = m.tipo === "Transferencia";
                   return (
                     <tr key={m.id} className="border-b border-border last:border-0">
                       <td className="px-4 py-3 text-muted-foreground whitespace-nowrap">{fmtFecha(m.fecha)}</td>
@@ -309,15 +326,28 @@ export default async function TarjetaDetallePage({ params }: Props) {
                         </div>
                       </td>
                       <td className="px-4 py-3">
-                        <BadgeTipoGasto
-                          metodo={m.metodo}
-                          clasificacion={m.clasificacion}
-                          cuotaNumero={m.cuota_numero}
-                          cuotas={m.cuotas}
-                        />
+                        {esCredito ? (
+                          <span className="text-xs px-2 py-0.5 rounded-[var(--radius-chip)] border bg-success/10 text-success border-success/20 whitespace-nowrap">
+                            Devolución
+                          </span>
+                        ) : esPago ? (
+                          <span className="text-xs px-2 py-0.5 rounded-[var(--radius-chip)] border bg-info/10 text-info border-info/20 whitespace-nowrap">
+                            Pago del resumen
+                          </span>
+                        ) : (
+                          <BadgeTipoGasto
+                            metodo={m.metodo}
+                            clasificacion={m.clasificacion}
+                            cuotaNumero={m.cuota_numero}
+                            cuotas={m.cuotas}
+                          />
+                        )}
                       </td>
-                      <td className="px-4 py-3 text-right font-semibold tabular-nums font-mono text-danger whitespace-nowrap">
-                        {fmt(m.monto, m.moneda)}
+                      <td className={cn(
+                        "px-4 py-3 text-right font-semibold tabular-nums font-mono whitespace-nowrap",
+                        esCredito || esPago ? "text-success" : "text-danger",
+                      )}>
+                        {esCredito || esPago ? "− " : ""}{fmt(m.monto, m.moneda)}
                       </td>
                     </tr>
                   );
