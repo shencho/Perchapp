@@ -78,7 +78,7 @@ export function GenerarPendientesModal({
 
   return (
     <Dialog open={open} onOpenChange={v => { if (!v) onClose(); }}>
-      <DialogContent className="max-w-2xl">
+      <DialogContent className="sm:max-w-2xl flex flex-col gap-3">
         <DialogHeader>
           <DialogTitle>Generar movimientos pendientes</DialogTitle>
         </DialogHeader>
@@ -88,8 +88,71 @@ export function GenerarPendientesModal({
             No hay plantillas pendientes para este mes.
           </p>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+          <div className="flex-1 min-h-0 overflow-y-auto -mx-1 px-1">
+            {/* Mobile: una tarjeta por plantilla. La tabla de 5 columnas con dos
+                inputs no entra en un teléfono ni con scroll horizontal. */}
+            <div className="sm:hidden space-y-3">
+              {plantillasPendientes.map(({ plantilla: p, diasRestantes, atrasada, fechaEsperada }) => (
+                <div
+                  key={p.id}
+                  className={cn(
+                    "rounded-[var(--radius-card)] border border-border p-3 space-y-2",
+                    !checked[p.id] && "opacity-60",
+                  )}
+                >
+                  <label className="flex items-start gap-2.5 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={!!checked[p.id]}
+                      onChange={e => setChecked(prev => ({ ...prev, [p.id]: e.target.checked }))}
+                      className="h-4 w-4 mt-0.5 rounded accent-primary shrink-0"
+                    />
+                    <span className="min-w-0 flex-1">
+                      <span className="flex items-center gap-1.5 flex-wrap">
+                        <span className="font-medium">{p.nombre}</span>
+                        <span className={cn(
+                          "text-xs px-1.5 py-0.5 rounded border font-medium",
+                          p.tipo === "Ingreso"
+                            ? "bg-success/10 text-success border-success/20"
+                            : "bg-danger/10 text-danger border-danger/20",
+                        )}>
+                          {p.tipo ?? "Egreso"}
+                        </span>
+                      </span>
+                      {atrasada ? (
+                        <span className="flex items-center gap-1 text-xs text-warning mt-0.5">
+                          <AlertTriangle className="h-3 w-3" />
+                          Atrasada {Math.abs(diasRestantes)}d · {fmtFecha(fechaEsperada)}
+                        </span>
+                      ) : (
+                        <span className="block text-xs text-muted-foreground mt-0.5">
+                          {fmtFecha(fechaEsperada)}
+                          {diasRestantes === 0 ? " · hoy" : ` · en ${diasRestantes}d`}
+                        </span>
+                      )}
+                    </span>
+                  </label>
+                  <div className="flex gap-2">
+                    <Input
+                      type="number" min={0} step="0.01"
+                      value={montos[p.id] ?? p.monto_estimado}
+                      onChange={e => setMontos(prev => ({ ...prev, [p.id]: e.target.valueAsNumber }))}
+                      className="w-32 text-right tabular-nums font-mono h-9"
+                      disabled={!checked[p.id]}
+                    />
+                    <Input
+                      value={descripciones[p.id] ?? ""}
+                      onChange={e => setDescrip(prev => ({ ...prev, [p.id]: e.target.value }))}
+                      placeholder="Descripción"
+                      className="h-9 flex-1 min-w-0"
+                      disabled={!checked[p.id]}
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <table className="hidden sm:table w-full text-sm">
               <thead>
                 <tr className="border-b border-border text-muted-foreground">
                   <th className="py-2 pr-3 text-left w-6"></th>
@@ -172,7 +235,7 @@ export function GenerarPendientesModal({
 
         {error && <p className="text-xs text-destructive">{error}</p>}
 
-        <DialogFooter>
+        <DialogFooter className="shrink-0">
           <Button variant="outline" onClick={onClose} disabled={isSubmitting}>
             Cancelar
           </Button>
