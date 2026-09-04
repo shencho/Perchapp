@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useTransition, useCallback, Fragment } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Plus, Pencil, Copy, Trash2, Search, ChevronDown, ChevronLeft, ChevronRight, RefreshCw, Users, Landmark, ArrowRight, X, SlidersHorizontal } from "lucide-react";
+import { Plus, Pencil, Copy, Trash2, Search, ChevronDown, ChevronLeft, ChevronRight, RefreshCw, Users, Landmark, ArrowRight, X, SlidersHorizontal, Eye } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
@@ -17,6 +17,8 @@ import {
 import type { ResultadoBalanceGrupal } from "@/lib/domain/calcularBalanceGrupal";
 import { TIPOS_MOV, METODOS, CLASIFICACIONES, FRECUENCIAS } from "@/lib/supabase/actions/movimientos-types";
 import { MovimientoEditor } from "./movimiento-editor";
+import { ScrollToTop } from "@/components/shared/scroll-to-top";
+import { MovimientoDetalleDialog } from "./movimiento-detalle-dialog";
 import { GenerarPendientesModal } from "./generar-pendientes-modal";
 import type { Movimiento, Cuenta, Tarjeta, Categoria, Persona, GastoCompartidoParticipante } from "@/types/supabase";
 import type { GrupoConMiembros } from "@/lib/supabase/actions/grupos-types";
@@ -24,14 +26,9 @@ import type { PlantillaConEstado } from "@/lib/domain/plantillas";
 
 // ── Tipos ─────────────────────────────────────────────────────────────────────
 
-type MovimientoConRelaciones = Movimiento & {
-  categorias?: { id: string; nombre: string; tipo: string; parent_id: string | null } | null;
-  cuentas?: { id: string; nombre: string; tipo: string } | null;
-  cuenta_destino?: { id: string; nombre: string } | null;
-  tarjetas?: { id: string; nombre: string } | null;
-  gastos_compartidos_participantes?: { id: string; estado: string; monto: number; persona_id: string | null }[] | null;
-  prestamos?: { id: string; tipo: string; institucion_nombre: string | null; persona_id: string | null; personas?: { nombre: string } | null } | null;
-};
+import type { MovimientoConRelaciones } from "./movimiento-format";
+// Se re-exporta porque page.tsx tipa la prop `movimientos` desde acá.
+export type { MovimientoConRelaciones };
 
 interface Props {
   movimientos: MovimientoConRelaciones[];
@@ -64,46 +61,9 @@ interface Props {
 
 // ── Constantes ────────────────────────────────────────────────────────────────
 
-const NECESIDAD_COLORS: Record<number, string> = {
-  1: "bg-danger/10 text-danger border-danger/20",
-  2: "bg-warning/10 text-warning border-warning/20",
-  3: "bg-warning/10 text-warning border-warning/20",
-  4: "bg-success/10 text-success border-success/20",
-  5: "bg-success/10 text-success border-success/20",
-};
-
-function formatMonto(n: number, moneda = "ARS") {
-  return new Intl.NumberFormat("es-AR", {
-    style: "currency",
-    currency: moneda,
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-  }).format(n);
-}
-
-function formatFecha(d: string) {
-  return new Date(d + "T12:00:00").toLocaleDateString("es-AR", {
-    day: "2-digit",
-    month: "short",
-  });
-}
-
-function todayStr() {
-  return new Date().toISOString().slice(0, 10);
-}
-
-// Muestra el concepto sin el sufijo "(cuota i/N)" (se ve como badge aparte).
-function conceptoBase(m: { concepto: string | null; descripcion: string | null }) {
-  return (m.concepto || m.descripcion || "—").replace(/\s*\(cuota\s*\d+\/\d+\)\s*$/i, "");
-}
-
-function nombrePrestamo(m: MovimientoConRelaciones): string | null {
-  if (!m.prestamos) return null;
-  const p = m.prestamos;
-  if (p.tipo === "bancario") return p.institucion_nombre ?? "Institución";
-  const persona = p.personas?.nombre ?? "Persona";
-  return p.tipo === "otorgado" ? `Préstamo a ${persona}` : `Préstamo de ${persona}`;
-}
+import {
+  NECESIDAD_COLORS, formatMonto, formatFecha, todayStr, conceptoBase, nombrePrestamo,
+} from "./movimiento-format";
 
 // ── CompartidoPanel ───────────────────────────────────────────────────────────
 
@@ -474,6 +434,9 @@ export function MovimientosClient({ movimientos, total, totales = {}, pagina = 0
   const [duplicando, setDuplicando]     = useState<Movimiento | null>(null);
   const [expandedId, setExpandedId]     = useState<string | null>(null);
   const [generarOpen, setGenerarOpen]   = useState(!!generarInicialId);
+  // Detalle de solo lectura. Es estado propio y NO reusa `expandedId`, que es
+  // del panel de gasto compartido y sólo existe en las filas compartidas.
+  const [detalle, setDetalle] = useState<MovimientoConRelaciones | null>(null);
 
   // Búsqueda: estado local para tipear, con debounce → searchParam `q` (server-side).
   const [busqueda, setBusqueda] = useState(busquedaInicial);
@@ -554,6 +517,9 @@ export function MovimientosClient({ movimientos, total, totales = {}, pagina = 0
       else sp.set(k, v);
     }
     if (resetPagina) sp.delete("pagina");
+    // El componente no se remonta al navegar: sin esto el detalle queda abierto
+    // sobre una lista que ya cambió.
+    setDetalle(null);
     startTransition(() => router.push(`?${sp.toString()}`));
   }, [searchParams, router, startTransition]);
 
@@ -1008,6 +974,9 @@ export function MovimientosClient({ movimientos, total, totales = {}, pagina = 0
                               <ChevronDown className={cn("h-3.5 w-3.5 transition-transform", isExpanded && "rotate-180")} />
                             </Button>
                           )}
+                          <Button variant="ghost" size="icon-sm" onClick={() => setDetalle(m)} title="Ver detalle">
+                            <Eye className="h-3.5 w-3.5" />
+                          </Button>
                           <Button variant="ghost" size="icon-sm" onClick={() => handleEditar(m)} title="Editar">
                             <Pencil className="h-3.5 w-3.5" />
                           </Button>
@@ -1129,6 +1098,9 @@ export function MovimientosClient({ movimientos, total, totales = {}, pagina = 0
                             <ChevronDown className={cn("h-3.5 w-3.5 transition-transform", isExpanded && "rotate-180")} />
                           </Button>
                         )}
+                        <Button variant="ghost" size="icon-sm" onClick={() => setDetalle(m)} title="Ver detalle">
+                          <Eye className="h-3.5 w-3.5" />
+                        </Button>
                         <Button variant="ghost" size="icon-sm" onClick={() => handleEditar(m)}>
                           <Pencil className="h-3.5 w-3.5" />
                         </Button>
@@ -1211,6 +1183,15 @@ export function MovimientosClient({ movimientos, total, totales = {}, pagina = 0
         personas={personas}
         grupos={grupos}
       />
+
+      <MovimientoDetalleDialog
+        movimiento={detalle}
+        onClose={() => setDetalle(null)}
+        onEditar={(m) => { setDetalle(null); handleEditar(m); }}
+      />
+
+      {/* Con 100 filas por página, volver arriba a mano es un scroll largo. */}
+      <ScrollToTop />
 
       {/* Modal plantillas pendientes */}
       <GenerarPendientesModal

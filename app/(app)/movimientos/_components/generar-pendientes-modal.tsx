@@ -53,6 +53,19 @@ export function GenerarPendientesModal({
   }, [open, plantillasPendientes, initialSelectedId]);
 
   const seleccionados = plantillasPendientes.filter(({ plantilla: p }) => checked[p.id]);
+  const todas = plantillasPendientes.length;
+  const marcadas = seleccionados.length;
+  const todasMarcadas = todas > 0 && marcadas === todas;
+  const algunaMarcada = marcadas > 0 && !todasMarcadas;
+
+  /**
+   * Marca o desmarca todo de una. Ojo con la inicialización: cuando se entra
+   * por el link de una alerta (`?generar=<id>`) queda marcada UNA sola a
+   * propósito, así que esto sólo puede correr por click explícito.
+   */
+  function marcarTodas(valor: boolean) {
+    setChecked(Object.fromEntries(plantillasPendientes.map(({ plantilla: p }) => [p.id, valor])));
+  }
 
   async function handleConfirmar() {
     if (seleccionados.length === 0) return;
@@ -92,6 +105,19 @@ export function GenerarPendientesModal({
             {/* Mobile: una tarjeta por plantilla. La tabla de 5 columnas con dos
                 inputs no entra en un teléfono ni con scroll horizontal. */}
             <div className="sm:hidden space-y-3">
+              <label className="flex items-center gap-2.5 text-sm font-medium px-1 pb-1">
+                <input
+                  type="checkbox"
+                  checked={todasMarcadas}
+                  ref={(el) => { if (el) el.indeterminate = algunaMarcada; }}
+                  onChange={(e) => marcarTodas(e.target.checked)}
+                  className="h-4 w-4 rounded accent-primary"
+                />
+                {todasMarcadas ? "Desmarcar todas" : "Marcar todas"}
+                <span className="text-xs text-muted-foreground font-normal">
+                  ({marcadas} de {todas})
+                </span>
+              </label>
               {plantillasPendientes.map(({ plantilla: p, diasRestantes, atrasada, fechaEsperada }) => (
                 <div
                   key={p.id}
@@ -155,7 +181,16 @@ export function GenerarPendientesModal({
             <table className="hidden sm:table w-full text-sm">
               <thead>
                 <tr className="border-b border-border text-muted-foreground">
-                  <th className="py-2 pr-3 text-left w-6"></th>
+                  <th className="py-2 pr-3 text-left w-6">
+                    <input
+                      type="checkbox"
+                      checked={todasMarcadas}
+                      ref={(el) => { if (el) el.indeterminate = algunaMarcada; }}
+                      onChange={(e) => marcarTodas(e.target.checked)}
+                      className="h-4 w-4 rounded accent-primary cursor-pointer"
+                      title={todasMarcadas ? "Desmarcar todas" : "Marcar todas"}
+                    />
+                  </th>
                   <th className="py-2 pr-3 text-left">Plantilla</th>
                   <th className="py-2 pr-3 text-center w-16">Día</th>
                   <th className="py-2 pr-3 text-right w-28">Monto</th>
