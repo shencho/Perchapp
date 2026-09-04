@@ -48,6 +48,13 @@ interface ParticipanteForm {
 }
 
 // ── Schema ────────────────────────────────────────────────────────────────────
+//
+// Este valida el FORMULARIO; `movimientoSchema` de movimientos-types.ts valida el
+// PAYLOAD que va a la base. No son el mismo objeto y no conviene fusionarlos:
+// acá los ids van como string pelado porque un select vacío es "", mientras que
+// el de la action exige uuid; y acá viven campos que no son columnas
+// (crear_recurrente, nombre_plantilla, dia_mes_recurrente).
+// Lo que sí es compartido son los enums, que se importan de allá.
 
 const schema = z.object({
   tipo:              z.enum(TIPOS_MOV),
@@ -634,6 +641,17 @@ export function MovimientoEditor({ open, onClose, onSaved, editing, duplicando, 
         if (Math.abs(delta) <= 1) {
           gcMiParteFinal = Math.round((gcMiParte + delta) * 100) / 100;
         }
+      }
+
+      // Una transferencia normal sin cuenta destino dejaba la plata a mitad de
+      // camino: salía del origen y no entraba a ningún lado. El pago de resumen
+      // es la excepción legítima (la contraparte es la tarjeta, no una cuenta),
+      // y por eso esto no puede vivir en el schema de zod: `esPagoTarjeta` sale
+      // de estado del componente, que zod no ve.
+      if (tipo === "Transferencia" && !esPagoTarjeta && !values.cuenta_destino_id) {
+        setError("Elegí la cuenta de destino de la transferencia.");
+        setIsSubmitting(false);
+        return;
       }
 
       const montoDestinoFinal = crossMoneda && Number.isFinite(values.monto_destino)

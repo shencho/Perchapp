@@ -4,10 +4,18 @@ import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 
+/**
+ * La categoría "Ajuste de inversión" se autocrea la primera vez que se revalúa
+ * una inversión.
+ *
+ * El tipo va CAPITALIZADO: la migración 006 reemplazó el check viejo
+ * `('ingreso','egreso')` por `('Ingreso','Egreso','Ambos')` (006:58-59) y acá
+ * seguía en minúscula, así que este insert venía fallando contra el constraint.
+ */
 async function getOrCreateCategoria(
   supabase: Awaited<ReturnType<typeof createClient>>,
   userId: string,
-  tipo: "ingreso" | "egreso"
+  tipo: "Ingreso" | "Egreso"
 ): Promise<string> {
   const nombre = "Ajuste de inversión";
 
@@ -56,7 +64,7 @@ export async function ajustarValorInversion(input: {
   if (!cuenta) throw new Error("Cuenta no encontrada");
 
   const tipoMov = diferencia > 0 ? "Ingreso" : "Egreso";
-  const tipoCat = diferencia > 0 ? "ingreso" : "egreso";
+  const tipoCat = diferencia > 0 ? "Ingreso" : "Egreso";
   const categoriaId = await getOrCreateCategoria(supabase, user.id, tipoCat);
 
   const { error } = await supabase.from("movimientos").insert({

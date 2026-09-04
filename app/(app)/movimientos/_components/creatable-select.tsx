@@ -42,6 +42,7 @@ export function CreatableSelect({
   const [creating, setCreating] = useState(false);
   const [inputVal, setInputVal] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const shouldSuggest =
@@ -57,6 +58,7 @@ export function CreatableSelect({
     const nombre = inputVal.trim();
     if (!nombre) { cancelCreate(); return; }
     setIsLoading(true);
+    setError(null);
     try {
       const result = await createCategoriaInline({ nombre, tipo, parent_id: parent_id ?? null });
       const opt = { id: result.id, nombre };
@@ -64,8 +66,10 @@ export function CreatableSelect({
       onCreated?.(opt);
       setCreating(false);
       setInputVal("");
-    } catch {
-      // leave input open so user can retry
+    } catch (e) {
+      // El catch estaba vacío: si crear fallaba, el input quedaba abierto sin
+      // ninguna señal y el usuario no sabía por qué no pasaba nada.
+      setError(e instanceof Error ? e.message : "No se pudo crear la categoría");
     } finally {
       setIsLoading(false);
     }
@@ -74,6 +78,7 @@ export function CreatableSelect({
   function cancelCreate() {
     setCreating(false);
     setInputVal("");
+    setError(null);
   }
 
   function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
@@ -83,6 +88,7 @@ export function CreatableSelect({
 
   if (creating) {
     return (
+      <div className="space-y-1">
       <div className="flex gap-1.5">
         <Input
           ref={inputRef}
@@ -105,6 +111,8 @@ export function CreatableSelect({
         <Button type="button" size="icon-sm" variant="ghost" onClick={cancelCreate}>
           <XIcon className="h-3.5 w-3.5 text-muted-foreground" />
         </Button>
+      </div>
+      {error && <p className="text-xs text-destructive">{error}</p>}
       </div>
     );
   }
