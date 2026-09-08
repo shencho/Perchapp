@@ -418,8 +418,19 @@ export function MovimientoEditor({ open, onClose, onSaved, editing, duplicando, 
     ? localCategorias.filter((c) => c.parent_id === padreId)
     : [];
 
-  // Al cambiar tipo o categoría padre, limpiar subcategoría
-  useEffect(() => { setSubcatId(null); }, [tipo, padreId]);
+  /**
+   * La subcategoría sólo vale si sigue colgando del padre elegido.
+   *
+   * Antes esto era `useEffect(() => setSubcatId(null), [tipo, padreId])`, que
+   * borraba SIEMPRE que cambiaba el padre — incluido el cambio de null al padre
+   * que resuelve `resolveCatId` al abrir el editor. Efecto: el intérprete de IA
+   * acertaba la subcategoría, el usuario tocaba "editar antes de guardar" y la
+   * perdía en blanco sin darse cuenta, guardando el movimiento sin subcategoría.
+   *
+   * Derivarlo en vez de reaccionar al cambio no puede tener esa carrera: si la
+   * subcategoría pertenece al padre, se usa; si no, no.
+   */
+  const subcatSel = subcatId && catsHijas.some((c) => c.id === subcatId) ? subcatId : null;
 
   // Visibilidad de tarjeta y fecha_vencimiento
   const esDebitoTarjeta = metodo === "Débito";
@@ -676,7 +687,7 @@ export function MovimientoEditor({ open, onClose, onSaved, editing, duplicando, 
           : (Number.isFinite(values.tipo_cambio) ? (values.tipo_cambio as number) : null),
         concepto:          values.concepto ?? null,
         descripcion:       values.descripcion ?? null,
-        categoria_id:      subcatId ?? padreId ?? null,
+        categoria_id:      subcatSel ?? padreId ?? null,
         necesidad:         showNecesidad ? (values.necesidad ?? null) : null,
         metodo:            values.metodo ?? null,
         cuenta_id:         showCuenta ? (values.cuenta_id ?? null) : null,
@@ -960,7 +971,7 @@ export function MovimientoEditor({ open, onClose, onSaved, editing, duplicando, 
                   <Label>Subcategoría</Label>
                   <CreatableSelect
                     options={catsHijas as CatOption[]}
-                    value={subcatId ?? ""}
+                    value={subcatSel ?? ""}
                     onValueChange={(v) => setSubcatId(v || null)}
                     onCreated={(opt) => {
                       setLocalCategorias((prev) => [
