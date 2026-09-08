@@ -43,6 +43,7 @@ export function PrestamoEditor({ open, onClose, personas, editing }: Props) {
   const [cuotaMensual, setCuotaMensual] = useState("");
   const [diaVencimiento, setDiaVencimiento] = useState("");
   const [notas, setNotas] = useState("");
+  const [autoLiquidar, setAutoLiquidar] = useState(false);
 
   // Populate al editar
   useEffect(() => {
@@ -59,6 +60,7 @@ export function PrestamoEditor({ open, onClose, personas, editing }: Props) {
       setCuotaMensual(editing.cuota_mensual ? String(editing.cuota_mensual) : "");
       setDiaVencimiento(editing.dia_vencimiento_cuota ? String(editing.dia_vencimiento_cuota) : "");
       setNotas(editing.notas ?? "");
+      setAutoLiquidar(editing.auto_liquidar ?? false);
     } else {
       setTipo("otorgado");
       setPersonaId("");
@@ -109,6 +111,7 @@ export function PrestamoEditor({ open, onClose, personas, editing }: Props) {
         dia_vencimiento_cuota: diaVencimiento ? parseInt(diaVencimiento) : null,
         estado: (editing?.estado ?? "activo") as "activo" | "cancelado",
         notas: notas.trim() || null,
+        auto_liquidar: autoLiquidar,
       };
 
       if (editing) {
@@ -303,6 +306,27 @@ export function PrestamoEditor({ open, onClose, personas, editing }: Props) {
                 </div>
               </div>
             )}
+
+            {/* Auto-liquidación: sólo tiene sentido si hay cuota y día */}
+            <div className="rounded-[var(--radius-card)] border border-border p-3 space-y-1.5">
+              <label className="flex items-start gap-2.5 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={autoLiquidar}
+                  onChange={(e) => setAutoLiquidar(e.target.checked)}
+                  disabled={!cuotaMensual || !diaVencimiento}
+                  className="h-4 w-4 mt-0.5 rounded accent-primary shrink-0"
+                />
+                <span>
+                  <span className="text-sm font-medium">Recordarme la cuota todos los meses</span>
+                  <span className="block text-xs text-muted-foreground mt-0.5">
+                    {!cuotaMensual || !diaVencimiento
+                      ? "Completá la cuota mensual y el día de vencimiento para activarlo."
+                      : "Cada mes te avisa que falta registrarla. No la carga sola: la confirmás vos."}
+                  </span>
+                </span>
+              </label>
+            </div>
 
             {/* Notas */}
             <div className="space-y-1.5">

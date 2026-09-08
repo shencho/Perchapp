@@ -1099,6 +1099,12 @@ export interface Database {
           dia_vencimiento_cuota: number | null
           estado: "activo" | "cancelado"
           notas: string | null
+          cuenta_id: string | null
+          tarjeta_id: string | null
+          categoria_id: string | null
+          metodo: string | null
+          auto_liquidar: boolean
+          movimiento_desembolso_id: string | null
           archivado: boolean
           created_at: string
         }
@@ -1118,6 +1124,12 @@ export interface Database {
           dia_vencimiento_cuota?: number | null
           estado?: "activo" | "cancelado"
           notas?: string | null
+          cuenta_id?: string | null
+          tarjeta_id?: string | null
+          categoria_id?: string | null
+          metodo?: string | null
+          auto_liquidar?: boolean
+          movimiento_desembolso_id?: string | null
           archivado?: boolean
           created_at?: string
         }
@@ -1137,6 +1149,12 @@ export interface Database {
           dia_vencimiento_cuota?: number | null
           estado?: "activo" | "cancelado"
           notas?: string | null
+          cuenta_id?: string | null
+          tarjeta_id?: string | null
+          categoria_id?: string | null
+          metodo?: string | null
+          auto_liquidar?: boolean
+          movimiento_desembolso_id?: string | null
           archivado?: boolean
           created_at?: string
         }

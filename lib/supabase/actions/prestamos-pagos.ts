@@ -119,7 +119,12 @@ export async function registrarPago(input: RegistrarPagoPrestamoInput): Promise<
       moneda: prestamo.moneda,
       fecha: parsed.fecha,
       concepto,
-      cuenta_id: parsed.cuentaId ?? null,
+      // Si el pago no trae cuenta, se usa la del préstamo. Antes se guardaba
+      // null y el movimiento no movía ningún saldo, pero sí contaba como gasto.
+      cuenta_id: parsed.cuentaId ?? prestamo.cuenta_id ?? null,
+      tarjeta_id: prestamo.tarjeta_id ?? null,
+      categoria_id: prestamo.categoria_id ?? null,
+      metodo: prestamo.metodo ?? null,
       observaciones: parsed.notas ?? null,
       es_reembolso: esDevolucionDeLoQuePreste,
       frecuencia: "No corriente" as const,

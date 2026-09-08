@@ -14,6 +14,16 @@ export const prestamoSchema = z.object({
   dia_vencimiento_cuota: z.number().int().min(1).max(31).nullable().optional(),
   estado: z.enum(["activo", "cancelado"]).default("activo"),
   notas: z.string().nullable().optional(),
+  // De dónde sale (o entra) la cuota. Sin esto cada pago volvía a preguntar
+  // todo, y se podía registrar sin cuenta: no movía ningún saldo pero sí
+  // contaba como gasto. Migración 036.
+  cuenta_id: z.string().uuid().nullable().optional(),
+  tarjeta_id: z.string().uuid().nullable().optional(),
+  categoria_id: z.string().uuid().nullable().optional(),
+  metodo: z.enum(["Efectivo","Transferencia","Billetera virtual","Crédito","Débito automático","Débito"])
+    .nullable().optional(),
+  /** La cuota se propone sola cada mes en el flujo de pendientes. */
+  auto_liquidar: z.boolean().optional(),
 });
 
 export type PrestamoInput = z.infer<typeof prestamoSchema>;

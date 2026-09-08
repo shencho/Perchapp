@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getPrestamos } from "@/lib/supabase/actions/prestamos";
+import { getCuotasPendientesDelMes } from "@/lib/domain/prestamos-auto";
 import { calcularSaldoCuenta } from "@/lib/domain/calcularSaldoCuenta";
 import { montoPropio } from "@/lib/domain/_utils/movimiento";
 import { totalesPorMoneda, idsAjusteInversion } from "@/lib/domain/finanzas";
@@ -332,6 +333,41 @@ export default async function DashboardPage() {
         descripcion:   `~${fmtARS(p.plantilla.monto_estimado)} estimado`,
         href:          `/movimientos?generar=${p.plantilla.id}`,
         referencia_id: p.plantilla.id,
+      });
+    });
+
+  // Cuotas de préstamo con auto-liquidación que faltan aplicar este mes.
+  // Se proponen, no se insertan solas: un movimiento que aparece sin que nadie
+  // lo pida es peor que uno que falta, porque nadie lo audita.
+  getCuotasPendientesDelMes(
+    prestamosRaw.map(p => ({
+      id: p.id, tipo: p.tipo, institucion_nombre: p.institucion_nombre,
+      moneda: p.moneda, cuota_mensual: p.cuota_mensual,
+      dia_vencimiento_cuota: p.dia_vencimiento_cuota,
+      cantidad_cuotas: p.cantidad_cuotas, estado: p.estado,
+      archivado: p.archivado, auto_liquidar: p.auto_liquidar ?? false,
+    })),
+    (prestamosRaw ?? []).flatMap(p =>
+      (p.prestamos_pagos ?? []).map(pg => ({ prestamo_id: p.id, fecha: pg.fecha })),
+    ),
+    now,
+  )
+    .filter(c => !idsSilenciadas.has(`cuota-${c.prestamo.id}`))
+    .forEach(c => {
+      const dias = Math.abs(c.diasRestantes);
+      const nombre = c.prestamo.institucion_nombre ?? "Préstamo";
+      alertas.push({
+        id:            `cuota-prestamo-${c.prestamo.id}`,
+        tipo:          c.atrasada ? "plantilla_atrasada" : "plantilla_pendiente",
+        urgencia:      c.atrasada || c.diasRestantes <= 1 ? "alta" : "media",
+        titulo:        c.atrasada
+          ? `Cuota de ${nombre} sin registrar (hace ${dias}d)`
+          : c.diasRestantes === 0
+            ? `Cuota de ${nombre} vence hoy`
+            : `Cuota de ${nombre} vence en ${dias}d`,
+        descripcion:   `${fmtARS(c.monto)} · cuota ${c.cuotaNumero}${c.prestamo.cantidad_cuotas ? ` de ${c.prestamo.cantidad_cuotas}` : ""}`,
+        href:          `/prestamos/${c.prestamo.id}`,
+        referencia_id: `cuota-${c.prestamo.id}`,
       });
     });
 
