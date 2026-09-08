@@ -62,7 +62,9 @@ export async function registrarPago(input: RegistrarPagoPrestamoInput): Promise<
   // Fetch prestamo para tipo, moneda, y calcular saldo actual
   const { data: prestamo, error: prestamoError } = await supabase
     .from("prestamos")
-    .select("*, prestamos_pagos(monto)")
+    // El embed de personas faltaba, y las líneas de abajo lo leían igual con un
+    // cast: por eso todos los conceptos decían literalmente "persona".
+    .select("*, prestamos_pagos(monto), personas(nombre)")
     .eq("id", parsed.prestamoId)
     .eq("user_id", userId)
     .single();
@@ -93,7 +95,20 @@ export async function registrarPago(input: RegistrarPagoPrestamoInput): Promise<
     concepto = `Cuota préstamo — ${prestamo.institucion_nombre ?? "institución"}${cuotaLabel}`;
   }
 
-  // Crear movimiento vinculado
+  // Crear movimiento vinculado.
+  //
+  // Criterio (antes se insertaba pelado y la cuota caía en "Sin categoría"):
+  //  - Cobrar lo que prestaste NO es un ingreso nuevo: es plata que vuelve. Va
+  //    con es_reembolso=true, que es exactamente para lo que existe la columna
+  //    (mismo uso que en gastos-compartidos.ts:134). Sin esto, cada devolución
+  //    inflaba los ingresos del mes en el inicio y en estadísticas.
+  //  - Una cuota de préstamo es un compromiso puntual con fecha de fin, no
+  //    parte del gasto corriente del mes: frecuencia "No corriente", que es lo
+  //    que lee el cash-flow para no proyectarla para siempre.
+  //  - clasificacion "Cuotas" cuando el préstamo tiene cuotas; "Fijo" si no.
+  const esDevolucionDeLoQuePreste = prestamo.tipo === "otorgado";
+  const tieneCuotas = (prestamo.cantidad_cuotas ?? 0) > 1;
+
   const { data: movimiento, error: movError } = await supabase
     .from("movimientos")
     .insert({
@@ -106,6 +121,11 @@ export async function registrarPago(input: RegistrarPagoPrestamoInput): Promise<
       concepto,
       cuenta_id: parsed.cuentaId ?? null,
       observaciones: parsed.notas ?? null,
+      es_reembolso: esDevolucionDeLoQuePreste,
+      frecuencia: "No corriente" as const,
+      clasificacion: tieneCuotas ? ("Cuotas" as const) : ("Fijo" as const),
+      cuotas: prestamo.cantidad_cuotas ?? 1,
+      cuota_numero: parsed.cuotaNumero ?? null,
     })
     .select("id")
     .single();
