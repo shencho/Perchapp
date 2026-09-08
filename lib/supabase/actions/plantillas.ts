@@ -21,6 +21,23 @@ export interface CreatePlantillaInput {
   fecha_inicio?: string;
   fecha_fin?: string | null;
   notas?: string | null;
+  // Campos que la plantilla no guardaba y hacían que el movimiento generado no
+  // fuera el mismo gasto (migración 035).
+  ambito?: "Personal" | "Profesional";
+  descripcion?: string | null;
+  observaciones?: string | null;
+  necesidad?: number | null;
+  cantidad?: number;
+  frecuencia?: "Corriente" | "No corriente";
+  es_compartido?: boolean;
+  gc_mi_parte?: number | null;
+  /** Repartición a replicar cada mes. Reemplaza en bloque a la anterior. */
+  participantes?: {
+    persona_nombre: string;
+    persona_id?: string | null;
+    monto: number;
+    modo?: "fijo" | "a_repartir";
+  }[];
 }
 
 export type UpdatePlantillaInput = Partial<CreatePlantillaInput> & { activo?: boolean };
@@ -45,15 +62,70 @@ export async function createPlantilla(input: CreatePlantillaInput): Promise<Plan
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error("No autenticado");
 
+  // `participantes` no es columna de la tabla: va aparte. Sin separarlo, el
+  // insert entero falla.
+  const { participantes, ...columnas } = input;
+
   const { data, error } = await supabase
     .from("plantillas_recurrentes")
-    .insert({ user_id: user.id, ...input })
+    .insert({ user_id: user.id, ...columnas })
     .select()
     .single();
 
   if (error || !data) throw new Error(error?.message ?? "Error al crear plantilla");
+
+  await guardarParticipantes(data.id, participantes);
   revalidatePath("/movimientos-recurrentes");
   return data;
+}
+
+/**
+ * Reemplaza en bloque la repartición de una plantilla.
+ *
+ * Se borra y se reinserta en vez de actualizar fila por fila: los participantes
+ * no tienen identidad estable entre ediciones (una persona puede salir y entrar),
+ * y el borrado en bloque evita quedarse con filas huérfanas de un reparto viejo.
+ */
+async function guardarParticipantes(
+  plantillaId: string,
+  participantes: CreatePlantillaInput["participantes"],
+): Promise<void> {
+  if (participantes === undefined) return; // no se tocó el reparto
+
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error("No autenticado");
+
+  await supabase.from("plantilla_participantes")
+    .delete().eq("plantilla_id", plantillaId).eq("user_id", user.id);
+
+  if (!participantes.length) return;
+
+  const { error } = await supabase.from("plantilla_participantes").insert(
+    participantes.map((p) => ({
+      user_id:        user.id,
+      plantilla_id:   plantillaId,
+      persona_nombre: p.persona_nombre,
+      persona_id:     p.persona_id ?? null,
+      monto:          p.monto,
+      modo:           p.modo ?? "a_repartir",
+    })),
+  );
+  if (error) throw new Error(error.message);
+}
+
+/** Repartición guardada de una plantilla, para precargar el editor. */
+export async function getParticipantesPlantilla(plantillaId: string) {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return [];
+
+  const { data } = await supabase
+    .from("plantilla_participantes")
+    .select("persona_nombre, persona_id, monto, modo")
+    .eq("plantilla_id", plantillaId)
+    .eq("user_id", user.id);
+  return data ?? [];
 }
 
 export async function updatePlantilla(id: string, input: UpdatePlantillaInput): Promise<void> {
@@ -61,13 +133,17 @@ export async function updatePlantilla(id: string, input: UpdatePlantillaInput): 
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error("No autenticado");
 
+  const { participantes, ...columnas } = input;
+
   const { error } = await supabase
     .from("plantillas_recurrentes")
-    .update(input)
+    .update(columnas)
     .eq("id", id)
     .eq("user_id", user.id);
 
   if (error) throw new Error(error.message);
+
+  await guardarParticipantes(id, participantes);
   revalidatePath("/movimientos-recurrentes");
 }
 
@@ -177,7 +253,7 @@ export async function generarMovimientosDePlantillas(
       tipo:                    (p.tipo ?? "Egreso") as "Ingreso" | "Egreso",
       fecha,
       monto:                   item.monto,
-      descripcion:             item.descripcion || null,
+      descripcion:             item.descripcion || p.descripcion || null,
       moneda:                  p.moneda,
       metodo:                  p.metodo,
       debita_de:               p.debita_de,
@@ -186,11 +262,55 @@ export async function generarMovimientosDePlantillas(
       categoria_id:            p.categoria_id,
       clasificacion:           p.clasificacion ?? "Fijo",
       concepto:                p.concepto ?? null,
-      frecuencia:              "Corriente" as const,
+      // Antes esto era `"Corriente"` fijo, sin mirar el original: una cuota o un
+      // gasto no corriente convertido en plantilla se regeneraba como corriente
+      // y el cash-flow lo proyectaba para siempre.
+      frecuencia:              (p.frecuencia ?? "Corriente") as "Corriente" | "No corriente",
+      ambito:                  p.ambito ?? "Personal",
+      observaciones:           p.observaciones ?? null,
+      necesidad:               p.necesidad ?? null,
+      cantidad:                p.cantidad ?? 1,
+      es_compartido:           p.es_compartido ?? false,
+      gc_mi_parte:             p.gc_mi_parte ?? null,
       plantilla_recurrente_id: p.id,
     };
   });
 
-  const { error } = await supabase.from("movimientos").insert(rows);
+  // `select("id")` para poder colgarle los participantes a cada movimiento nuevo.
+  const { data: creados, error } = await supabase
+    .from("movimientos").insert(rows).select("id, plantilla_recurrente_id");
   if (error) throw new Error(error.message);
+
+  // Replicar la repartición del gasto compartido. Sin esto, una plantilla de un
+  // gasto compartido generaba un gasto entero NO compartido y se perdía la
+  // deuda de los demás.
+  const idsCompartidas = plantillas.filter(p => p.es_compartido).map(p => p.id);
+  if (idsCompartidas.length && creados?.length) {
+    const { data: participantes } = await supabase
+      .from("plantilla_participantes")
+      .select("plantilla_id, persona_nombre, persona_id, monto, modo")
+      .eq("user_id", user.id)
+      .in("plantilla_id", idsCompartidas);
+
+    const filas = (creados ?? []).flatMap(mov =>
+      (participantes ?? [])
+        .filter(pp => pp.plantilla_id === mov.plantilla_recurrente_id)
+        .map(pp => ({
+          user_id:        user.id,
+          movimiento_id:  mov.id,
+          persona_nombre: pp.persona_nombre,
+          persona_id:     pp.persona_id,
+          monto:          pp.monto,
+          modo:           pp.modo,
+          // La plantilla describe el reparto, no el cobro: cada mes arranca
+          // pendiente de cobrar.
+          estado:         "pendiente" as const,
+        })),
+    );
+    if (filas.length) {
+      const { error: eParts } = await supabase
+        .from("gastos_compartidos_participantes").insert(filas);
+      if (eParts) throw new Error(eParts.message);
+    }
+  }
 }

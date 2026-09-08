@@ -1173,6 +1173,39 @@ export interface Database {
           created_at?: string
         }
       }
+      plantilla_participantes: {
+        Row: {
+          id: string
+          user_id: string
+          plantilla_id: string
+          persona_nombre: string
+          persona_id: string | null
+          monto: number
+          modo: "fijo" | "a_repartir"
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          plantilla_id: string
+          persona_nombre: string
+          persona_id?: string | null
+          monto: number
+          modo?: "fijo" | "a_repartir"
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          plantilla_id?: string
+          persona_nombre?: string
+          persona_id?: string | null
+          monto?: number
+          modo?: "fijo" | "a_repartir"
+          created_at?: string
+        }
+        Relationships: []
+      }
       plantillas_recurrentes: {
         Row: {
           id: string
@@ -1197,6 +1230,13 @@ export interface Database {
           fecha_fin: string | null
           notas: string | null
           created_at: string
+          descripcion: string | null
+          observaciones: string | null
+          necesidad: number | null
+          cantidad: number
+          frecuencia: "Corriente" | "No corriente"
+          es_compartido: boolean
+          gc_mi_parte: number | null
           updated_at: string
         }
         Insert: {
@@ -1222,6 +1262,13 @@ export interface Database {
           fecha_fin?: string | null
           notas?: string | null
           created_at?: string
+          descripcion?: string | null
+          observaciones?: string | null
+          necesidad?: number | null
+          cantidad?: number
+          frecuencia?: "Corriente" | "No corriente"
+          es_compartido?: boolean
+          gc_mi_parte?: number | null
           updated_at?: string
         }
         Update: {
@@ -1247,6 +1294,13 @@ export interface Database {
           fecha_fin?: string | null
           notas?: string | null
           created_at?: string
+          descripcion?: string | null
+          observaciones?: string | null
+          necesidad?: number | null
+          cantidad?: number
+          frecuencia?: "Corriente" | "No corriente"
+          es_compartido?: boolean
+          gc_mi_parte?: number | null
           updated_at?: string
         }
       }
@@ -1362,6 +1416,7 @@ export type GastoCompartidoParticipante = Database["public"]["Tables"]["gastos_c
 export type Prestamo = Database["public"]["Tables"]["prestamos"]["Row"]
 export type PrestamoPago = Database["public"]["Tables"]["prestamos_pagos"]["Row"]
 export type GastoGrupalPagador = Database["public"]["Tables"]["gastos_grupales_pagadores"]["Row"]
+export type PlantillaParticipante = Database["public"]["Tables"]["plantilla_participantes"]["Row"];
 export type PlantillaRecurrente = Database["public"]["Tables"]["plantillas_recurrentes"]["Row"]
 export type AlertaSilenciada = Database["public"]["Tables"]["alertas_silenciadas"]["Row"]
 export type Conexion = Database["public"]["Tables"]["conexiones"]["Row"]

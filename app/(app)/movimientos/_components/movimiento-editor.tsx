@@ -773,10 +773,15 @@ export function MovimientoEditor({ open, onClose, onSaved, editing, duplicando, 
         // ── Crear plantilla y vincular ─────────────────────
         if (hacerRecurrente) {
           try {
-            const montoPlantilla = esCompartido && gcMiParte && gcMiParte > 0 ? gcMiParte : values.monto;
+            // La plantilla guarda el MISMO gasto, no una versión recortada.
+            // Antes guardaba `gcMiParte` como monto_estimado y nada más, así que
+            // el mes siguiente generaba un gasto entero NO compartido: se perdía
+            // el total real y la deuda de los demás. Ahora el total va en
+            // monto_estimado, tu parte en gc_mi_parte y el reparto en
+            // plantilla_participantes, igual que en el movimiento (migración 035).
             const plantilla = await createPlantilla({
               nombre:         values.nombre_plantilla!,
-              monto_estimado: montoPlantilla,
+              monto_estimado: values.monto,
               moneda:         values.moneda,
               dia_mes:        values.dia_mes_recurrente!,
               tipo:           values.tipo as "Egreso" | "Ingreso",
@@ -787,6 +792,18 @@ export function MovimientoEditor({ open, onClose, onSaved, editing, duplicando, 
               categoria_id:   payload.categoria_id ?? null,
               concepto:       payload.concepto ?? null,
               clasificacion:  values.clasificacion as PlantillaRecurrente["clasificacion"],
+              // Campos que la plantilla no guardaba y hacían que el movimiento
+              // generado no fuera el mismo gasto.
+              // El editor no expone ámbito; el movimiento cae al default de la base.
+              ambito:         "Personal",
+              descripcion:    payload.descripcion ?? null,
+              observaciones:  payload.observaciones ?? null,
+              necesidad:      payload.necesidad ?? null,
+              cantidad:       payload.cantidad ?? 1,
+              frecuencia:     values.frecuencia as "Corriente" | "No corriente",
+              es_compartido:  compartir,
+              gc_mi_parte:    compartir ? gcMiParte : null,
+              participantes:  compartir ? participantesInput : undefined,
             });
             await updateMovimiento(nuevoId, { plantilla_recurrente_id: plantilla.id });
           } catch (plantillaErr) {
