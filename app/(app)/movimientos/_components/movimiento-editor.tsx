@@ -704,9 +704,15 @@ export function MovimientoEditor({ open, onClose, onSaved, editing, duplicando, 
 
       const payload: MovimientoInput = {
         ...values,
-        // Si viene de una plantilla, el vínculo tiene que quedar guardado o el
-        // modal de pendientes la va a seguir ofreciendo todo el mes.
-        plantilla_recurrente_id: plantillaOrigenId ?? null,
+        // Sólo se manda la clave cuando SE ESTÁ generando desde una plantilla.
+        //
+        // Estaba como `plantillaOrigenId ?? null`, y al editar un movimiento
+        // cualquiera `plantillaOrigenId` es undefined: eso escribía null y le
+        // borraba el vínculo con su plantilla. El movimiento quedaba huérfano y
+        // el modal volvía a ofrecer esa recurrente como pendiente.
+        // `updateMovimiento` filtra por clave presente, así que omitirla deja la
+        // columna intacta.
+        ...(plantillaOrigenId ? { plantilla_recurrente_id: plantillaOrigenId } : {}),
         monto_destino:     montoDestinoFinal,
         // En cross-moneda el TC se guarda siempre como ARS por USD.
         tipo_cambio:       crossMoneda
