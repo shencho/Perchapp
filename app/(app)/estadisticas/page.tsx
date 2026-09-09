@@ -4,14 +4,10 @@ import { idsAjusteInversion } from "@/lib/domain/finanzas";
 import { buildJerarquia, agruparPorCategoria, agruparPorDimension } from "@/lib/domain/categorias";
 import { EstadisticasClient } from "./_components/estadisticas-client";
 
+import { etiquetaNecesidad } from "@/lib/ui/necesidad";
+
 const MONEDAS = ["ARS", "USD"];
-const NECESIDAD_LABEL: Record<number, string> = {
-  1: "1 · Imprescindible",
-  2: "2 · Necesario",
-  3: "3 · Conveniente",
-  4: "4 · Prescindible",
-  5: "5 · Superfluo",
-};
+
 
 interface Props {
   searchParams: Promise<{ mes?: string }>;
@@ -71,7 +67,7 @@ export default async function EstadisticasPage({ searchParams }: Props) {
         necesidad: agruparPorDimension(delMes, {
           tipo, excluirCategorias: excluir,
           clave: (mv) => (mv.necesidad != null ? String(mv.necesidad) : null),
-          nombre: (id) => NECESIDAD_LABEL[Number(id)] ?? id,
+          nombre: (id) => etiquetaNecesidad(Number(id)),
           etiquetaVacia: "Sin necesidad",
         }),
       });

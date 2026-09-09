@@ -12,6 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { NamedSelect } from "@/components/ui/named-select";
 import { cn } from "@/lib/utils";
+import { NECESIDAD_LABELS } from "@/lib/ui/necesidad";
 import { createMovimiento, updateMovimiento } from "@/lib/supabase/actions/movimientos";
 import { createPlantilla, buscarPlantillaParecida } from "@/lib/supabase/actions/plantillas";
 import {
@@ -119,13 +120,7 @@ interface Props {
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-const NECESIDAD_LABELS: Record<number, string> = {
-  1: "Innecesario",
-  2: "Prescindible",
-  3: "Medio",
-  4: "Necesario",
-  5: "Esencial",
-};
+
 
 const NECESIDAD_COLORS: Record<number, string> = {
   1: "bg-danger border-danger/20 text-danger",
@@ -189,6 +184,14 @@ export function MovimientoEditor({ open, onClose, onSaved, editing, duplicando, 
   const [localCategorias, setLocalCategorias] = useState<Categoria[]>(categorias);
   const [padreId, setPadreId] = useState<string | null>(null);
   const [subcatId, setSubcatId] = useState<string | null>(null);
+  /**
+   * ¿El usuario tocó los selectores de categoría en esta apertura?
+   *
+   * Si edita el monto de un movimiento y no toca la categoría, guardar NO puede
+   * cambiársela. Sin esto, cualquier problema de resolución en el editor se
+   * traduce en una categoría perdida en silencio, que es lo que venía pasando.
+   */
+  const [categoriaTocada, setCategoriaTocada] = useState(false);
 
   // Tipo de cambio tipeado en una compra/venta de USD (ARS por USD).
   const [tcManual, setTcManual] = useState<number | null>(null);
@@ -307,6 +310,8 @@ export function MovimientoEditor({ open, onClose, onSaved, editing, duplicando, 
       reset(emptyForm());
     }
 
+    setCategoriaTocada(false);
+
     // Compra/venta USD: el TC tipeado no persiste entre aperturas.
     setTcManual(null);
 
@@ -419,10 +424,20 @@ export function MovimientoEditor({ open, onClose, onSaved, editing, duplicando, 
   const catsPadre = localCategorias.filter((c) => !c.parent_id && (
     tipo === "Transferencia" ? false : c.tipo === tipo || c.tipo === "Ambos"
   ));
-  // Subcategorías del padre seleccionado — usa padreId (estado local, no RHF)
-  const catsHijas = padreId
-    ? localCategorias.filter((c) => c.parent_id === padreId)
-    : [];
+  // Subcategorías del padre seleccionado — usa padreId (estado local, no RHF).
+  //
+  // Se incluye SIEMPRE la que está seleccionada, aunque el catálogo no la traiga
+  // (por ejemplo si quedó archivada). Si no, el select no la encuentra entre sus
+  // opciones, muestra el placeholder, y al guardar se pierde en silencio.
+  const catsHijas = (() => {
+    if (!padreId) return [];
+    const hijas = localCategorias.filter((c) => c.parent_id === padreId);
+    if (subcatId && !hijas.some((c) => c.id === subcatId)) {
+      const suelta = localCategorias.find((c) => c.id === subcatId);
+      if (suelta) return [...hijas, suelta];
+    }
+    return hijas;
+  })();
 
   /**
    * La subcategoría sólo vale si sigue colgando del padre elegido.
@@ -436,7 +451,14 @@ export function MovimientoEditor({ open, onClose, onSaved, editing, duplicando, 
    * Derivarlo en vez de reaccionar al cambio no puede tener esa carrera: si la
    * subcategoría pertenece al padre, se usa; si no, no.
    */
-  const subcatSel = subcatId && catsHijas.some((c) => c.id === subcatId) ? subcatId : null;
+  const subcatSel = (() => {
+    if (!subcatId) return null;
+    const sub = localCategorias.find((c) => c.id === subcatId);
+    // Válida si sigue colgando del padre elegido. Se chequea contra el catálogo
+    // completo y no contra `catsHijas`, que es una lista de opciones y puede
+    // estar recortada.
+    return sub && sub.parent_id === padreId ? subcatId : null;
+  })();
 
   // Visibilidad de tarjeta y fecha_vencimiento
   const esDebitoTarjeta = metodo === "Débito";
@@ -696,7 +718,11 @@ export function MovimientoEditor({ open, onClose, onSaved, editing, duplicando, 
           : (Number.isFinite(values.tipo_cambio) ? (values.tipo_cambio as number) : null),
         concepto:          values.concepto ?? null,
         descripcion:       values.descripcion ?? null,
-        categoria_id:      subcatSel ?? padreId ?? null,
+        // Si no se tocó la categoría al editar, se conserva la que ya tenía:
+        // editar el monto no puede cambiar la categorización.
+        categoria_id:      (!categoriaTocada && editing)
+          ? (editing.categoria_id ?? null)
+          : (subcatSel ?? padreId ?? null),
         necesidad:         showNecesidad ? (values.necesidad ?? null) : null,
         metodo:            values.metodo ?? null,
         cuenta_id:         showCuenta ? (values.cuenta_id ?? null) : null,
@@ -965,6 +991,7 @@ export function MovimientoEditor({ open, onClose, onSaved, editing, duplicando, 
                     options={catsPadre as CatOption[]}
                     value={padreId ?? ""}
                     onValueChange={(v) => {
+                      setCategoriaTocada(true);
                       setPadreId(v || null);
                       setSubcatId(null);
                     }}
@@ -998,7 +1025,7 @@ export function MovimientoEditor({ open, onClose, onSaved, editing, duplicando, 
                   <CreatableSelect
                     options={catsHijas as CatOption[]}
                     value={subcatSel ?? ""}
-                    onValueChange={(v) => setSubcatId(v || null)}
+                    onValueChange={(v) => { setCategoriaTocada(true); setSubcatId(v || null); }}
                     onCreated={(opt) => {
                       setLocalCategorias((prev) => [
                         ...prev,

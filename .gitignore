@@ -42,3 +42,6 @@ next-env.d.ts
 
 # Handoffs de diseño (no van al repo)
 *.zip
+
+# Demo local: fuentes de la demo grabada, no forman parte de la app.
+demo/
