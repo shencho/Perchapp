@@ -23,6 +23,8 @@ export interface MovimientoFinanzas {
   es_compartido?: boolean | null;
   gc_mi_parte?: number | null;
   es_reembolso?: boolean | null;
+  /** Sólo lo usa el desglose por concepto de `agruparPorCategoria`. */
+  concepto?: string | null;
 }
 
 export interface TotalesMoneda {

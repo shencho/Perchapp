@@ -152,6 +152,16 @@ function SeccionCategorias({
   vacio: string;
 }) {
   const [abierta, setAbierta] = useState<string | null>(null);
+  // Tercer nivel: los conceptos de una subcategoría. Se permite más de una
+  // abierta porque comparar dos clientes es justamente el caso de uso.
+  const [subsAbiertas, setSubsAbiertas] = useState<Set<string>>(new Set());
+  function toggleSub(id: string) {
+    setSubsAbiertas((prev) => {
+      const n = new Set(prev);
+      if (n.has(id)) n.delete(id); else n.add(id);
+      return n;
+    });
+  }
 
   if (resumen.filas.length === 0) {
     return (
@@ -230,15 +240,56 @@ function SeccionCategorias({
 
               {abiertaEsta && (
                 <div className="bg-surface pb-1">
-                  {c.hijos.map((h) => (
-                    <div key={h.id} className="flex items-center gap-3 pl-11 pr-4 py-1.5">
-                      <span className="text-xs text-muted-foreground min-w-0 truncate flex-1">{h.nombre}</span>
-                      <span className="text-[11px] text-muted-foreground tabular-nums shrink-0">{h.porcentaje}%</span>
-                      <span className="text-xs tabular-nums font-mono shrink-0 w-28 text-right">
-                        {fmt(h.monto, moneda)}
-                      </span>
-                    </div>
-                  ))}
+                  {c.hijos.map((h) => {
+                    // Sólo vale desplegar si hay más de un concepto: con uno
+                    // solo el detalle repite la fila de arriba.
+                    const conceptos = h.conceptos ?? [];
+                    const puedeAbrir = conceptos.length > 1;
+                    const subAbierta = subsAbiertas.has(h.id);
+                    return (
+                      <div key={h.id}>
+                        <button
+                          type="button"
+                          disabled={!puedeAbrir}
+                          onClick={() => toggleSub(h.id)}
+                          className={cn(
+                            "w-full flex items-center gap-3 pl-11 pr-4 py-1.5 text-left transition-colors",
+                            puedeAbrir && "hover:bg-surface-2",
+                          )}
+                        >
+                          {puedeAbrir ? (
+                            <ChevronDown
+                              className={cn(
+                                "h-3 w-3 shrink-0 text-muted-foreground transition-transform duration-150 -ml-5",
+                                !subAbierta && "-rotate-90",
+                              )}
+                            />
+                          ) : (
+                            <span className="w-3 shrink-0 -ml-5" />
+                          )}
+                          <span className="text-xs text-muted-foreground min-w-0 truncate flex-1">{h.nombre}</span>
+                          <span className="text-[11px] text-muted-foreground tabular-nums shrink-0">{h.porcentaje}%</span>
+                          <span className="text-xs tabular-nums font-mono shrink-0 w-28 text-right">
+                            {fmt(h.monto, moneda)}
+                          </span>
+                        </button>
+
+                        {subAbierta && conceptos.map((cn2) => (
+                          <div key={cn2.nombre} className="flex items-center gap-3 pl-[4.5rem] pr-4 py-1">
+                            <span className="text-[11px] text-muted-foreground/80 min-w-0 truncate flex-1">
+                              {cn2.nombre}
+                            </span>
+                            <span className="text-[10px] text-muted-foreground/70 tabular-nums shrink-0">
+                              {cn2.porcentaje}%
+                            </span>
+                            <span className="text-[11px] tabular-nums font-mono shrink-0 w-28 text-right text-muted-foreground">
+                              {fmt(cn2.monto, moneda)}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    );
+                  })}
                 </div>
               )}
             </div>

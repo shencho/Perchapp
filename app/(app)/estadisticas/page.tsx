@@ -27,7 +27,8 @@ export default async function EstadisticasPage({ searchParams }: Props) {
 
   const [{ data: movRaw }, { data: categoriasRaw }, { data: cuentasRaw }] = await Promise.all([
     supabase.from("movimientos")
-      .select("tipo, monto, moneda, categoria_id, metodo, cuenta_id, necesidad, es_compartido, gc_mi_parte, es_reembolso")
+      // `concepto` alimenta el tercer nivel del corte por categoría.
+      .select("tipo, monto, moneda, categoria_id, metodo, cuenta_id, necesidad, es_compartido, gc_mi_parte, es_reembolso, concepto")
       .eq("user_id", user.id)
       .neq("tipo", "Transferencia")
       .gte("fecha", inicio).lte("fecha", fin),

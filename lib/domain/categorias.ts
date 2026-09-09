@@ -28,6 +28,8 @@ export const SIN_CATEGORIA = "__sin__";
 export const DIRECTO_EN_PADRE = "__directo__";
 /** Sin medio de pago / sin cuenta / sin necesidad cargada. */
 export const SIN_ESPECIFICAR = "__na__";
+/** Movimiento sin concepto cargado. */
+export const SIN_CONCEPTO = "__sinconcepto__";
 
 export function buildJerarquia(categorias: CategoriaBase[]): Jerarquia {
   const parentDe = new Map(categorias.map((c) => [c.id, c.parent_id]));
@@ -86,12 +88,26 @@ export function buildJerarquia(categorias: CategoriaBase[]): Jerarquia {
   };
 }
 
+/** Tercer nivel: los conceptos dentro de una subcategoría. */
+export interface FilaConcepto {
+  nombre: string;
+  monto: number;
+  porcentaje: number;
+}
+
 export interface FilaCategoria {
   id: string;
   nombre: string;
   monto: number;
   porcentaje: number;
-  hijos: { id: string; nombre: string; monto: number; porcentaje: number }[];
+  hijos: {
+    id: string;
+    nombre: string;
+    monto: number;
+    porcentaje: number;
+    /** Desglose por concepto. Vacío si la dimensión no los tiene. */
+    conceptos: FilaConcepto[];
+  }[];
 }
 
 export interface ResumenCategorias {
@@ -111,8 +127,11 @@ export function agruparPorCategoria(
   const { tipo, excluirCategorias = [] } = opts;
   const { padreDe, nombreDe } = jerarquia;
 
-  // padreId → { monto, hijos: hijoId → monto }
-  const acc = new Map<string, { monto: number; hijos: Map<string, number> }>();
+  // padreId → { monto, hijos: hijoId → { monto, conceptos: nombre → monto } }
+  const acc = new Map<string, {
+    monto: number;
+    hijos: Map<string, { monto: number; conceptos: Map<string, number> }>;
+  }>();
   let total = 0;
 
   for (const m of movimientos) {
@@ -125,13 +144,19 @@ export function agruparPorCategoria(
     const propia = m.categoria_id ?? SIN_CATEGORIA;
     const padre = m.categoria_id ? (padreDe.get(m.categoria_id) ?? m.categoria_id) : SIN_CATEGORIA;
 
-    const entry = acc.get(padre) ?? { monto: 0, hijos: new Map<string, number>() };
+    const entry = acc.get(padre) ?? { monto: 0, hijos: new Map<string, { monto: number; conceptos: Map<string, number> }>() };
     entry.monto += monto;
     // Un movimiento cargado DIRECTO en la categoría padre también necesita su
     // fila: sin esto sumaba al total pero no aparecía entre los hijos, y los
     // porcentajes de las subcategorías nunca llegaban al 100%.
     const claveHijo = propia !== padre ? propia : DIRECTO_EN_PADRE;
-    entry.hijos.set(claveHijo, (entry.hijos.get(claveHijo) ?? 0) + monto);
+    const hijo = entry.hijos.get(claveHijo) ?? { monto: 0, conceptos: new Map<string, number>() };
+    hijo.monto += monto;
+    // Tercer nivel. El concepto es texto libre, así que se agrupa por su valor
+    // ya recortado: sin esto, "Corifersa " y "Corifersa" serían dos filas.
+    const concepto = (m.concepto ?? "").trim() || SIN_CONCEPTO;
+    hijo.conceptos.set(concepto, (hijo.conceptos.get(concepto) ?? 0) + monto);
+    entry.hijos.set(claveHijo, hijo);
     acc.set(padre, entry);
   }
 
@@ -144,11 +169,18 @@ export function agruparPorCategoria(
       monto,
       porcentaje: pct(monto, total),
       hijos: [...hijos.entries()]
-        .map(([hid, hmonto]) => ({
+        .map(([hid, h]) => ({
           id: hid,
           nombre: hid === DIRECTO_EN_PADRE ? "Sin subcategoría" : (nombreDe.get(hid) ?? "Sin categoría"),
-          monto: hmonto,
-          porcentaje: pct(hmonto, monto),
+          monto: h.monto,
+          porcentaje: pct(h.monto, monto),
+          conceptos: [...h.conceptos.entries()]
+            .map(([nombre, cmonto]) => ({
+              nombre: nombre === SIN_CONCEPTO ? "Sin concepto" : nombre,
+              monto: cmonto,
+              porcentaje: pct(cmonto, h.monto),
+            }))
+            .sort((a, b) => b.monto - a.monto),
         }))
         .sort((a, b) => b.monto - a.monto)
         // Si lo único que hay es el "directo en el padre", desplegar no aporta.
