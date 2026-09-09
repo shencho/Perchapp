@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { AlertTriangle } from "lucide-react";
+import { AlertTriangle, Pencil } from "lucide-react";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog";
@@ -17,6 +17,12 @@ interface Props {
   onClose: () => void;
   plantillasPendientes: PlantillaConEstado[];
   initialSelectedId?: string;
+  /**
+   * Abrir el editor completo para esta plantilla, en vez de generarla acá.
+   * El modal se cierra: el editor NO es un Dialog (es un `fixed inset-0`
+   * propio), así que apilarlos deja dos overlays peleándose el foco y el Escape.
+   */
+  onEditarEnDetalle?: (p: PlantillaConEstado, monto: number) => void;
 }
 
 function fmtFecha(iso: string) {
@@ -26,7 +32,7 @@ function fmtFecha(iso: string) {
 }
 
 export function GenerarPendientesModal({
-  open, onClose, plantillasPendientes, initialSelectedId,
+  open, onClose, plantillasPendientes, initialSelectedId, onEditarEnDetalle,
 }: Props) {
   const router = useRouter();
   const [montos, setMontos]           = useState<Record<string, number>>({});
@@ -159,6 +165,18 @@ export function GenerarPendientesModal({
                     </span>
                   </label>
                   <div className="flex gap-2">
+                    {onEditarEnDetalle && (
+                      <Button
+                        type="button" variant="outline" size="sm" className="h-9 px-2 shrink-0"
+                        onClick={() => onEditarEnDetalle(
+                          plantillasPendientes.find((x) => x.plantilla.id === p.id)!,
+                          montos[p.id] ?? p.monto_estimado,
+                        )}
+                        title="Editar en detalle"
+                      >
+                        <Pencil className="h-3.5 w-3.5" />
+                      </Button>
+                    )}
                     <Input
                       type="number" min={0} step="0.01"
                       value={montos[p.id] ?? p.monto_estimado}
@@ -195,6 +213,7 @@ export function GenerarPendientesModal({
                   <th className="py-2 pr-3 text-center w-16">Día</th>
                   <th className="py-2 pr-3 text-right w-28">Monto</th>
                   <th className="py-2 text-left">Descripción</th>
+                  <th className="py-2 w-8"></th>
                 </tr>
               </thead>
               <tbody>
@@ -260,6 +279,20 @@ export function GenerarPendientesModal({
                         className="h-8"
                         disabled={!checked[p.id]}
                       />
+                    </td>
+                    <td className="py-2.5 pl-1">
+                      {onEditarEnDetalle && (
+                        <Button
+                          type="button" variant="ghost" size="icon-sm"
+                          onClick={() => onEditarEnDetalle(
+                            plantillasPendientes.find((x) => x.plantilla.id === p.id)!,
+                            montos[p.id] ?? p.monto_estimado,
+                          )}
+                          title="Editar en detalle antes de generar"
+                        >
+                          <Pencil className="h-3.5 w-3.5" />
+                        </Button>
+                      )}
                     </td>
                   </tr>
                 ))}

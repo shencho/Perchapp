@@ -106,6 +106,12 @@ interface Props {
   tarjetas: Tarjeta[];
   categorias: Categoria[];
   defaultValues?: Partial<FormData>;
+  /**
+   * Se está generando el movimiento de esta plantilla recurrente, editándolo
+   * antes de confirmar. Se guarda en el movimiento para que la plantilla quede
+   * marcada como generada este mes; si no, el modal la seguiría ofreciendo.
+   */
+  plantillaOrigenId?: string | null;
   suggestCategoria?: string;
   personas?: Persona[];
   grupos?: GrupoConMiembros[];
@@ -176,7 +182,7 @@ function emptyForm(): DefaultValues<FormData> {
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
-export function MovimientoEditor({ open, onClose, onSaved, editing, duplicando, cuentas, tarjetas, categorias, defaultValues, suggestCategoria, personas = [], grupos = [] }: Props) {
+export function MovimientoEditor({ open, onClose, onSaved, editing, duplicando, cuentas, tarjetas, categorias, defaultValues, plantillaOrigenId, suggestCategoria, personas = [], grupos = [] }: Props) {
   const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -676,6 +682,9 @@ export function MovimientoEditor({ open, onClose, onSaved, editing, duplicando, 
 
       const payload: MovimientoInput = {
         ...values,
+        // Si viene de una plantilla, el vínculo tiene que quedar guardado o el
+        // modal de pendientes la va a seguir ofreciendo todo el mes.
+        plantilla_recurrente_id: plantillaOrigenId ?? null,
         monto_destino:     montoDestinoFinal,
         // En cross-moneda el TC se guarda siempre como ARS por USD.
         tipo_cambio:       crossMoneda

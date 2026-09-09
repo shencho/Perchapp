@@ -437,6 +437,11 @@ export function MovimientosClient({ movimientos, total, totales = {}, pagina = 0
   // Detalle de solo lectura. Es estado propio y NO reusa `expandedId`, que es
   // del panel de gasto compartido y sólo existe en las filas compartidas.
   const [detalle, setDetalle] = useState<MovimientoConRelaciones | null>(null);
+  // Plantilla que se está generando con el editor completo abierto.
+  const [plantillaEnEdicion, setPlantillaEnEdicion] = useState<{
+    id: string;
+    valores: Record<string, unknown>;
+  } | null>(null);
 
   // Búsqueda: estado local para tipear, con debounce → searchParam `q` (server-side).
   const [busqueda, setBusqueda] = useState(busquedaInicial);
@@ -1174,9 +1179,11 @@ export function MovimientosClient({ movimientos, total, totales = {}, pagina = 0
       {/* Editor modal */}
       <MovimientoEditor
         open={editorOpen}
-        onClose={() => setEditorOpen(false)}
+        onClose={() => { setEditorOpen(false); setPlantillaEnEdicion(null); }}
         editing={editing}
         duplicando={duplicando}
+        defaultValues={plantillaEnEdicion?.valores as never}
+        plantillaOrigenId={plantillaEnEdicion?.id ?? null}
         cuentas={cuentasActivas}
         tarjetas={tarjetasActivas}
         categorias={categoriasActivas}
@@ -1195,6 +1202,36 @@ export function MovimientosClient({ movimientos, total, totales = {}, pagina = 0
 
       {/* Modal plantillas pendientes */}
       <GenerarPendientesModal
+        onEditarEnDetalle={(p, monto) => {
+          // Cerrar la tanda antes de abrir el editor: el editor no es un Dialog
+          // y apilarlos deja dos overlays peleándose el foco y el Escape.
+          setGenerarOpen(false);
+          const pl = p.plantilla;
+          setPlantillaEnEdicion({
+            id: pl.id,
+            valores: {
+              tipo:          pl.tipo ?? "Egreso",
+              moneda:        pl.moneda,
+              monto,
+              fecha:         p.fechaEsperada,
+              concepto:      pl.concepto ?? pl.nombre,
+              descripcion:   pl.descripcion ?? null,
+              observaciones: pl.observaciones ?? null,
+              categoria_id:  pl.categoria_id ?? null,
+              clasificacion: pl.clasificacion ?? "Fijo",
+              frecuencia:    pl.frecuencia ?? "Corriente",
+              necesidad:     pl.necesidad ?? null,
+              cantidad:      pl.cantidad ?? 1,
+              metodo:        pl.metodo ?? null,
+              debita_de:     pl.debita_de ?? null,
+              cuenta_id:     pl.cuenta_id ?? null,
+              tarjeta_id:    pl.tarjeta_id ?? null,
+            },
+          });
+          setEditing(null);
+          setDuplicando(null);
+          setEditorOpen(true);
+        }}
         open={generarOpen}
         onClose={() => setGenerarOpen(false)}
         plantillasPendientes={plantillasPendientes}
