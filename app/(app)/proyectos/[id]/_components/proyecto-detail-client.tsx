@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
   ArrowLeft, Plus, Trash2, ArrowRight, Check, UserPlus, X,
+  Pencil,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -14,7 +15,7 @@ import { FormDialog } from "@/components/shared/form-dialog";
 import { DeleteConfirm } from "@/components/shared/delete-confirm";
 import { cn } from "@/lib/utils";
 import {
-  addProyectoGasto, deleteProyectoGasto, saldarProyecto, addMiembro, removeMiembro,
+  addProyectoGasto, updateProyectoGasto, deleteProyectoGasto, saldarProyecto, addMiembro, removeMiembro,
 } from "@/lib/supabase/actions/proyectos";
 import type { ProyectoDetalle } from "@/lib/supabase/actions/proyectos-types";
 import type { Persona } from "@/types/supabase";
@@ -48,11 +49,40 @@ export function ProyectoDetailClient({ detalle, personasConectadas }: Props) {
   const [moneda, setMoneda] = useState(proyecto.moneda_default);
   const [pagadorId, setPagadorId] = useState<string>(miMiembroId ?? miembros[0]?.id ?? "");
   const [entre, setEntre] = useState<Set<string>>(new Set(miembros.map((m) => m.id)));
+  const [editandoId, setEditandoId] = useState<string | null>(null);
+  /**
+   * Monto fijado a mano por miembro. Los que no están acá se reparten el resto,
+   * igual que en gastos compartidos: ahí "fijo" es un monto puesto a dedo y
+   * "a_repartir" es el que absorbe la diferencia.
+   */
+  const [fijos, setFijos] = useState<Record<string, string>>({});
+
+  // Un proyecto ya saldado no se puede editar: las deudas materializadas
+  // apuntarían a un balance que cambió y la otra persona no se enteraría.
+  const yaSaldado = detalle.yaSaldado;
 
   function openGasto() {
+    setEditandoId(null);
     setConcepto(""); setMonto(""); setFecha(today()); setMoneda(proyecto.moneda_default);
     setPagadorId(miMiembroId ?? miembros[0]?.id ?? "");
     setEntre(new Set(miembros.map((m) => m.id)));
+    setFijos({});
+    setError(null); setShowGasto(true);
+  }
+
+  function openEditarGasto(g: typeof gastos[number]) {
+    setEditandoId(g.id);
+    setConcepto(g.concepto ?? "");
+    setMonto(String(g.monto_total));
+    setFecha(g.fecha);
+    setMoneda(g.moneda);
+    setPagadorId(g.pagadores[0]?.miembro_id ?? miMiembroId ?? "");
+    setEntre(new Set(g.splits.map((sp) => sp.miembro_id)));
+    // Se recuperan los montos puestos a dedo; los "a_repartir" vuelven a
+    // calcularse solos para que sigan cerrando si cambia el total.
+    setFijos(Object.fromEntries(
+      g.splits.filter((sp) => sp.modo === "fijo").map((sp) => [sp.miembro_id, String(sp.monto_consumido)]),
+    ));
     setError(null); setShowGasto(true);
   }
   function toggleEntre(id: string) {
@@ -70,16 +100,42 @@ export function ProyectoDetailClient({ detalle, personasConectadas }: Props) {
     if (!pagadorId) { setError("Elegí quién pagó"); return; }
     const ids = Array.from(entre);
     if (ids.length === 0) { setError("Elegí entre quiénes se divide"); return; }
+    // Reparto igual que en gastos compartidos: lo puesto a dedo es fijo, y el
+    // resto se divide entre los demás seleccionados.
+    const conFijo = ids.filter((id) => {
+      const v = parseFloat(fijos[id] ?? "");
+      return Number.isFinite(v) && v > 0;
+    });
+    const aRepartir = ids.filter((id) => !conFijo.includes(id));
+    const sumaFijos = r2(conFijo.reduce((acc, id) => acc + parseFloat(fijos[id]!), 0));
+
+    if (sumaFijos > total + 0.01) {
+      setError(`Los montos fijos suman ${fmt(sumaFijos, moneda)}, más que el total.`);
+      return;
+    }
+    if (aRepartir.length === 0 && Math.abs(sumaFijos - total) > 0.01) {
+      setError(`Los montos fijos suman ${fmt(sumaFijos, moneda)} y el total es ${fmt(total, moneda)}. No cierra.`);
+      return;
+    }
+
     setBusy(true); setError(null);
     try {
-      const base = r2(total / ids.length);
-      const splits = ids.map((miembroId, i) => ({
-        miembroId,
-        // el primero absorbe el redondeo para cerrar exacto
-        montoConsumido: i === 0 ? r2(total - base * (ids.length - 1)) : base,
-        modo: "a_repartir" as const,
-      }));
-      await addProyectoGasto({
+      const resto = r2(total - sumaFijos);
+      const base = aRepartir.length ? r2(resto / aRepartir.length) : 0;
+      const splits = [
+        ...conFijo.map((miembroId) => ({
+          miembroId,
+          montoConsumido: r2(parseFloat(fijos[miembroId]!)),
+          modo: "fijo" as const,
+        })),
+        // El primero de los que reparten absorbe el redondeo para cerrar exacto.
+        ...aRepartir.map((miembroId, i) => ({
+          miembroId,
+          montoConsumido: i === 0 ? r2(resto - base * (aRepartir.length - 1)) : base,
+          modo: "a_repartir" as const,
+        })),
+      ];
+      const payload = {
         proyectoId: proyecto.id,
         concepto: concepto.trim() || null,
         montoTotal: total,
@@ -87,7 +143,9 @@ export function ProyectoDetailClient({ detalle, personasConectadas }: Props) {
         fecha,
         pagadores: [{ miembroId: pagadorId, montoPagado: total }],
         splits,
-      });
+      };
+      if (editandoId) await updateProyectoGasto(editandoId, payload);
+      else await addProyectoGasto(payload);
       setShowGasto(false);
       router.refresh();
     } catch (err) {
@@ -215,6 +273,14 @@ export function ProyectoDetailClient({ detalle, personasConectadas }: Props) {
       {/* Gastos */}
       <div className="flex flex-col gap-2">
         <h2 className="text-sm font-semibold">Gastos</h2>
+        {yaSaldado && (
+          <p className="text-xs text-warning bg-warning/10 border border-warning/20 rounded-[var(--radius-card)] px-3 py-2 mb-2">
+            Este proyecto ya se saldó. Los gastos quedan congelados: las deudas
+            generadas ya las vio (y quizá pagó) la otra persona, así que cambiar
+            un monto ahora las dejaría apuntando a un balance que no existe.
+            Para corregir algo, primero revertí las deudas.
+          </p>
+        )}
         {gastos.length === 0 ? (
           <p className="text-sm text-muted-foreground py-6 text-center border border-dashed border-border rounded-lg">
             Todavía no hay gastos. Cargá el primero.
@@ -223,7 +289,9 @@ export function ProyectoDetailClient({ detalle, personasConectadas }: Props) {
           <div className="flex flex-col divide-y divide-border rounded-lg border border-border">
             {gastos.map((g) => {
               const pagador = g.pagadores[0] ? nombreMiembro(g.pagadores[0].miembro_id) : "—";
-              const puedoBorrar = g.creado_por === detalle.miUsuarioId;
+              // La RLS sólo deja editar y borrar a quien cargó el gasto.
+              const puedoEditar = g.creado_por === detalle.miUsuarioId && !yaSaldado;
+              const puedoBorrar = puedoEditar;
               return (
                 <div key={g.id} className="flex items-center justify-between gap-3 px-4 py-3">
                   <div className="min-w-0">
@@ -234,6 +302,16 @@ export function ProyectoDetailClient({ detalle, personasConectadas }: Props) {
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
                     <span className="text-sm tabular-nums font-mono font-medium">{fmt(g.monto_total, g.moneda)}</span>
+                    {puedoEditar && (
+                      <Button
+                        size="icon-sm" variant="ghost"
+                        onClick={() => openEditarGasto(g)}
+                        title="Editar"
+                        className="text-muted-foreground hover:text-foreground"
+                      >
+                        <Pencil className="h-3.5 w-3.5" />
+                      </Button>
+                    )}
                     {puedoBorrar && (
                       <Button
                         size="icon-sm" variant="ghost"
@@ -280,7 +358,7 @@ export function ProyectoDetailClient({ detalle, personasConectadas }: Props) {
       <FormDialog
         open={showGasto}
         onOpenChange={setShowGasto}
-        title="Cargar gasto"
+        title={editandoId ? "Editar gasto" : "Cargar gasto"}
         onSubmit={handleAddGasto}
         isSubmitting={busy}
         submitLabel="Guardar"
@@ -318,23 +396,46 @@ export function ProyectoDetailClient({ detalle, personasConectadas }: Props) {
           <div className="border border-border rounded-lg overflow-hidden">
             {miembros.map((m) => {
               const checked = entre.has(m.id);
+              const fijo = fijos[m.id] ?? "";
               return (
-                <button
-                  key={m.id} type="button" onClick={() => toggleEntre(m.id)}
-                  className="flex items-center gap-3 w-full px-3 py-2 border-b border-border last:border-b-0 text-sm hover:bg-surface/60 text-left"
+                <div
+                  key={m.id}
+                  className="flex items-center gap-2 w-full px-3 py-2 border-b border-border last:border-b-0 text-sm"
                 >
-                  <span className={cn(
-                    "flex h-4 w-4 items-center justify-center rounded border shrink-0 text-[10px]",
-                    checked ? "bg-primary border-primary text-primary-foreground" : "border-border",
-                  )}>
-                    {checked && "✓"}
-                  </span>
-                  {m.nombre}
-                </button>
+                  <button
+                    type="button" onClick={() => toggleEntre(m.id)}
+                    className="flex items-center gap-3 flex-1 min-w-0 text-left hover:opacity-80"
+                  >
+                    <span className={cn(
+                      "flex h-4 w-4 items-center justify-center rounded border shrink-0 text-[10px]",
+                      checked ? "bg-primary border-primary text-primary-foreground" : "border-border",
+                    )}>
+                      {checked && "✓"}
+                    </span>
+                    <span className="truncate">{m.nombre}</span>
+                  </button>
+                  {/* Dejar el monto vacío = se reparte el resto. Es el mismo
+                      criterio de gastos compartidos: lo que ponés a dedo es
+                      fijo, lo que dejás en blanco absorbe la diferencia. */}
+                  <Input
+                    type="number" inputMode="decimal" placeholder="resto"
+                    value={fijo}
+                    disabled={!checked}
+                    onChange={(e) => setFijos((prev) => {
+                      const n = { ...prev };
+                      if (e.target.value === "") delete n[m.id];
+                      else n[m.id] = e.target.value;
+                      return n;
+                    })}
+                    className="w-24 h-8 text-right tabular-nums font-mono"
+                  />
+                </div>
               );
             })}
           </div>
-          <p className="text-xs text-muted-foreground">Se divide en partes iguales entre los seleccionados.</p>
+          <p className="text-xs text-muted-foreground">
+            Dejá el monto en blanco para que esa persona se reparta el resto en partes iguales.
+          </p>
         </div>
         {error && <p className="text-xs text-destructive">{error}</p>}
       </FormDialog>

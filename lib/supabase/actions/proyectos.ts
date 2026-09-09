@@ -96,13 +96,19 @@ export async function getProyecto(id: string): Promise<ProyectoDetalle | null> {
     .single();
   if (error || !proyecto) return null;
 
-  const [{ data: miembros }, { data: gastosRaw }] = await Promise.all([
+  const [{ data: miembros }, { data: gastosRaw }, { data: deudasVivas }] = await Promise.all([
     supabase.from("proyecto_miembros").select("*").eq("proyecto_id", id).order("created_at"),
     supabase
       .from("proyecto_gastos")
       .select("*, proyecto_gasto_pagadores(miembro_id, monto_pagado), proyecto_gasto_splits(miembro_id, monto_consumido, modo)")
       .eq("proyecto_id", id)
       .order("fecha", { ascending: false }),
+    // Si ya se saldó, editar o borrar un gasto dejaría las deudas generadas
+    // apuntando a un balance que cambió, sin que la otra persona se entere.
+    supabase.from("deudas_compartidas").select("id")
+      .eq("proyecto_id", id)
+      .in("estado", ["pendiente", "pago_marcado", "confirmada"])
+      .limit(1),
   ]);
 
   const gastos: ProyectoGastoConDetalle[] = (gastosRaw ?? []).map((g) => {
@@ -128,6 +134,7 @@ export async function getProyecto(id: string): Promise<ProyectoDetalle | null> {
     esOwner: proyecto.created_by === userId,
     miUsuarioId: userId,
     miMiembroId: miMiembro?.id ?? null,
+    yaSaldado: (deudasVivas ?? []).length > 0,
   };
 }
 
@@ -329,8 +336,97 @@ export async function addProyectoGasto(input: GastoProyectoInput): Promise<{ id:
   return { id: gastoId };
 }
 
+/**
+ * Un proyecto ya saldado no se puede seguir editando.
+ *
+ * `saldarProyecto` materializa el balance como deudas bilaterales reales en
+ * `deudas_compartidas`, que la otra persona ya vio y quizá hasta pagó. Si
+ * después se edita un gasto, el balance cambia pero esas deudas siguen
+ * apuntando a montos que ya no existen, y no hay forma de que el otro usuario
+ * se entere.
+ */
+async function proyectoEstaSaldado(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  proyectoId: string,
+): Promise<boolean> {
+  const { data } = await supabase
+    .from("deudas_compartidas")
+    .select("id")
+    .eq("proyecto_id", proyectoId)
+    .in("estado", ["pendiente", "pago_marcado", "confirmada"])
+    .limit(1);
+  return (data ?? []).length > 0;
+}
+
+export async function updateProyectoGasto(
+  gastoId: string,
+  input: GastoProyectoInput,
+): Promise<void> {
+  const { supabase } = await getAuthed();
+
+  if (await proyectoEstaSaldado(supabase, input.proyectoId)) {
+    throw new Error(
+      "Este proyecto ya se saldó: hay deudas generadas que la otra persona puede haber pagado. " +
+      "Para corregirlo, primero revertí las deudas.",
+    );
+  }
+
+  const { error } = await supabase
+    .from("proyecto_gastos")
+    .update({
+      concepto: input.concepto,
+      monto_total: input.montoTotal,
+      moneda: input.moneda,
+      fecha: input.fecha,
+    })
+    .eq("id", gastoId);
+  if (error) throw new Error(error.message);
+
+  // Splits y pagadores se reemplazan en bloque: `getProyecto` no trae sus ids
+  // (:103 selecciona sólo miembro_id y monto), así que no hay PK para updatear
+  // fila por fila. Y una edición puede sacar o agregar personas, con lo cual el
+  // borrado completo es además lo correcto: si quedara una fila vieja, el
+  // balance —que sale de splits y pagadores, NO de monto_total— quedaría mal.
+  const [{ error: dp }, { error: ds }] = await Promise.all([
+    supabase.from("proyecto_gasto_pagadores").delete().eq("gasto_id", gastoId),
+    supabase.from("proyecto_gasto_splits").delete().eq("gasto_id", gastoId),
+  ]);
+  if (dp) throw new Error(dp.message);
+  if (ds) throw new Error(ds.message);
+
+  if (input.pagadores.length > 0) {
+    const { error: pErr } = await supabase.from("proyecto_gasto_pagadores").insert(
+      input.pagadores.map((p) => ({ gasto_id: gastoId, miembro_id: p.miembroId, monto_pagado: p.montoPagado })),
+    );
+    if (pErr) throw new Error(pErr.message);
+  }
+  if (input.splits.length > 0) {
+    const { error: sErr } = await supabase.from("proyecto_gasto_splits").insert(
+      input.splits.map((s) => ({
+        gasto_id: gastoId,
+        miembro_id: s.miembroId,
+        monto_consumido: s.montoConsumido,
+        modo: s.modo ?? "a_repartir",
+      })),
+    );
+    if (sErr) throw new Error(sErr.message);
+  }
+
+  revalidar(input.proyectoId);
+}
+
 export async function deleteProyectoGasto(gastoId: string, proyectoId: string): Promise<void> {
   const { supabase } = await getAuthed();
+
+  // Mismo criterio que editar: borrar un gasto después de saldar deja las
+  // deudas ya generadas apuntando a un balance que cambió.
+  if (await proyectoEstaSaldado(supabase, proyectoId)) {
+    throw new Error(
+      "Este proyecto ya se saldó: hay deudas generadas que la otra persona puede haber pagado. " +
+      "Para corregirlo, primero revertí las deudas.",
+    );
+  }
+
   const { error } = await supabase.from("proyecto_gastos").delete().eq("id", gastoId);
   if (error) throw new Error(error.message);
   revalidar(proyectoId);

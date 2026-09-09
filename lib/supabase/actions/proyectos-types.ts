@@ -26,6 +26,8 @@ export interface ProyectoDetalle {
   miUsuarioId: string;
   /** miembro_id que corresponde al usuario actual (si es miembro-usuario). */
   miMiembroId: string | null;
+  /** Ya se generaron deudas: el proyecto queda congelado. */
+  yaSaldado: boolean;
 }
 
 export interface MiembroInput {
